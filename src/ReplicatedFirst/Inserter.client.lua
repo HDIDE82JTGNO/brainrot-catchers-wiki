@@ -1,0 +1,1 @@
+script.Parent.Loading.Parent = game.Players.LocalPlayer.PlayerGui

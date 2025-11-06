@@ -1,0 +1,11 @@
+{
+  "ignoreUnknownInstances": false,
+  "properties": {
+    "ClassName": "Folder"
+  },
+  "children": {
+    "StatCalc": {
+      "className": "ModuleScript"
+    }
+  }
+}
