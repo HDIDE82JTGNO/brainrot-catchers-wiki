@@ -109,7 +109,7 @@ local ChunkList = {
 		ValidPrevious = {"Chunk3"}
 	},
 
-	--Chunk 4 and sub rooms
+	--Chunk 5 and sub rooms
 	["Chunk5"] = {
 		ProperName = "Asterden", -- Fredd's city
 		IsSubRoom = false,

@@ -474,35 +474,73 @@ function ChunkManager:PositionPlayerAtStartDoor()
 		return
 	end
 	
-	-- Calculate spawn position 8 studs behind the door trigger with 180 degree rotation
+	-- Calculate spawn position 10 studs behind the door trigger with 180 degree rotation (and slight Y lift)
 	local TriggerCFrame = Trigger.CFrame
-	local SpawnCFrame = (TriggerCFrame + TriggerCFrame.LookVector * -8) * CFrame.Angles(0, math.rad(180), 0)
+	local SpawnCFrame = (TriggerCFrame + TriggerCFrame.LookVector * -10 + Vector3.new(0, 0.5, 0)) * CFrame.Angles(0, math.rad(180), 0)
 	local SpawnPosition = SpawnCFrame.Position
 	
-	-- Get player character and position them
+	-- Get player character and position them (robust to Character spawn timing)
 	local Player = game.Players.LocalPlayer
-	local Character = Player.Character
-	if Character and Character:FindFirstChild("HumanoidRootPart") then
-		-- Set position and rotation (Y-axis only, no X rotation)
-		local LookDirection = SpawnCFrame.LookVector
-		local YRotation = math.atan2(-LookDirection.X, LookDirection.Z)
-		local FlatCFrame = CFrame.new(SpawnPosition) * CFrame.Angles(0, YRotation, 0)
-		Character.HumanoidRootPart.CFrame = FlatCFrame
-		DBG:print("Positioned player at", SpawnReason, "Position:", SpawnPosition, "YRotation:", math.deg(YRotation))
+	local function applyDoorSpawn()
+		local Character = Player.Character
+		local hrp = Character and Character:FindFirstChild("HumanoidRootPart")
+		if Character and hrp then
+			-- Set position and rotation (Y-axis only, no X rotation)
+			local LookDirection = SpawnCFrame.LookVector
+			local YRotation = math.atan2(-LookDirection.X, LookDirection.Z)
+			local targetCFrame = CFrame.new(SpawnPosition) * CFrame.Angles(0, YRotation, 0)
+			hrp.CFrame = targetCFrame
+			-- Clear any residual physics velocities that can cause fling/tumble on spawn
+			if hrp.AssemblyLinearVelocity then
+				hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+			end
+			if hrp.AssemblyAngularVelocity then
+				hrp.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+			end
+			-- Nudge humanoid out of ragdoll if applicable
+			local humanoid = Character:FindFirstChildOfClass("Humanoid")
+			if humanoid then
+				pcall(function()
+					humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+				end)
+			end
+			DBG:print("Positioned player at", SpawnReason, "Position:", SpawnPosition, "YRotation:", math.deg(YRotation))
+			return true
+		end
+		return false
+	end
+	
+	if applyDoorSpawn() then
+		-- Re-apply shortly after to overcome physics settling, if needed
+		task.defer(function()
+			if applyDoorSpawn() then
+				-- Re-zero velocities one more time to resist fling
+				local Character = Player.Character
+				local hrp = Character and Character:FindFirstChild("HumanoidRootPart")
+				if hrp and hrp:IsA("BasePart") then
+					hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+					hrp.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+				end
+			end
+		end)
 
 		-- Orient camera to face the door (180 degrees of player facing) on spawn
 		local cam = workspace.CurrentCamera
 		if cam then
 			local isCutscene = CutsceneRegistry:IsAnyActive()
 			if not isCutscene then
-				local hrpPos = Character.HumanoidRootPart.Position
-				local camPos = hrpPos + Vector3.new(0, 2.5, 0)
-				local doorAim = Trigger.Position + Vector3.new(0, (Trigger.Size and Trigger.Size.Y * 0.5) or 0, 0)
-				cam.CameraType = Enum.CameraType.Scriptable
-				cam.CFrame = CFrame.new(camPos, doorAim)
-				task.delay(0.15, function()
-					cam.CameraType = Enum.CameraType.Custom
-				end)
+				local ch = Player.Character
+				local h2 = ch and ch:FindFirstChild("HumanoidRootPart")
+				if h2 and h2:IsA("BasePart") then
+					local hrpPos = h2.Position
+					local camPos = hrpPos + Vector3.new(0, 2.5, 0)
+					local doorAim = Trigger.Position + Vector3.new(0, (Trigger.Size and Trigger.Size.Y * 0.5) or 0, 0)
+					cam.CameraType = Enum.CameraType.Scriptable
+					cam.CFrame = CFrame.new(camPos, doorAim)
+					task.delay(0.15, function()
+						cam.CameraType = Enum.CameraType.Custom
+					end)
+				end
 			end
 		end
 		
@@ -539,7 +577,16 @@ function ChunkManager:PositionPlayerAtStartDoor()
 			end
 		end)
 	else
-		DBG:warn("Player character not found for positioning")
+		DBG:warn("Player character not found for positioning - deferring until CharacterAdded")
+		Player.CharacterAdded:Once(function()
+			task.defer(function()
+				if not applyDoorSpawn() then
+					-- Final attempt after a brief delay
+					task.wait(0.1)
+					applyDoorSpawn()
+				end
+			end)
+		end)
 	end
 end
 
@@ -548,16 +595,18 @@ function ChunkManager:ClientRequestChunk(ChunkName)
 	local Call = Events.Request:InvokeServer({"RequestChunk",ChunkName})
 	local properName
 	if typeof(Call) == "table" then
+		-- Server may redirect the requested chunk (e.g., Title Continue, CatchCare recovery)
+		local serverChunkName = Call[1] or ChunkName
 		properName = Call[2]
-		local FoundChunk = PlayerGui:WaitForChild(ChunkName)
+		local FoundChunk = PlayerGui:WaitForChild(serverChunkName)
 		local ok, chunk = ChunkManager:Load(FoundChunk,false,true)
 		if ok then
 			-- Stash for post-transition location banner
 			ChunkManager._pendingShowLocation = true
-			ChunkManager._pendingLocationName = properName or ChunkName
+			ChunkManager._pendingLocationName = properName or serverChunkName
 			-- Also store on current chunk for reference
 			pcall(function()
-				ChunkManager.CurrentChunk.ProperName = properName or ChunkName
+				ChunkManager.CurrentChunk.ProperName = properName or serverChunkName
 			end)
 		end
 		return ok, chunk

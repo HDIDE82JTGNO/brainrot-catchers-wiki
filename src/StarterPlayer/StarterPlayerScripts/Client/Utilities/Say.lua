@@ -209,25 +209,40 @@ function Say:Say(talkerstr,allowproceed,tbl,talker,hearer)
 	
 	WasAbleToMove = CharacterFunctions:CheckCanMove()
 
-	--If we have the topbar showing
-	local UI = getUI()
-	if UI and UI.TopBar then
-		HadTopBarOpen = UI.TopBar:GetState()
-	else
-		HadTopBarOpen = false
-	end
+    --If we have the topbar showing
+    local UI = getUI()
+    if UI and UI.TopBar then
+        HadTopBarOpen = UI.TopBar:GetState()
+    else
+        HadTopBarOpen = false
+    end
+
+    -- Detect if Bag UI is currently open; if so, avoid closing TopBar/Bag
+    local isBagOpen = false
+    pcall(function()
+        local pg = game.Players.LocalPlayer.PlayerGui
+        local gameUi = pg and pg:FindFirstChild("GameUI")
+        local bag = gameUi and gameUi:FindFirstChild("Bag")
+        isBagOpen = (bag and bag.Visible == true) or false
+    end)
 	
-	-- Safety fix: Force close any open TopBar menus if NPC interaction somehow happens
-	if UI and UI.TopBar and UI.TopBar.IsMenuOpen and UI.TopBar:IsMenuOpen() then
-		UI.TopBar:Hide() -- Force close any open menus
-		HadTopBarOpen = false -- Don't try to restore TopBar since we forced it closed
-	end
+    -- Safety fix: Force close any open TopBar menus if NPC interaction somehow happens
+    if UI and UI.TopBar and UI.TopBar.IsMenuOpen and UI.TopBar:IsMenuOpen() then
+        if not isBagOpen then
+            UI.TopBar:Hide() -- Force close any open menus
+            HadTopBarOpen = false -- Don't try to restore TopBar since we forced it closed
+        end
+    end
 	
-	if HadTopBarOpen == true and UI and UI.TopBar then
-		UI.TopBar:Hide() -- if the topbar is active/open, hide it while talking
-	end
+    if HadTopBarOpen == true and UI and UI.TopBar then
+        if not isBagOpen then
+            UI.TopBar:Hide() -- if the topbar is active/open, hide it while talking
+        end
+    end
 	
-	CharacterFunctions:CanMove(false)
+    if not isBagOpen then
+        CharacterFunctions:CanMove(false)
+    end
 
 	-- If provided text list is blank (only empty/whitespace strings), do not show UI; just wait for proceed input
 	local function isBlankList(list)

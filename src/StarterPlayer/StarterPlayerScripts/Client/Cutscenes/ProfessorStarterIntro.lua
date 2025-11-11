@@ -868,7 +868,7 @@ return function(CurrentChunk: any, handle: any): boolean
 								end
 								
 								-- Position camera to the side at a good distance (2 studs further back like Kyro scene)
-								local cameraOffset = perpDir * 10 + Vector3.new(0, 2, 0)
+								local cameraOffset = -perpDir * 10 + Vector3.new(0, 2, 0)
 								local cameraPos = centerPos + cameraOffset
 								local cameraCFrame = CFrame.lookAt(cameraPos, centerPos)
 								
@@ -957,7 +957,7 @@ return function(CurrentChunk: any, handle: any): boolean
 									},chunkData.Model.NPCs.Mom)
 
 									Say:Say("", true, {
-						{ Text = nickname.." obtained 5 Capture Cubes!", Emotions = { Talker = "Smug", Hearer = "Happy" } },
+						{ Text = nickname.." obtained 500 Capture Cubes!", Emotions = { Talker = "Smug", Hearer = "Happy" } },
 									},chunkData.Model.NPCs.Mom)
 
 					-- Mark tutorial completion to trigger server-side item grant

@@ -175,11 +175,16 @@ end
 
 --[[
 	Generates a message for a move missing
-	@param actorName The name of the creature whose move missed
+	@param actorName The name of the creature whose move missed (optional, message may be pre-formatted)
 	@return Formatted message string
 ]]
-function BattleMessageGenerator.Miss(actorName: string): string
-	return string.format("%s's attack missed!", actorName)
+function BattleMessageGenerator.Miss(actorName: string?): string
+	-- If message is already formatted (from server), use it directly
+	if actorName and not string.find(actorName, "'s attack missed", 1, true) and not string.find(actorName, "avoided", 1, true) then
+		return string.format("%s's attack missed!", actorName)
+	end
+	-- Default message for when server provides pre-formatted message
+	return actorName or "The attack missed!"
 end
 
 --[[

@@ -12,6 +12,8 @@ local UIFunctions = require(script.Parent:WaitForChild("UIFunctions"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Creatures = require(Shared:WaitForChild("Creatures"))
+local SpeciesAbilities = require(Shared:WaitForChild("SpeciesAbilities"))
+local Items = require(Shared:WaitForChild("Items"))
 
 local UtilitiesFolder = script.Parent.Parent:WaitForChild("Utilities")
 local Say = require(UtilitiesFolder:WaitForChild("Say"))
@@ -268,7 +270,14 @@ local function setIconState(button, creature)
     local held = button:FindFirstChild("HeldItem")
     local heldShadow = button:FindFirstChild("HeldItemShadow")
     local hasHeld = creature.HeldItem ~= nil and creature.HeldItem ~= ""
-    if held and held:IsA("ImageLabel") then held.Visible = hasHeld end
+    if held and held:IsA("ImageLabel") then
+        held.Visible = hasHeld
+        if hasHeld and Items and Items[creature.HeldItem] then
+            local def = Items[creature.HeldItem]
+            local img = (def and def.Image) or "rbxassetid://0"
+            held.Image = img
+        end
+    end
     if heldShadow and heldShadow:IsA("ImageLabel") then heldShadow.Visible = hasHeld end
 end
 
@@ -618,6 +627,58 @@ function Vault:ShowSummary(creatureData)
     summary.Visible = true
     -- Delegate rendering to shared Summary UI
     SummaryUI:Render(summary, creatureData)
+
+    -- Ability UI wiring (Summary.AdditionalInfo.HA, Summary.Ability.AbilityText, Summary.Hidden.HiddenText)
+    local function getHiddenAbilityName(speciesName: string?): string?
+        if not speciesName then return nil end
+        local pool = SpeciesAbilities[speciesName]
+        if type(pool) ~= "table" then return nil end
+        local hiddenName: string? = nil
+        local minChance = math.huge
+        for _, entry in ipairs(pool) do
+            local ch = tonumber(entry.Chance) or 0
+            if ch <= 2 then
+                hiddenName = entry.Name
+                break
+            end
+            if ch < minChance then
+                minChance = ch
+                hiddenName = entry.Name
+            end
+        end
+        return hiddenName
+    end
+
+    do
+        local abilityName = tostring(creatureData.Ability or "")
+        local speciesName = creatureData.BaseName or creatureData.Name
+        local hiddenName = getHiddenAbilityName(speciesName)
+        local hasHidden = (abilityName ~= "" and hiddenName ~= nil and abilityName == hiddenName)
+
+        -- Ability text
+        local abilityFrame = summary:FindFirstChild("Ability")
+        if abilityFrame and abilityFrame:IsA("Frame") then
+            local abilityText = abilityFrame:FindFirstChild("AbilityText")
+            if abilityText and abilityText:IsA("TextLabel") then
+                abilityText.Text = abilityName ~= "" and abilityName or "—"
+            end
+        end
+
+        -- Hidden ability indicators
+        local additionalInfo = summary:FindFirstChild("AdditionalInfo")
+        local ha = additionalInfo and additionalInfo:FindFirstChild("HA")
+        if ha and ha:IsA("GuiObject") then
+            ha.Visible = hasHidden
+        end
+        local hiddenFrame = summary:FindFirstChild("Hidden")
+        if hiddenFrame and hiddenFrame:IsA("Frame") then
+            hiddenFrame.Visible = hasHidden
+            local hiddenText = hiddenFrame:FindFirstChild("HiddenText")
+            if hiddenText and hiddenText:IsA("TextLabel") then
+                hiddenText.Text = hasHidden and hiddenName or ""
+            end
+        end
+    end
 
     -- Back button inside summary
     local closeBtn = summary:FindFirstChild("SummaryClose") or summary:FindFirstChild("Close")

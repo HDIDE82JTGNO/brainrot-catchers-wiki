@@ -257,13 +257,15 @@ end
 	@param moveName The move name
 	@param onHit Callback when hit marker is reached
 	@param onComplete Callback when animation completes
+	@param skipDamaged If true, skip playing the Damaged animation on defender (for misses)
 ]]
 function CombatEffects:PlayMoveAttack(
 	attackerModel: Model,
 	defenderModel: Model,
 	moveName: string,
 	onHit: (() -> ())?,
-	onComplete: (() -> ())?
+	onComplete: (() -> ())?,
+	skipDamaged: boolean?
 )
 	if not attackerModel or not defenderModel then
 		if onComplete then
@@ -280,15 +282,24 @@ function CombatEffects:PlayMoveAttack(
 		end
 		-- Note: Hit impact VFX is triggered in Damage step to respect effectiveness
 		
-		-- Play damage animation on defender
-		self._animationController:PlayAnimation(defenderModel, "Damaged", function()
-			-- Return attacker to idle
+		-- Play damage animation on defender only if the move hit
+		if not skipDamaged then
+			self._animationController:PlayAnimation(defenderModel, "Damaged", function()
+				-- Return attacker to idle
+				self._animationController:PlayIdleAnimation(attackerModel)
+				
+				if onComplete then
+					onComplete()
+				end
+			end)
+		else
+			-- Move missed - just return attacker to idle without playing Damaged animation
 			self._animationController:PlayIdleAnimation(attackerModel)
 			
 			if onComplete then
 				onComplete()
 			end
-		end)
+		end
 	end, function()
 		-- Attack animation completed (no hit marker)
 		-- Return attacker to idle

@@ -524,14 +524,23 @@ function HologramSpawnEffect:CreateFadeOut(model: Model, onComplete, onPeak)
 	end
 	
 	-- Call completion callback when effect finishes
+	local completedFired = false
 	fadeOutTween.Completed:Connect(function()
+		completedFired = true
 		if onComplete and type(onComplete) == "function" then
+			pcall(onComplete)
+		end
+	end)
+	-- Safety fallback: if the hologram is cleaned up early (e.g., via Debris), ensure onComplete still fires
+	task.delay(ANIMATION_CONFIG.OUT_DURATION + 0.15, function()
+		if not completedFired and onComplete and type(onComplete) == "function" then
 			pcall(onComplete)
 		end
 	end)
 	
 	-- Cleanup
-	Debris:AddItem(hologram, 1)
+	-- Ensure hologram persists long enough for Completed to fire; then clean up with margin
+	Debris:AddItem(hologram, ANIMATION_CONFIG.OUT_DURATION + 0.5)
 	
 	return hologram
 end

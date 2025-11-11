@@ -50,9 +50,9 @@ local DebugData = {
 	LastChunk = "Chunk1", 
 	LeaveData = {
 		Position = {
-			X = 216.209,
-			Y = 10,
-			Z = -263.683
+			X = 260.141,
+			Y = 12, 
+			Z = -155.417
 		},
 		Rotation = {
 			X = 0,
@@ -62,11 +62,12 @@ local DebugData = {
 		}
 	},
 	Party = {
-		--[1] = { Name = "Duckaroo", Level = 3, Gender = 1, Shiny = false, Nickname = nil, CurrentHP = 11, XPProgress = 0, IVs = {HP = 20, Attack = 20, Defense = 20, Speed = 20}, OT = 4788714726, TradeLocked = false, Nature = "Calm", CatchData = { CaughtWhen = os.time(), CaughtBy = 4788714726 }, WeightKg = 40, CurrentMoves = {"Peck","Perch","Fast Attack","Bite"} },
-		--[2] = { Name = "Primarina Ballerina", Level = 47, Gender = 1, Shiny = false, Nickname = nil, CurrentHP = 100, XPProgress = 99.5, IVs = {HP = 20, Attack = 20, Defense = 20, Speed = 20}, OT = 4788714726, TradeLocked = false, Nature = "Modest", CatchData = { CaughtWhen = os.time(), CaughtBy = 4788714726 }, WeightKg = 40, CurrentMoves = {"Dance Strike","Dazzle Beam","Fairy Strike","Shield Bash"} },
-		--[3] = { Name = "Magi-Tung", Level = 38, Gender = 1, Shiny = false, Nickname = nil, CurrentHP = 100, XPProgress = 0, IVs = {HP = 20, Attack = 20, Defense = 20, Speed = 20}, OT = 4788714726, TradeLocked = false, Nature = "Jolly", CatchData = { CaughtWhen = os.time(), CaughtBy = 4788714726 }, WeightKg = 40, CurrentMoves = {"Scratch","Fast Attack","Double Kick","Uppercut"} },
-		--[4] = { Name = "Sir Tung", Level = 26, Gender = 0, Shiny = false, Nickname = nil, CurrentHP = 100, XPProgress = 0, IVs = {HP = 20, Attack = 20, Defense = 20, Speed = 20}, OT = 4788714726, TradeLocked = false, Nature = "Adamant", CatchData = { CaughtWhen = os.time(), CaughtBy = 4788714726 }, WeightKg = 55, CurrentMoves = {"Fast Attack","Double Kick","Uppercut","Grand Slam"} },
-		[1] = { Name = "Frulli Frulla", Level = 8, Gender = 1, Shiny = true, Nickname = nil, CurrentHP = 100, XPProgress = 0, IVs = {HP = 18, Attack = 16, Defense = 14, Speed = 17}, OT = 4788714726, TradeLocked = false, Nature = "Timid", CatchData = { CaughtWhen = os.time(), CaughtBy = 4788714726 }, WeightKg = 6, CurrentMoves = {"Peck","Perch","Fast Attack","Bite"}, HeldItem = "Apple" },
+		[1] = { Name = "Frulli Frulla", Level = 3, Gender = 1, Shiny = true, Nickname = nil, CurrentHP = 33, XPProgress = 0, IVs = {HP = 18, Attack = 16, Defense = 14, Speed = 17}, OT = 4788714726, TradeLocked = false, Nature = "Timid", CatchData = { CaughtWhen = os.time(), CaughtBy = 4788714726 }, WeightKg = 6, CurrentMoves = {"Peck","Perch","Fast Attack","Bite"}, HeldItem = "Crumbs" },
+		[2] = { Name = "Sir Tung", Level = 18, Gender = 0, Shiny = false, CurrentHP = 62, XPProgress = 0, IVs = {HP = 14, Attack = 14, Defense = 12, Speed = 10}, Nature = "Adamant", CatchData = { CaughtWhen = os.time(), CaughtBy = 4788714726 }, CurrentMoves = {"Fast Attack","Double Kick","Uppercut"} },
+		[3] = { Name = "Tim Cheese", Level = 22, Gender = 1, Shiny = true, CurrentHP = 70, XPProgress = 0, IVs = {HP = 14, Attack = 15, Defense = 12, Speed = 12}, Nature = "Modest", CatchData = { CaughtWhen = os.time(), CaughtBy = 4788714726 }, CurrentMoves = {"Scratch","Tackle","Bite","Crunch"}, HeldItem = "Capture Cube" },
+		[4] = { Name = "Kitung", Level = 5, Gender = 1, Shiny = true, CurrentHP = 28, XPProgress = 0, IVs = {HP = 12, Attack = 11, Defense = 10, Speed = 13}, Nature = "Hardy", CatchData = { CaughtWhen = os.time(), CaughtBy = 4788714726 }, CurrentMoves = {"Scratch","Fast Attack"} },
+		[5] = { Name = "Magi-Tung", Level = 32, Gender = 1, Shiny = false, CurrentHP = 90, XPProgress = 0, IVs = {HP = 20, Attack = 18, Defense = 16, Speed = 17}, Nature = "Jolly", CatchData = { CaughtWhen = os.time(), CaughtBy = 4788714726 }, CurrentMoves = {"Double Kick","Uppercut","Grand Slam"}, HeldItem = "Metal Fist" },
+		[6] = { Name = "Duckaroo", Level = 16, Gender = 1, Shiny = false, CurrentHP = 55, XPProgress = 0, IVs = {HP = 13, Attack = 16, Defense = 11, Speed = 14}, Nature = "Brave", CatchData = { CaughtWhen = os.time(), CaughtBy = 4788714726 }, CurrentMoves = {"Peck","Fast Attack","Sand Storm"} },
 	},
 
 	-- Debug Vault boxes (supports new named-box format; Vault will also handle legacy)
@@ -134,12 +135,19 @@ local DebugData = {
 		MET_PROFESSOR = true,
 		FIRST_CREATURE = true,
 		FIRST_BATTLE = true,
-		MET_KYRO_ROUTE_1 = false,
+		MET_KYRO_ROUTE_1 = true,
+		AYLA_ROUTE2_DONE = false,
+		MET_KYRO_ROUTE_3 = false,
 	},
 
 	DefeatedTrainers = {
 		["TrainerCecil01"] = true,
 		["TrainerNicole01"] = true,
+		["TrainerAiden01"] = true,
+		["TrainerGiselle01"] = true,
+		["TrainerHope01"] = true,
+		["TrainerJames01"] = true,
+		["TrainerLucian01"] = true,
 	},
 }
 

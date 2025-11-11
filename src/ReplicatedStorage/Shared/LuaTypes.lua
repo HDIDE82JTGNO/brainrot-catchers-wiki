@@ -24,7 +24,7 @@ export type StatBoostInfo = {
 export type Item = {
 	Stats: StatBlock,
 	Description: string,
-	Category: string, -- "CaptureCubes" | "Heals" | "Items"
+	Category: string, -- "CaptureCubes" | "Heals" | "Items" | "MoveLearners"
     ContextType: string?, -- "Battle" | "Overworld" 
     UsableInBattle: boolean?,
     UsableInOverworld: boolean?,
@@ -83,6 +83,7 @@ export type CreatureInstance = {
     CatchData: CatchData?,
     WeightKg: number?,
     LearnedMoves: {[string]: boolean}?,
+    Ability: string?,
 }
 
 

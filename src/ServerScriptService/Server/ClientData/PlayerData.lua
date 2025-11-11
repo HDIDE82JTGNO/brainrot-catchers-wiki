@@ -6,7 +6,7 @@ local ServerScriptService = game.ServerScriptService
 local PlayerDataTemplate = require(ReplicatedStorage.Shared.PlayerData)
 
 local ProfileStore = require(ServerScriptService.Packages.ProfileStore)
-local DATA_STORE_KEY = RunService:IsStudio() and "435g6hyu7tefr" or "Production"
+local DATA_STORE_KEY = RunService:IsStudio() and "435g6hyu7tefr" or "Test-2"
 
 
 local PlayerStore = ProfileStore.New(DATA_STORE_KEY,PlayerDataTemplate.DEFAULT_PLAYER_DATA)
@@ -93,6 +93,22 @@ function Local.LoadProfile(player:Player)
 	
 	if player.Parent == PlayersService then
 		Profiles[player] = Profile
+		
+		-- Proactively push initial data to client once the profile is ready
+		do
+			local ok, mod = pcall(function()
+				return require(ServerScriptService.Server.ClientData)
+			end)
+			if ok and mod and mod.UpdateClientData then
+				mod:UpdateClientData(player, Profile.Data)
+			else
+				-- Fallback to direct event to avoid tight coupling if module is unavailable
+				pcall(function()
+					local Events = game:GetService("ReplicatedStorage"):WaitForChild("Events")
+					Events.Communicate:FireClient(player, "ClientData", Profile.Data)
+				end)
+			end
+		end
 
 		-- Roll back any mid-battle state from a previous session using PendingBattle snapshot
 		local data = Profile.Data

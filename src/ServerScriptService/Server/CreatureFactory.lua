@@ -3,13 +3,30 @@
 -- Server-side utility to create fully initialized creature instances consistently
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ServerScriptService = game:GetService("ServerScriptService")
+local Players = game:GetService("Players")
 
 local Creatures = require(ReplicatedStorage.Shared.Creatures)
 local Moves = require(ReplicatedStorage.Shared.Moves)
 local StatCalc = require(ReplicatedStorage.Shared.StatCalc)
 local Natures = require(ReplicatedStorage.Shared.Natures)
+local Abilities = require(ReplicatedStorage.Shared.Abilities)
+local GameConfig = require(ServerScriptService.Server.GameData.Config)
 
 local CreatureFactory = {}
+
+local function rollWeightKg(baseWeight: number?): number?
+	if type(baseWeight) ~= "number" or baseWeight <= 0 then
+		return nil
+	end
+	local lower = math.max(1, math.floor(baseWeight * 0.7))
+	local upper = math.max(lower, math.ceil(baseWeight * 1.3))
+	return math.random(lower, upper)
+end
+
+local function simpleStat(base: number, level: number, iv: number): number
+	return math.floor(((2 * base + iv) * level / 100) + level + 10)
+end
 
 -- Normalize a list of move refs (strings or move tables) to valid move name strings present in Moves
 local function normalizeMoves(moveRefs: {any}): {string}
@@ -131,8 +148,102 @@ local stats, maxStats = StatCalc.ComputeStats(name, level, ivs, foe.Nature)
     for _, mn in ipairs(moveNames) do learned[mn] = true end
     instance.LearnedMoves = learned
 
+    -- Assign ability if not provided
+    if foe and foe.Ability then
+        instance.Ability = foe.Ability
+    else
+        instance.Ability = Abilities.SelectAbility(name, false)
+    end
+
     return instance
 end
+
+function CreatureFactory.CreateFromInfo(info: any)
+	if type(info) ~= "table" or type(info.Creature) ~= "string" then
+		return "Invalid creature info."
+	end
+
+	local creatureDef = Creatures[info.Creature]
+	if not creatureDef then
+		return "Creature: " .. tostring(info.Creature) .. " not found."
+	end
+
+	local level = tonumber(info.Level) or 1
+	local tempCurrentMoves = {}
+	if creatureDef.LearnableMoves then
+		if creatureDef.LearnableMoves[1] then tempCurrentMoves[1] = creatureDef.LearnableMoves[1] end
+		if level >= 10 and creatureDef.LearnableMoves[2] then tempCurrentMoves[2] = creatureDef.LearnableMoves[2] end
+		if level >= 25 and creatureDef.LearnableMoves[3] then tempCurrentMoves[3] = creatureDef.LearnableMoves[3] end
+		if level >= 45 and creatureDef.LearnableMoves[4] then tempCurrentMoves[4] = creatureDef.LearnableMoves[4] end
+	end
+
+	local tempIVs = {}
+	local tempStats = {}
+	for statName, base in pairs(creatureDef.BaseStats or {}) do
+		local iv = math.random(0, 31)
+		tempIVs[statName] = iv
+		tempStats[statName] = simpleStat(base, level, iv)
+	end
+
+	local gender
+	if info.Gender == 0 or info.Gender == 1 then
+		gender = info.Gender
+	else
+		local fc = tonumber(creatureDef.FemaleChance) or 50
+		gender = (math.random(1, 100) <= fc) and 1 or 0
+	end
+
+	local isShiny = false
+	if info.Shiny == true then
+		isShiny = true
+	elseif math.random(1, GameConfig.SHINY_CHANCE) == 1 then
+		isShiny = true
+	end
+
+	local natureName = info.Nature or Natures.GetRandomNature()
+	local statsWithNature = Natures.ApplyNatureModifiers(tempStats, natureName)
+
+	local caughtBy = info.CaughtBy
+	if not caughtBy and typeof(info.OT) == "number" then
+		local ok, name = pcall(function()
+			return Players:GetNameFromUserIdAsync(info.OT)
+		end)
+		if ok and name and name ~= "" then
+			caughtBy = name
+		end
+	end
+	caughtBy = caughtBy or "Unknown"
+
+	local catchData = {
+		CaughtWhen = os.time(),
+		CaughtBy = caughtBy,
+	}
+
+	local finalCreation = {
+		DexNumber = creatureDef.DexNumber,
+		Name = creatureDef.Name,
+		Description = creatureDef.Description,
+		Type = creatureDef.Type,
+		-- Assign a species ability (allow override via info.Ability)
+		Ability = info.Ability or Abilities.SelectAbility(creatureDef.Name, false),
+		Stats = statsWithNature,
+		IVs = tempIVs,
+		LearnableMoves = creatureDef.LearnableMoves,
+		CurrentMoves = tempCurrentMoves,
+		Shiny = isShiny,
+		Level = level,
+		Gender = gender,
+		OT = info.OT,
+		TradeLocked = (info.TradeLocked == true),
+		Nature = natureName,
+		CatchData = catchData,
+		WeightKg = rollWeightKg(creatureDef.BaseWeightKg),
+	}
+
+	return finalCreation
+end
+
+CreatureFactory.RollWeightKg = rollWeightKg
 
 return CreatureFactory
 

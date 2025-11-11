@@ -1161,6 +1161,17 @@ function BattleSystemV2:_startBlackoutSequence()
 		local MusicManager = require(script.Parent.MusicManager)
 		if self._battleInfo and self._battleInfo.Type == "Trainer" then
 			MusicManager:EndTrainerBattleMusic()
+			-- Resume chunk music after trainer battle ends
+			local okCL, ChunkLoader = pcall(function() return require(script.Parent:WaitForChild("ChunkLoader")) end)
+			if okCL and ChunkLoader and ChunkLoader.GetCurrentChunk then
+				local chunk = ChunkLoader:GetCurrentChunk()
+				local essentials = chunk and chunk.Essentials
+				if essentials then
+					pcall(function()
+						MusicManager:SetChunkMusic(essentials)
+					end)
+				end
+			end
 		else
 			MusicManager:EndEncounterMusic()
 		end

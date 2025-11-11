@@ -108,14 +108,41 @@ end
 
 
 function UIFunctions:Transition(Active:boolean, Yeild:any)
-
 	warn("Attempting to transition to: " .. tostring(Active))
+	-- Resolve UI references safely
+	local pg = PlayerGui or (game.Players.LocalPlayer and game.Players.LocalPlayer:FindFirstChild("PlayerGui"))
+	if not pg then
+		warn("[UIFunctions.Transition] PlayerGui not available")
+		return false
+	end
+	local gameUI = pg:FindFirstChild("GameUI")
+	if not gameUI then
+		warn("[UIFunctions.Transition] GameUI not found in PlayerGui")
+		return false
+	end
+	local blackout = gameUI:FindFirstChild("Blackout")
+	if not blackout then
+		warn("[UIFunctions.Transition] Blackout frame not found")
+		return false
+	end
+	local loading = blackout:FindFirstChild("Loading")
+	if not loading then
+		warn("[UIFunctions.Transition] Blackout.Loading not found")
+		return false
+	end
+
 	local TargetTransparency = Active and 0 or 1
 
-	TweenService:Create(PlayerGui.GameUI.Blackout, TweenInfo.new(0.5, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {
+	-- Ensure visibility state so tween actually shows/hides
+	if Active then
+		blackout.Visible = true
+		loading.Visible = true
+	end
+
+	TweenService:Create(blackout, TweenInfo.new(0.5, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {
 		BackgroundTransparency = TargetTransparency
 	}):Play()
-	TweenService:Create(PlayerGui.GameUI.Blackout.Loading, TweenInfo.new(0.5, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {
+	TweenService:Create(loading, TweenInfo.new(0.5, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {
 		ImageTransparency = TargetTransparency
 	}):Play()
 
@@ -124,14 +151,18 @@ function UIFunctions:Transition(Active:boolean, Yeild:any)
 			task.cancel(SpinningTask)
 			SpinningTask = nil
 		end
-
 		SpinningTask = task.spawn(function()
 			while true do
 				task.wait()
-				PlayerGui.GameUI.Blackout.Loading.Rotation += 0.2
+				loading.Rotation += 0.2
 			end
 		end)
 	else
+		-- When hiding, schedule visibility off after fade
+		task.delay(0.55, function()
+			blackout.Visible = false
+			loading.Visible = false
+		end)
 		if SpinningTask then
 			task.delay(0.5, function()
 				if SpinningTask then
@@ -141,6 +172,7 @@ function UIFunctions:Transition(Active:boolean, Yeild:any)
 			end)
 		end
 	end
+	return true
 end
 
 function UIFunctions:SaveNotificationSuccess(SaveNotificationFrame)

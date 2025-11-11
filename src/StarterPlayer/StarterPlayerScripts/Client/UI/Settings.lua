@@ -179,6 +179,99 @@ function SettingsModule:Init(All)
 			end)
 		end
 	end
+	
+	-- Wire up Get Unstuck button if present
+	do
+		local SettingsUI = game.Players.LocalPlayer.PlayerGui:WaitForChild("GameUI"):WaitForChild("Settings")
+		local Elements = SettingsUI:FindFirstChild("Elements")
+		local GetUnstuck = nil
+		if Elements then
+			-- Try direct first, then recursive search to tolerate layout changes
+			GetUnstuck = Elements:FindFirstChild("GetUnstuck") or Elements:FindFirstChild("GetUnstuck", true)
+			-- If the found instance is not a button, try to find a button under it
+			if GetUnstuck and (not GetUnstuck:IsA("TextButton") and not GetUnstuck:IsA("ImageButton")) then
+				local childBtn = GetUnstuck:FindFirstChildWhichIsA("TextButton", true) or GetUnstuck:FindFirstChildWhichIsA("ImageButton", true)
+				if childBtn then
+					GetUnstuck = childBtn
+				end
+			end
+		end
+		if GetUnstuck and (GetUnstuck:IsA("TextButton") or GetUnstuck:IsA("ImageButton")) then
+			local TitleLabel = GetUnstuck:FindFirstChild("Title")
+			local function setTitle(txt: string)
+				if TitleLabel and TitleLabel:IsA("TextLabel") then
+					TitleLabel.Text = txt
+				end
+			end
+			-- Helper to apply a UI cooldown that disables clicking until expiry
+			local function applyCooldown(seconds: number)
+				seconds = tonumber(seconds) or 0
+				if seconds <= 0 then return end
+				setTitle("On cooldown")
+				GetUnstuck.Active = false
+				if GetUnstuck:IsA("TextButton") then GetUnstuck.AutoButtonColor = false end
+				GetUnstuck:SetAttribute("CooldownUntil", os.clock() + seconds)
+				task.delay(seconds, function()
+					-- Re-enable only if not extended by a later click
+					local untilTs = tonumber(GetUnstuck:GetAttribute("CooldownUntil")) or 0
+					if os.clock() >= untilTs then
+						GetUnstuck.Active = true
+						if GetUnstuck:IsA("TextButton") then GetUnstuck.AutoButtonColor = true end
+						setTitle("Get unstuck")
+						GetUnstuck:SetAttribute("CooldownUntil", nil)
+					end
+				end)
+			end
+			-- If a cooldown is already in progress (UI reopened), enforce it
+			do
+				local untilTs = tonumber(GetUnstuck:GetAttribute("CooldownUntil")) or 0
+				local rem = untilTs - os.clock()
+				if rem > 0 then
+					applyCooldown(rem)
+				end
+			end
+			UIFunctions:NewButton(GetUnstuck, {"Action"}, { Click = "One", HoverOn = "One", HoverOff = "One" }, 0.7, function()
+				Audio.SFX.Click:Play()
+				-- Prevent clicks during cooldown
+				local untilTs = tonumber(GetUnstuck:GetAttribute("CooldownUntil")) or 0
+				if os.clock() < untilTs then
+					return
+				end
+				-- Begin transition
+				pcall(function() UIFunctions:Transition(true) end)
+
+				task.wait(0.75)
+				
+				-- Ask server for cooldown authorization
+				local res = nil
+				local ok = pcall(function()
+					res = Events.Request:InvokeServer({"GetUnstuck"})
+				end)
+				local success = ok and type(res) == "table" and (res.Success == true)
+				local cooldown = (type(res) == "table" and tonumber(res.CooldownSeconds)) or 180
+				
+				-- If authorized, teleport to chunk start door locally
+				if success then
+					pcall(function()
+						local ChunkLoader = require(script.Parent.Parent.Utilities.ChunkLoader)
+						ChunkLoader:PositionPlayerAtStartDoor()
+					end)
+					applyCooldown(cooldown)
+				else
+					-- If server reports remaining cooldown, enforce it client-side too
+					local remaining = (type(res) == "table" and tonumber(res.CooldownSeconds)) or 0
+					if remaining > 0 then
+						applyCooldown(remaining)
+					end
+				end
+				
+				-- End transition after delay regardless of result
+				task.delay(2, function()
+					pcall(function() UIFunctions:Transition(false) end)
+				end)
+			end)
+		end
+	end
 end
 
 --// Settings Open

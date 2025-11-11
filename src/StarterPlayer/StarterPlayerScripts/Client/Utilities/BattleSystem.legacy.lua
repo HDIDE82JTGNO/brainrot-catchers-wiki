@@ -3041,7 +3041,8 @@ function BattleSystem:OpenBagMenu()
 	-- This would open the bag menu
 	local UI = require(script.Parent.Parent.UI)
 	if UI and UI.Bag then
-		UI.Bag:Open()
+		local isTrainer = (CurrentBattle and CurrentBattle.Type == "Trainer") == true
+		UI.Bag:Open({ Context = "Battle", IsTrainer = isTrainer, BattleType = (CurrentBattle and CurrentBattle.Type) })
 	end
 end
 

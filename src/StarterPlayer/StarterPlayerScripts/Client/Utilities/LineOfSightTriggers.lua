@@ -8,6 +8,7 @@ local LOS = {}
 local ActiveTriggers = {}
 local TriggeredOnce = {}
 local LastTriggeredAt = {}
+local CharacterFunctions = require(script.Parent:WaitForChild("CharacterFunctions"))
 local CutsceneRegistry = require(script.Parent:WaitForChild("CutsceneRegistry"))
 local EncounterZone = require(script.Parent:WaitForChild("EncounterZone"))
 local MusicManager = require(script.Parent:WaitForChild("MusicManager"))
@@ -16,6 +17,9 @@ local MusicManager = require(script.Parent:WaitForChild("MusicManager"))
 local GraceUntil: number? = nil
 function LOS:SetGraceUntil(t: number)
     GraceUntil = t
+end
+function LOS:_SetGraceFor(seconds: number)
+    GraceUntil = os.clock() + (seconds or 0)
 end
 
 local function showExclamation(npcModel: Model)
@@ -82,6 +86,12 @@ function LOS:SetupOnceTrigger(npcModel: Model, config)
         if GraceUntil and os.clock() < GraceUntil then return end
         -- Visual exclamation
         showExclamation(npcModel)
+        -- Immediately suppress player input and movement, and add brief grace to avoid double-triggers
+        pcall(function()
+            CharacterFunctions:SetSuppressed(true)
+            CharacterFunctions:CanMove(false)
+        end)
+        LOS:_SetGraceFor(2.0)
         -- Trainer LOS intro sting only if this NPC is a trainer (has Dialogue.LineOfSight == true)
         local dialogueModule = npcModel:FindFirstChild("Dialogue")
         if dialogueModule then
@@ -161,6 +171,12 @@ function LOS:SetupRearmingTrigger(npcModel: Model, config)
         LastTriggeredAt[key] = os.clock()
         -- Visual exclamation
         showExclamation(npcModel)
+        -- Immediately suppress player input and movement, and add brief grace to avoid double-triggers
+        pcall(function()
+            CharacterFunctions:SetSuppressed(true)
+            CharacterFunctions:CanMove(false)
+        end)
+        LOS:_SetGraceFor(2.0)
         -- Trainer LOS intro sting only if this NPC is a trainer (has Dialogue.LineOfSight == true)
         local dialogueModule = npcModel:FindFirstChild("Dialogue")
         if dialogueModule then

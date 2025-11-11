@@ -20,6 +20,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Request = ReplicatedStorage:WaitForChild("Events"):WaitForChild("Request")
 local TweenService = game:GetService("TweenService")
 local Creatures = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Creatures"))
+local SpeciesAbilities = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("SpeciesAbilities"))
+local Items = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Items"))
 local TypesModule = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Types"))
 local MovesModule = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Moves"))
 local StatCalc = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("StatCalc"))
@@ -229,6 +231,8 @@ local function renderSlotFromCreature(btn: TextButton, creatureData: any)
 	local HP = btn:FindFirstChild("HP")
 	local Shiny = btn:FindFirstChild("Shiny")
 	local TradeLockedIcon = btn:FindFirstChild("TradeLocked")
+	local HeldItemIcon = btn:FindFirstChild("HeldItem")
+	local GenderIcon = btn:FindFirstChild("Gender")
 	local CreatureHP = btn:FindFirstChild("CreatureHP")
 
 	if creatureData then
@@ -251,8 +255,8 @@ local function renderSlotFromCreature(btn: TextButton, creatureData: any)
 		if HP and HP:IsA("Frame") then
 			local currentHP, maxHP = ComputeCurrentAndMaxHP(creatureData)
 			local hpPercent = math.clamp(currentHP / math.max(1, maxHP), 0, 1)
-			local maxWidthScale = 0.5
-			local heightScale = 0.234
+			local maxWidthScale = 0.511
+			local heightScale = 0.143
 			HP.Visible = currentHP > 0
 			HP.Size = UDim2.new(maxWidthScale * hpPercent, 0, heightScale, 0)
 		end
@@ -265,6 +269,29 @@ local function renderSlotFromCreature(btn: TextButton, creatureData: any)
 		end
 		if TradeLockedIcon and TradeLockedIcon:IsA("ImageLabel") then
 			TradeLockedIcon.Visible = creatureData.TradeLocked == true
+		end
+		-- Held item icon/image
+		if HeldItemIcon and HeldItemIcon:IsA("ImageLabel") then
+			local heldName = creatureData.HeldItem
+			local hasHeld = type(heldName) == "string" and heldName ~= ""
+			HeldItemIcon.Visible = hasHeld
+			if hasHeld then
+				local def = Items and Items[heldName]
+				HeldItemIcon.Image = (def and def.Image) or "rbxassetid://0"
+			end
+		end
+		-- Gender icon sprite region
+		if GenderIcon and GenderIcon:IsA("ImageLabel") then
+			local g = creatureData.Gender
+			if g == 0 then
+				GenderIcon.ImageRectOffset = Vector2.new(510, 75) -- Male
+				GenderIcon.Visible = true
+			elseif g == 1 or g == 2 then
+				GenderIcon.ImageRectOffset = Vector2.new(0, 75) -- Female
+				GenderIcon.Visible = true
+			else
+				GenderIcon.Visible = false
+			end
 		end
 		btn.AutoButtonColor = true
 		btn.Active = true
@@ -493,28 +520,32 @@ local function ensureDragHandlers(PartyUI: ScreenGui)
 			table.insert(SlotConnections[i], clickConnection)
 			print("[PartyUI] Click connection created for slot", i, "Total connections:", #SlotConnections[i])
 			
-			-- Drag start: only activate after 0.2s hold (prevents accidental drags on click)
-			local downConnection = btn.MouseButton1Down:Connect(function(x, y)
-				print("[PartyUI] Down handler fired for slot", i)
-				local pos = Vector2.new(x, y)
-				local thisIndex = i
-				-- Delay before starting drag; if released before 0.2s, treat as click
-				local started = true
-				task.delay(0.2, function()
-					if not started then return end
-					if UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
-						beginDrag(PartyUI, thisIndex, pos)
-					end
+			-- Drag start: only when drag is allowed (prevents accidental drags in battle)
+			if AllowDrag then
+				local downConnection = btn.MouseButton1Down:Connect(function(x, y)
+					print("[PartyUI] Down handler fired for slot", i)
+					local pos = Vector2.new(x, y)
+					local thisIndex = i
+					-- Delay before starting drag; if released before 0.2s, treat as click
+					local started = true
+					task.delay(0.2, function()
+						if not started then return end
+						if UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
+							beginDrag(PartyUI, thisIndex, pos)
+						end
+					end)
+					local releaseConn; releaseConn = UserInputService.InputEnded:Connect(function(input)
+						if input.UserInputType == Enum.UserInputType.MouseButton1 then
+							started = false
+							releaseConn:Disconnect()
+						end
+					end)
 				end)
-				local releaseConn; releaseConn = UserInputService.InputEnded:Connect(function(input)
-					if input.UserInputType == Enum.UserInputType.MouseButton1 then
-						started = false
-						releaseConn:Disconnect()
-					end
-				end)
-			end)
-			table.insert(SlotConnections[i], downConnection)
-			print("[PartyUI] Down connection created for slot", i, "Total connections:", #SlotConnections[i])
+				table.insert(SlotConnections[i], downConnection)
+				print("[PartyUI] Down connection created for slot", i, "Total connections:", #SlotConnections[i])
+			else
+				print("[PartyUI] Drag disabled; skipping down handler for slot", i)
+			end
 		else
 			print("[PartyUI] No button found for slot", i)
 		end
@@ -673,19 +704,22 @@ function PartyModule:UpdatePartyDisplay()
 	getListAndSlots(PartyUI)
 	
 	-- Only setup drag handlers if enabled and not already done
+	-- Ensure click handlers are always present; add drag handlers only when allowed
 	if AllowDrag then
 		if not DragSetupDone then
-			print("[PartyUI] Setting up drag handlers for the first time (drag enabled)")
+			print("[PartyUI] Setting up handlers (click + drag enabled)")
 			ensureDragHandlers(PartyUI)
 		else
-			print("[PartyUI] Drag handlers already setup, skipping")
+			print("[PartyUI] Handlers already setup")
 		end
 	else
-		-- If drag is not allowed, ensure no handlers remain
+		-- If drag was previously set up, clear then set up click-only handlers
 		if DragSetupDone then
-			print("[PartyUI] Drag disabled in this context; removing handlers")
+			print("[PartyUI] Drag disabled; resetting handlers to rebind click-only")
 			resetDragHandlers()
 		end
+		print("[PartyUI] Setting up handlers (click-only; drag disabled)")
+		ensureDragHandlers(PartyUI)
 	end
 
 	-- Initialize order to identity each time based on ActiveCount
@@ -804,6 +838,67 @@ function PartyModule:LoadCreatureSummary(creatureData, slotIndex)
 
 	-- Delegate summary UI rendering to shared module and stop here to avoid duplicate logic
 	SummaryUI:Render(Summary, creatureData)
+
+	-- Notify battle integration about the current selection so SendOut updates
+	if SelectionChangedCallback then
+		SelectionChangedCallback(creatureData, slotIndex)
+	end
+
+	-- Ability UI wiring (Summary.AdditionalInfo.HA, Summary.Ability.AbilityText, Summary.Hidden.HiddenText)
+	local function getHiddenAbilityName(speciesName: string?): string?
+		if not speciesName then return nil end
+		local pool = SpeciesAbilities[speciesName]
+		if type(pool) ~= "table" then return nil end
+		local hiddenName: string? = nil
+		local minChance = math.huge
+		for _, entry in ipairs(pool) do
+			local ch = tonumber(entry.Chance) or 0
+			-- Treat very low chance (<=2) as hidden; fallback to lowest chance
+			if ch <= 2 then
+				hiddenName = entry.Name
+				break
+			end
+			if ch < minChance then
+				minChance = ch
+				hiddenName = entry.Name
+			end
+		end
+		return hiddenName
+	end
+
+	local abilityName = tostring(creatureData.Ability or "")
+	local speciesName = creatureData.BaseName or creatureData.Name
+	local hiddenName = getHiddenAbilityName(speciesName)
+	local hasHidden = (abilityName ~= "" and hiddenName ~= nil and abilityName == hiddenName)
+
+	-- Ability text
+	do
+		local abilityFrame = Summary:FindFirstChild("Ability")
+		if abilityFrame and abilityFrame:IsA("Frame") then
+			local abilityText = abilityFrame:FindFirstChild("AbilityText")
+			if abilityText and abilityText:IsA("TextLabel") then
+				abilityText.Text = abilityName ~= "" and abilityName or "—"
+			end
+		end
+	end
+
+	-- Hidden ability pill and text
+	do
+		local additionalInfo = Summary:FindFirstChild("AdditionalInfo")
+		local ha = additionalInfo and additionalInfo:FindFirstChild("HA")
+		if ha and ha:IsA("GuiObject") then
+			ha.Visible = hasHidden
+		end
+		local hiddenFrame = Summary:FindFirstChild("Hidden")
+		if hiddenFrame and hiddenFrame:IsA("Frame") then
+			hiddenFrame.Visible = hasHidden
+			local hiddenText = hiddenFrame:FindFirstChild("HiddenText")
+			if hiddenText and hiddenText:IsA("TextLabel") then
+				hiddenText.Text = hasHidden and hiddenName or ""
+			end
+		end
+	end
+
 	connectSummaryButtons(self, PartyUI)
 	return
 	

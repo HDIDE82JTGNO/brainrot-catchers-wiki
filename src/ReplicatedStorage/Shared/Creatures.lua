@@ -561,13 +561,13 @@ local Creatures: { [string]: Creature_Type } = {
 		45,
 		50
 	),
-	["Tadbalabu"] = createCreature(
-		19,
-		"Tadbalabu",
-		"rbxassetid://TODO",
-		nil,
-		"A little frog‑tad that drums on puddles with its tail.",
-		{ "Grass" },
+		["Tadbalabu"] = createCreature(
+			19,
+			"Tadbalabu",
+			"rbxassetid://TODO",
+			nil,
+			"A little frog‑tad that drums on puddles with its tail.",
+			{ "Grass" },
 		{
 			HP = 45,
 			Attack = 45,
@@ -708,7 +708,9 @@ local Creatures: { [string]: Creature_Type } = {
 				Speed = 30,
 			},
 			{
-				
+				[1] = {"Tackle", "Bite", "Water Jet"},
+				[8] = {"Aqua Slash"},
+				[16] = {"Hydro Burst"}
 			},
 			nil,
 			nil,

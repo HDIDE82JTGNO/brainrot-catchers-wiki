@@ -6,6 +6,7 @@ type Item_Type = LuaTypes.Item
 -- CaptureCubes - Items used to capture creatures
 -- Heals - Items that heal or boost stats by percentage
 -- Items - General items
+-- MoveLearners - Items that teach moves to creatures (like TMs, called ML)
 
 local function createItem(stats: {HP: number, Attack: number, Defense: number, Speed: number}, description: string, category: string, usableInBattle: boolean?, usableInOverworld: boolean?, image: string?): Item_Type
 	return {

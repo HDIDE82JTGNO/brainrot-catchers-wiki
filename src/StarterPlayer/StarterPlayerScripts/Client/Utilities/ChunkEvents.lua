@@ -10,8 +10,27 @@ local CutsceneManager = require(script.Parent:WaitForChild("CutsceneManager"))
 local CameraManager = require(script.Parent:WaitForChild("CameraManager"))
 local RunService = game:GetService("RunService")
 local ClientData = require(script.Parent.Parent.Plugins.ClientData)
+local CharacterFunctions = require(script.Parent.CharacterFunctions)
+local MoveTo = require(script.Parent.MoveTo)
+local UIFunctions = require(script.Parent.Parent.UI.UIFunctions)
 
 DBG:print("[ChunkEvents] Module required and initialized")
+
+local function setClientEventFlag(eventName: string, value: boolean): ()
+	local data = ClientData:Get()
+	if data then
+		data.Events = data.Events or {}
+		data.Events[eventName] = value
+	end
+	task.spawn(function()
+		local success, result = pcall(function()
+			return Events.Request:InvokeServer({"SetEvent", eventName, value})
+		end)
+		if not success or result ~= true then
+			DBG:warn(string.format("[ChunkEvents] Failed to set event %s (value=%s): %s", tostring(eventName), tostring(value), tostring(result)))
+		end
+	end)
+end
 
 -- Helper: lazy-load and register a cutscene module by name from Client/Cutscenes
 local function LoadAndRegisterCutscene(cutsceneName: string, moduleName: string): boolean
@@ -181,7 +200,6 @@ return {
 			local essentials = CurrentChunk and CurrentChunk.Essentials
 			local kyroFolder = essentials and essentials:FindFirstChild("Kyro_R1")
 			local kyro = kyroFolder:FindFirstChild("Kyro")
-			local MoveTo = require(script.Parent.MoveTo)
 			local CharacterFunctions = require(script.Parent.CharacterFunctions)
 			local Interactables = require(script.Parent.Interactables)
 			local RelocationSignals = require(script.Parent.RelocationSignals)
@@ -214,6 +232,7 @@ return {
 							{ Text = "Just go up ahead and you'll meet a few trainers, and a find a few creatures to catch.", Emotion = "Happy" },
 						}, kyro)
 						UI.TopBar:Show()
+					setClientEventFlag("MET_KYRO_ROUTE_1", true)
 						if hbProxConn then hbProxConn:Disconnect() hbProxConn = nil end
 					end
 				end)
@@ -573,7 +592,7 @@ return {
 						{ Text = "Hmm, that didn't work. Come back when you're nearby.", Emotion = "Confused" },
 					}, Healer)
 					UI.TopBar:Show()
-					local CharacterFunctions = require(script.Parent.CharacterFunctions)
+
 					pcall(function()
 						CharacterFunctions:SetSuppressed(false)
 						CharacterFunctions:CanMove(true)
@@ -588,6 +607,562 @@ return {
 			ChunkName = "Chunk2",
 			NPCTargetName = "Healer Tom",
 		}
+
+		-- Ayla Route 2 cutscene and search sequence
+		local Essentials = CurrentChunk and CurrentChunk.Essentials
+		local Cutscene = Essentials and Essentials:FindFirstChild("Cutscene")
+		if not (Essentials and Cutscene) then
+			return
+		end
+
+		-- One-time gate: destroy cutscene rig if already completed
+		do
+			local CD = ClientData:Get()
+			if CD and CD.Events and CD.Events.AYLA_ROUTE2_DONE == true then
+				pcall(function() Cutscene:Destroy() end)
+				return
+			end
+		end
+
+		local function getPart(name: string): BasePart?
+			local p = Cutscene:FindFirstChild(name)
+			return (p and p:IsA("BasePart")) and p or nil
+		end
+		local function getNPC(name: string): Model?
+			local m = Cutscene:FindFirstChild(name)
+			return (m and m:IsA("Model")) and m or nil
+		end
+		local function getHRP(m: Model?): BasePart?
+			return m and (m:FindFirstChild("HumanoidRootPart") :: BasePart?) or nil
+		end
+		local function setModelVisible(m: Model?, visible: boolean)
+			if not m then return end
+			for _, d in ipairs(m:GetDescendants()) do
+				if d:IsA("BasePart") then
+					d.Transparency = visible and 0 or 1
+					d.CanCollide = visible
+				elseif d:IsA("Decal") or d:IsA("Texture") then
+					d.Transparency = visible and 0 or 1
+				end
+			end
+		end
+		local function placeModelAt(m: Model?, p: BasePart?)
+			local hrp = getHRP(m)
+			if hrp and p then
+				hrp.CFrame = p.CFrame
+			end
+		end
+		local function playCreatureIdle(model: Model?)
+			if not model then return end
+			-- Find or create animator (check Humanoid first, then AnimationController)
+			local animator: Animator? = nil
+			local humanoid = model:FindFirstChildOfClass("Humanoid")
+			if humanoid then
+				animator = humanoid:FindFirstChildOfClass("Animator")
+				if not animator then
+					animator = Instance.new("Animator")
+					animator.Parent = humanoid
+				end
+			else
+				local animController = model:FindFirstChildOfClass("AnimationController")
+				if not animController then
+					animController = Instance.new("AnimationController")
+					animController.Parent = model
+				end
+				animator = animController:FindFirstChildOfClass("Animator")
+				if not animator then
+					animator = Instance.new("Animator")
+					animator.Parent = animController
+				end
+			end
+			-- Find Idle animation (check Animations folder first, then direct child)
+			local animFolder = model:FindFirstChild("Animations")
+			local idle = animFolder and animFolder:FindFirstChild("Idle") or model:FindFirstChild("Idle")
+			if idle and idle:IsA("Animation") and animator then
+				local ok, track = pcall(function()
+					return animator:LoadAnimation(idle)
+				end)
+				if ok and track then
+					track.Priority = Enum.AnimationPriority.Idle
+					track.Looped = true
+					pcall(function() track:Play() end)
+				end
+			end
+		end
+		local function playerHRP(): BasePart?
+			local player = game:GetService("Players").LocalPlayer
+			local character = player and (player.Character or player.CharacterAdded:Wait())
+			return character and character:FindFirstChild("HumanoidRootPart") or nil
+		end
+		local function playerName(): string
+			local CD = ClientData:Get()
+			return (CD and CD.Nickname) or (game:GetService("Players").LocalPlayer and game:GetService("Players").LocalPlayer.Name) or "Player"
+		end
+
+		-- Shared dialogue lines to avoid duplication
+		local Lines = {
+			AylaFoundAva = { { Text = "There you are!! I was so worried, Ava!", Emotion = "Happy" } },
+		}
+		
+		-- Helpers to reduce duplication within this cutscene
+		local function frameGroupShot(AylaModel: Model?, BryanModel: Model?, EdwardModel: Model?, camMgrOpt)
+			local pHRP = playerHRP()
+			local aHRP = getHRP(AylaModel)
+			local bHRP = getHRP(BryanModel)
+			local eHRP = getHRP(EdwardModel)
+			local points = {}
+			if pHRP then table.insert(points, pHRP.Position) end
+			if aHRP then table.insert(points, aHRP.Position) end
+			if bHRP then table.insert(points, bHRP.Position) end
+			if eHRP then table.insert(points, eHRP.Position) end
+			if #points >= 2 then
+				local center = Vector3.new(0, 0, 0)
+				for _, v in ipairs(points) do center += v end
+				center /= #points
+				local maxR = 0
+				for _, v in ipairs(points) do
+					local d = (Vector3.new(v.X, 0, v.Z) - Vector3.new(center.X, 0, center.Z)).Magnitude
+					if d > maxR then maxR = d end
+				end
+				local facing = (pHRP and pHRP.CFrame.LookVector) or Vector3.new(0, 0, -1)
+				local backDist = math.max(12, maxR * 1.8)
+				local height = math.max(6, maxR * 0.7)
+				local camPos = center - facing * backDist + Vector3.new(0, height, 0)
+				local cf = CFrame.lookAt(camPos, center)
+				local camShot = camMgrOpt or CameraManager.new()
+				camShot:TransitionTo(cf, 0.6, 65, nil)
+			end
+		end
+		local function getFixedSpecFor(npc: Model?): {any}
+			local name = npc and npc.Name or ""
+			if name == "Grunt Bryan" then
+				return {
+					{ Name = "Frulli Frulla", Level = 6 },
+					{ Name = "Doggolino", Level = 5 },
+				}
+			elseif name == "Grunt Edward" then
+				return {
+					{ Name = "Burbaloni Lulliloli", Level = 7 },
+					{ Name = "Timmy Cheddar", Level = 6 },
+				}
+			end
+			return { { Name = "Frulli Frulla", Level = 5 } }
+		end
+		local function startTrainerBattle(npc: Model?): boolean
+			local tname = npc and npc.Name or "Trainer"
+			local spec = getFixedSpecFor(npc)
+			pcall(function()
+				local TrainerIntroController = require(script.Parent.TrainerIntroController)
+				TrainerIntroController:PrepareFromNPC(npc)
+			end)
+			local ok = pcall(function()
+				Events.Request:InvokeServer({"StartBattle", "Trainer", {
+					TrainerName = tname,
+					TrainerSpec = spec,
+					TrainerId = tname,
+				}})
+			end)
+			if not ok then return false end
+			local done = false
+			local ec
+			ec = Events.Communicate.OnClientEvent:Connect(function(ev)
+				if ev ~= "BattleOver" then return end
+				if ec then ec:Disconnect() end
+				local rc
+				rc = require(script.Parent.RelocationSignals).OnPostBattleRelocated(function()
+					done = true
+					if rc then rc:Disconnect() end
+				end)
+			end)
+			local t0 = os.clock()
+			while not done and (os.clock() - t0) < 90 do task.wait(0.25) end
+			if ec then ec:Disconnect() end
+			return done
+		end
+		local function moveAwayNPC(npc: Model?)
+			local hrp = getHRP(npc) 
+			local hum = npc and npc:FindFirstChildOfClass("Humanoid")
+			if not (hrp and hum) then return end
+			MoveTo.MoveHumanoidToTarget(hum, hrp, Vector3.new(142.698, 12.114, -1024.194), { minWalkSpeed = 18, timeout = 5, arriveRadius = 1.5, retryInterval = 0.3 })
+		end
+		local function runAylaConfrontationFlow(pnameLocal: string, AylaModel: Model?, BryanModel: Model?, EdwardModel: Model?, connsTab: {RBXScriptConnection}, camMgrOpt)
+			CharacterFunctions:SetSuppressed(true)
+			CharacterFunctions:CanMove(false)
+			UI.TopBar:Hide()
+			UIFunctions:Transition(true)
+			task.wait(1.5)
+			local NPCUtil = require(script.Parent.NPC)
+			if AylaModel then NPCUtil:StopFollowingPlayer(AylaModel) end
+			local ppb = getPart("PlayerPlacement_Before")
+			local apb = getPart("AylaPlacement_Before")
+			local phrpNow = playerHRP()
+			if phrpNow and ppb then
+				phrpNow.CFrame = ppb.CFrame
+			end
+			placeModelAt(AylaModel, apb)
+			UIFunctions:Transition(false)
+			-- Mark that confrontation phase has begun (used for rejoin restore)
+			setClientEventFlag("AYLA_ROUTE2_CONFRONT", true)
+			-- Two-shot on player and Ayla
+			do
+				local camFront = camMgrOpt or CameraManager.new()
+				local pHRP = playerHRP()
+				local aHRP = getHRP(AylaModel)
+				if pHRP and aHRP then
+					local center = (pHRP.Position + aHRP.Position) / 2
+					local forward = pHRP.CFrame.LookVector
+					local cameraPos = center - (forward * 8) + Vector3.new(0, 3, 0)
+					local cf = CFrame.lookAt(cameraPos, center)
+					camFront:TransitionTo(cf, 0.6, 60, nil)
+				end
+			end
+			task.wait(0.5)
+			Say:Say("Ayla", true, Lines.AylaFoundAva)
+			-- Face after-placements
+			local ppa = getPart("PlayerPlacement_After")
+			local apa = getPart("AylaPlacement_After")
+			local phrp3 = playerHRP()
+			if phrp3 and ppa then
+				phrp3.CFrame = CFrame.new(phrp3.Position, Vector3.new(ppa.Position.X, phrp3.Position.Y, ppa.Position.Z))
+			end
+			placeModelAt(AylaModel, apa)
+			-- Place Team Rift members and frame group
+			placeModelAt(BryanModel, getPart("BryanPlacement"))
+			placeModelAt(EdwardModel, getPart("EdwardPlacement"))
+			frameGroupShot(AylaModel, BryanModel, EdwardModel, camMgrOpt)
+			-- Rift intro lines
+			Say:Say("Team Rift Member Bryan", true, {
+				{ Text = "Step away, kids.", Emotion = "Angry" },
+				{ Text = "It seems this Avocadini Guffo has been in contact with the shard.", Emotion = "Talking" },
+				{ Text = "You two wouldn't happen to know where it got this energy, would you?", Emotion = "Talking" },
+				{ Text = "Silence, huh? No matter—we'll take this creature with us.", Emotion = "Smug" },
+			}, getHRP(BryanModel))
+			Say:Say("Ayla", true, {
+				{ Text = (pnameLocal or "Player") .. ", I don't have any brainrots... what do we do?", Emotion = "Sad" },
+				{ Text = "Wait—you're going to help? I believe in you!", Emotion = "Happy" },
+			}, getHRP(AylaModel))
+			-- Battles
+			startTrainerBattle(BryanModel)
+			Say:Say("Team Rift Member Edward", true, {
+				{ Text = "There's no way you beat Bryan...", Emotion = "Angry" },
+				{ Text = "I guess I'll just have to stop you.", Emotion = "Angry" },
+			}, getHRP(EdwardModel))
+			startTrainerBattle(EdwardModel)
+			-- Wrap-up
+			Say:Say("Team Rift Member Edward", true, {
+				{ Text = "Guess I humbled myself...", Emotion = "Sad" },
+			}, getHRP(EdwardModel))
+			Say:Say("Team Rift Member Bryan", true, {
+				{ Text = "We said you'd keep it; we're leaving.", Emotion = "Neutral" },
+				{ Text = "Boss will be mad... but we'll deal with it. Anyone can be strong.", Emotion = "Talking" },
+			}, getHRP(BryanModel))
+			task.spawn(function()
+				moveAwayNPC(BryanModel); moveAwayNPC(EdwardModel)
+			end)
+			task.wait(1.5)
+			Say:Say("Ayla", true, {
+				{ Text = "Woah! I can't believe you beat both of them!", Emotion = "Excited" },
+				{ Text = "Thank you so much, " .. (pnameLocal or "Player") .. "! Because of you, I got Ava back!", Emotion = "Happy" },
+				{ Text = "I'll meet you in Cresamore Town—see how strong Ava is and battle me there!", Emotion = "Happy" },
+				{ Text = "See you soon!", Emotion = "Happy" },
+			}, getHRP(AylaModel))
+			UIFunctions:Transition(true)
+			setClientEventFlag("AYLA_ROUTE2_DONE", true)
+			-- Done; cleanup after fade
+			task.delay(0.75, function()
+				pcall(function() Cutscene:Destroy() end)
+			end)
+			task.delay(2, function()
+				UIFunctions:Transition(false)
+				UI.TopBar:Show()
+			end)
+		end
+		-- (restoreRoute2State is defined later, after controller class)
+
+		-- References
+		local Ayla: Model? = getNPC("Ayla")
+		local Avocadini: Model? = Cutscene:FindFirstChild("AvocadiniGuffo")
+		local Bryan: Model? = getNPC("Grunt Bryan")
+		local Edward: Model? = getNPC("Grunt Edward")
+
+		-- Stage Ayla and hide Avocadini at load
+		placeModelAt(Ayla, getPart("AylaFirstPlacement"))
+		setModelVisible(Avocadini, false)
+
+		-- Connection cleanup on unload
+		local conns: {RBXScriptConnection} = {}
+		if CurrentChunk and CurrentChunk.Model then
+			local c = CurrentChunk.Model.AncestryChanged:Connect(function(_, parent)
+				if not parent then
+					for _, cc in ipairs(conns) do if cc.Connected then cc:Disconnect() end end
+				end
+			end)
+			table.insert(conns, c)
+		end
+
+		-- Controller to manage Ayla Route 2 search flow (OOP-style)
+		type AylaSearchControllerType = {
+			Ayla: Model?,
+			Avocadini: Model?,
+			Bryan: Model?,
+			Edward: Model?,
+			conns: {RBXScriptConnection},
+			pnameLocal: string,
+			start: (self: any) -> (),
+			_bindChatter: (self: any) -> (),
+			_bindISeeHer: (self: any) -> (),
+			_bindFound: (self: any) -> (),
+		}
+		
+		local AylaSearchController = {}
+		AylaSearchController.__index = AylaSearchController
+		
+		function AylaSearchController.new(Ayla: Model?, Avocadini: Model?, Bryan: Model?, Edward: Model?, connsTab: {RBXScriptConnection}): AylaSearchControllerType
+			local self = setmetatable({}, AylaSearchController)
+			self.Ayla = Ayla
+			self.Avocadini = Avocadini
+			self.Bryan = Bryan
+			self.Edward = Edward
+			self.conns = connsTab
+			self.pnameLocal = playerName()
+			return (self :: any) :: AylaSearchControllerType
+		end
+		
+		function AylaSearchController:start()
+			local NPCUtil = require(script.Parent.NPC)
+			if self.Ayla then
+				NPCUtil:StartFollowingPlayer(self.Ayla, { stopDistance = 4, maxTeleportDistance = 35, runSpeed = 20 })
+			end
+			setClientEventFlag("AYLA_ROUTE2_SEARCH_ACTIVE", true)
+			
+			CharacterFunctions:SetSuppressed(false)
+			CharacterFunctions:CanMove(true)
+			UI.TopBar:Show()
+			
+			setModelVisible(self.Avocadini, true)
+			placeModelAt(self.Avocadini, getPart("CreaturePlacement"))
+			playCreatureIdle(self.Avocadini)
+			
+			self:_bindChatter()
+			self:_bindISeeHer()
+			self:_bindFound()
+		end
+		
+		function AylaSearchController:_bindChatter()
+			local searchLines = {
+				{ { Text = "Looks like there's nothing here...", Emotion = "Neutral" } },
+				{ { Text = "Nothing here at all...", Emotion = "Neutral" } },
+				{ { Text = "I think I heard something!", Emotion = "Excited" } },
+				{ { Text = "I hope Ava is doing okay...", Emotion = "Sad" } },
+				{ { Text = "I really appreciate the help, " .. (self.pnameLocal or "Player"), Emotion = "Happy" } },
+				{ { Text = "You're the best—let's keep searching!", Emotion = "Happy" } },
+			}
+			local function bindOneShot(name: string, idx: number)
+				local p = getPart(name)
+				if not p then return end
+				local fired = false
+				local c; c = p.Touched:Connect(function(hit2)
+					local phrp2 = playerHRP()
+					if fired or not phrp2 or hit2 ~= phrp2 then return end
+					fired = true
+					Say:Say("Ayla", true, searchLines[idx], getHRP(self.Ayla))
+					if c then c:Disconnect() end
+				end)
+				table.insert(self.conns, c)
+			end
+			bindOneShot("AylaNothingHere1", 1)
+			bindOneShot("AylaNothingHere2", 2)
+			bindOneShot("AylaNothingHere3", 3)
+			bindOneShot("AylaNothingHere4", 4)
+		end
+		
+		function AylaSearchController:_bindISeeHer()
+			local p = getPart("AylaIThinkISeeHer")
+			if not p then return end
+			local fired = false
+			local c; c = p.Touched:Connect(function(hit3)
+				local phrp2 = playerHRP()
+				if fired or not phrp2 or hit3 ~= phrp2 then return end
+				fired = true
+				Say:Say("Ayla", true, { { Text = (self.pnameLocal or "Player") .. ", I think I see her!", Emotion = "Excited" } }, getHRP(self.Ayla))
+				if c then c:Disconnect() end
+			end)
+			table.insert(self.conns, c)
+		end
+		
+		function AylaSearchController:_bindFound()
+			local p = getPart("AylaFoundHer")
+			if not p then return end
+			local fired = false
+			local c; c = p.Touched:Connect(function(hit4)
+				local phrp2 = playerHRP()
+				if fired or not phrp2 or hit4 ~= phrp2 then return end
+				fired = true
+				
+				setClientEventFlag("AYLA_ROUTE2_SEARCH_ACTIVE", false)
+
+				runAylaConfrontationFlow(self.pnameLocal, self.Ayla, self.Bryan, self.Edward, self.conns, nil)
+				
+				if c then c:Disconnect() end
+			end)
+			table.insert(self.conns, c)
+		end
+		
+		-- Define restoration helper after controller to avoid forward reference issues
+		local function restoreRoute2State(AylaModel: Model?, AvocadiniModel: Model?, BryanModel: Model?, EdwardModel: Model?, connsTab: {RBXScriptConnection})
+			local cd = ClientData:Get()
+			local ev = cd and cd.Events
+			if not ev then return end
+			if ev.AYLA_ROUTE2_DONE == true then
+				pcall(function() Cutscene:Destroy() end)
+				return
+			end
+			if ev.AYLA_ROUTE2_CONFRONT == true then
+				runAylaConfrontationFlow(playerName(), AylaModel, BryanModel, EdwardModel, connsTab, nil)
+				return
+			end
+			if ev.AYLA_ROUTE2_SEARCH_ACTIVE == true then
+				local controller = AylaSearchController.new(AylaModel, AvocadiniModel, BryanModel, EdwardModel, connsTab)
+				controller:start()
+				return
+			end
+		end
+		-- Restore any pending Route 2 state on (re)join
+		restoreRoute2State(Ayla, Avocadini, Bryan, Edward, conns)
+		-- Start cutscene when player touches AylaCutsceneTrigger
+		local trigger = getPart("AylaCutsceneTrigger")
+		if trigger then
+			local started = false
+			local tConn
+			tConn = trigger.Touched:Connect(function(hit)
+				local phrp = playerHRP()
+				if started or not phrp or hit ~= phrp then return end
+				started = true
+
+				CharacterFunctions:SetSuppressed(true)
+				CharacterFunctions:CanMove(false)
+				UI.TopBar:Hide()
+				local camMgr = CameraManager.new()
+				pcall(function() camMgr:Reset() end)
+
+				getHRP(Ayla).Anchored = false
+
+				Say:Say("Ayla", true, {
+					{ Text = "Ava!!! Where are you!! someone help!!", Emotion = "Angry" },
+				}, getHRP(Ayla))
+
+				-- Walk Ayla to player
+				if Ayla and phrp then
+					local aylaHum = Ayla:FindFirstChildOfClass("Humanoid")
+					local aylaHRP = getHRP(Ayla)
+					local walkTrack = nil
+					MoveTo.MoveHumanoidToTarget(aylaHum, aylaHRP, phrp.Position, {
+						minWalkSpeed = 16,
+						timeout = 3.5,
+						arriveRadius = 5,
+						retryInterval = 0.35,
+						onStart = function()
+							if not aylaHum then return end
+							local animator = aylaHum:FindFirstChildOfClass("Animator")
+							if not animator then
+								animator = Instance.new("Animator")
+								animator.Parent = aylaHum
+							end
+							local anim = Instance.new("Animation")
+							anim.AnimationId = "rbxassetid://120866625087275"
+							local ok, track = pcall(function() return animator:LoadAnimation(anim) end)
+							if ok and track then
+								walkTrack = track
+								walkTrack.Priority = Enum.AnimationPriority.Movement
+								walkTrack.Looped = true
+								pcall(function() walkTrack:Play(0.1) end)
+							end
+						end,
+						onComplete = function()
+							if walkTrack then
+								pcall(function() walkTrack:Stop(0.15) end)
+								walkTrack = nil
+							end
+						end,
+					})
+				end
+
+				local pname = playerName()
+				Say:Say("Ayla", true, {
+					{ Text = "Hey you! I need help finding my creature; I've been calling her for ages and can't find her.", Emotion = "Talking" },
+					{ Text = "There's an area near the end of this route I haven't checked.", Emotion = "Talking" },
+					{ Text = "My creature is Avocadini Guffo—Ava. She's a green owl, super sweet.", Emotion = "Happy" },
+					{ Text = "Route 2 is pretty busy with trainers; I couldn't get past after I lost her...", Emotion = "Sad" },
+					{ Text = "If you help me out, I’ll have to pay you back!", Emotion = "Happy" },
+					{ Text = "Before we continue—what's your name?", Emotion = "Talking" },
+					{ Text = "Oh your name's " .. pname .. "? Awesome name!", Emotion = "Happy" },
+					{ Text = "What's your story, " .. pname .. "?", Emotion = "Talking" },
+				}, getHRP(Ayla))
+
+				local UIFunctions = require(script.Parent.Parent.UI.UIFunctions)
+				UIFunctions:Transition(true)
+				task.wait(1)
+				Say:Say("", true, {
+					{ Text = "Moments later...", Emotion = "Confused" },
+				})
+	
+				task.wait(0.5)
+				UIFunctions:Transition(false)
+				Say:Say("Ayla", true, {
+					{ Text = "Woah... you said someone fought you because of a shard?", Emotion = "Confused" },
+					{ Text = "I caught Ava near Route 5; there was a weird shard there—gave me creepy vibes.", Emotion = "Thinking" },
+					{ Text = "Maybe that shard is related to what Team Rift was talking about.", Emotion = "Thinking" },
+					{ Text = "Ava was acting strange near it... I hope she's okay.", Emotion = "Sad" },
+					{ Text = "We should start searching!", Emotion = "Excited" },
+				}, getHRP(Ayla))
+	
+
+				-- Begin search phase via controller (maintainable)
+				do
+					local controller = AylaSearchController.new(Ayla, Avocadini, Bryan, Edward, conns)
+					controller.pnameLocal = pname
+					controller:start()
+				end
+				
+				-- Controller sets up all search bindings for the search phase
+				local pnameLocal = pname
+
+				-- Search chatter and triggers bound by AylaSearchController
+
+				-- "I think I see her!" trigger handled by AylaSearchController
+
+				-- Found trigger (handled by AylaSearchController; rejoin handled via restoreRoute2State)
+			end)
+			table.insert(conns, tConn)
+		end
+	end,
+	["Load_Chunk3"] = function(CurrentChunk)
+		local CD = ClientData:Get()
+		if CD and CD.Events and CD.Events.MET_KYRO_ROUTE_3 ~= true then
+			print("We've not met kyro in route 3 yet, running cutscene")
+			local nickname = (CD and CD.Nickname) or "Trainer"
+			UI.TopBar:Hide()
+			UI.TopBar:SetSuppressed(true)
+			CharacterFunctions:CanMove(false)
+			CharacterFunctions:SetSuppressed(true)
+			local kf = CurrentChunk.Model.Essentials.KyroFolder
+			Say:Say("Kyro", true, {
+				{ Text = nickname .. "!", Emotion = "Happy" },
+			}, kf.Kyro)
+			local kyroHRP = kf.Kyro:FindFirstChild("HumanoidRootPart")
+			local character = game.Players.LocalPlayer.Character
+			local phrp: BasePart? = character and character:FindFirstChild("HumanoidRootPart")
+			local look = kyroHRP.CFrame.LookVector
+			local target = Vector3.new(kyroHRP.Position.X, phrp.Position.Y, kyroHRP.Position.Z) - (look * -4)
+			MoveTo.MoveToTarget(target, { minWalkSpeed = 16, timeout = 2.5, preserveFacing = true, arriveRadius = 2.0, retryInterval = 0.35, delayAfter = 0.2 })
+			Say:Say("Kyro", true, {
+				{ Text = "I've been waiting here for you, looks like I must have passed you on the way here.", Emotion = "Happy" },
+				{ Text = "My team is a lot stronger now, and I've found some cool creatures...", Emotion = "Happy" },
+			}, kf.Kyro)
+		else
+				--Destroy the cutscene stuff
+				CurrentChunk.Model.Essentials.KyroFolder:Destroy()
+		end
 	end,
 ["Load_Professor's Lab"] = function(CurrentChunk)
         -- If player hasn't chosen a starter yet, re-run the professor intro cutscene on (re)entry

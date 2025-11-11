@@ -182,6 +182,9 @@ function PartyIntegration:OpenForVoluntarySwitch(isPreviewSwitch: boolean?)
 	self._switchMode = "Voluntary"
 	self._isPreviewSwitch = isPreviewSwitch or false
 	self._isOpen = true
+
+	-- Refresh UI references in case Party UI wasn't ready at construction time
+	self:_initializeUI()
 	
 	-- Set up UI and button handlers
 	self:_setButtonVisibility(true)
@@ -190,7 +193,11 @@ function PartyIntegration:OpenForVoluntarySwitch(isPreviewSwitch: boolean?)
 	
 	-- Open party menu
 	if self._partyModule.Open then
-		self._partyModule:Open()
+		self._partyModule:Open("Battle")
+		-- Re-acquire UI elements after opening to ensure references are valid, then (idempotently) wire handlers
+		self:_initializeUI()
+		self:_setButtonVisibility(true)
+		self:_setupButtonHandlers()
 	end
 end
 
@@ -212,6 +219,9 @@ function PartyIntegration:OpenForForcedSwitch()
 	
 	self._switchMode = "Forced"
 	self._isOpen = true
+
+	-- Refresh UI references in case Party UI wasn't ready at construction time
+	self:_initializeUI()
 	
 	-- Set up UI and button handlers
 	self:_setButtonVisibility(true)
@@ -220,7 +230,11 @@ function PartyIntegration:OpenForForcedSwitch()
 	
 	-- Open party menu
 	if self._partyModule.Open then
-		self._partyModule:Open()
+		self._partyModule:Open("Battle")
+		-- Re-acquire UI elements after opening to ensure references are valid, then (idempotently) wire handlers
+		self:_initializeUI()
+		self:_setButtonVisibility(true)
+		self:_setupButtonHandlers()
 	end
 end
 

@@ -304,12 +304,15 @@ function CaughtUI:Show(creatureData)
         -- Check party capacity and add or prompt swap
         local data = ClientData:Get()
         local party = (data and data.Party) or {}
-        if #party >= 6 then
-            -- Open Party UI to swap (reuse existing party module)
-            PartyUI:Open("Battle")
-            -- For now, cancel returns to the same prompt (not implemented fully)
-            Say:Say("", true, {"Party is full. Swap via Party UI or cancel to choose again."})
-        else
+		if #party >= 6 then
+			-- For now: auto-send to box and inform the player
+			local ok = Request:InvokeServer({"FinalizeCapture", {Nickname = creatureData.Nickname, Destination = "Box"}})
+			if ok then
+				Say:Say("", true, {"your party is full, " .. display .. " will be sent to a box."})
+			else
+				Say:Say("", true, {"Failed to send to a box. Please try again."})
+			end
+		else
             -- Server: finalize capture into party
             local ok = Request:InvokeServer({"FinalizeCapture", {Nickname = creatureData.Nickname, Destination = "Party"}})
             if ok then

@@ -15,6 +15,8 @@ local LocalPlayer = Players.LocalPlayer
 
 -- Track active door interactions to prevent multiple triggers
 local ActiveDoorInteractions = {}
+-- Global post-load cooldown to avoid immediate re-entry loops (e.g., CatchCare exit)
+local GlobalDoorCooldownUntil = 0
 
 -- Door model animation handling (original functionality)
 local function PlayDoorAnimation(DoorModel, DoorType)
@@ -108,6 +110,11 @@ local function OnDoorTrigger(DoorModel, Hit, ChunkLoadFunction)
 	
 	-- Check if it's a player character
 	if not Humanoid or not Player then
+		return
+	end
+	
+	-- Global cooldown gate (prevents auto re-trigger right after a chunk load)
+	if os.clock() < GlobalDoorCooldownUntil then
 		return
 	end
 	
@@ -293,6 +300,8 @@ local function OnDoorTrigger(DoorModel, Hit, ChunkLoadFunction)
 	
 	if success then
 		DBG:print("Successfully loaded chunk:", ActualLoadChunk)
+		-- After any successful chunk load, block door interactions briefly
+		GlobalDoorCooldownUntil = os.clock() + 1.2
 		-- Reset camera type back to Custom after door transition
 		workspace.CurrentCamera.CameraType = Enum.CameraType.Custom
 		-- Re-enable movement after transition completes

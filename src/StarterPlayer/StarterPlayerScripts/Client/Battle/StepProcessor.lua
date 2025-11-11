@@ -463,6 +463,11 @@ function StepProcessor:_processMove(step: any, isPlayer: boolean, onComplete: St
         local hadPending = (self._battleState and self._battleState:GetPendingHP() ~= nil)
 		-- Defer committing the pending HP snapshot until the hit marker.
 		-- Do NOT update HP when the creature is sent out; only tween on hit.
+		
+		-- Check if move missed (no HPDelta means no damage, which indicates a miss)
+		local hpDelta = (step and type(step.HPDelta) == "table") and step.HPDelta or nil
+		local willMiss = (hpDelta == nil) or (isPlayer and (not hpDelta.Enemy or hpDelta.Enemy == 0)) or (not isPlayer and (not hpDelta.Player or hpDelta.Player == 0))
+		
 		self._combatEffects:PlayMoveAttack(
 			attackerModel,
 			defenderModel,
@@ -478,10 +483,10 @@ function StepProcessor:_processMove(step: any, isPlayer: boolean, onComplete: St
 					self:_updateUIWithPendingHP(targetIsPlayer)
 				end
 			end,
-			onComplete
+			onComplete,
+			willMiss  -- Skip Damaged animation if move missed
 		)
         -- Record pending damage delta for fallback if provided (do not apply here)
-        local hpDelta = (step and type(step.HPDelta) == "table") and step.HPDelta or nil
         if hpDelta then
             if isPlayer and type(hpDelta.Enemy) == "number" then
                 self._pendingDamageDeltaFoe = hpDelta.Enemy -- negative value
@@ -556,6 +561,17 @@ end
 	Internal: Process heal step
 ]]
 function StepProcessor:_processHeal(step: any, isPlayer: boolean, onComplete: StepCallback?)
+	-- Show message first so the audience reads it before the HP bar moves
+	if step.Message then
+		self._messageQueue:Enqueue(step.Message)
+	end
+
+	-- Optional delay (e.g., Crumbs) before visually applying the heal
+	local delaySec = tonumber(step.DelaySeconds) or tonumber(step.Delay) or 0
+	if delaySec and delaySec > 0 then
+		task.wait(delaySec)
+	end
+
 	-- Use server-authoritative creature data already updated in battle state
 	local serverCreature = isPlayer 
 		and self._battleState.PlayerCreature 
@@ -564,7 +580,9 @@ function StepProcessor:_processHeal(step: any, isPlayer: boolean, onComplete: St
 	if serverCreature then
 		-- For player's heal: if we detect incoming enemy damage this turn, display the healed HP,
 		-- not the end-of-turn HP. Compute pre-damage visual using incoming damage context.
-		if isPlayer and self._incomingContext and type(self._incomingContext.incomingPlayerDamageAbs) == "number" then
+		-- Skip this adjustment for end-of-turn heals (e.g., Crumbs) to avoid HP appearing to go down.
+		local isEndOfTurnHeal = (step and (step.EndOfTurn == true or (tonumber(step.DelaySeconds) or 0) > 0)) or false
+		if (not isEndOfTurnHeal) and isPlayer and self._incomingContext and type(self._incomingContext.incomingPlayerDamageAbs) == "number" then
 			local dmgAbs = self._incomingContext.incomingPlayerDamageAbs
 			local vis = table.clone(serverCreature)
 			vis.Stats = vis.Stats or {}
@@ -578,9 +596,23 @@ function StepProcessor:_processHeal(step: any, isPlayer: boolean, onComplete: St
 			self._uiController:UpdateLevelUI(vis, false)
 			self._uiController:UpdateHPBar(isPlayer, vis, true)
 		else
-			self._uiController:UpdateCreatureUI(isPlayer, serverCreature, true)
-			self._uiController:UpdateLevelUI(serverCreature, false)
-			self._uiController:UpdateHPBar(isPlayer, serverCreature, true)
+			-- Prefer an explicit target HP provided by server (e.g., Crumbs NewHP)
+			if type(step.NewHP) == "number" then
+				local vis = table.clone(serverCreature)
+				vis.Stats = vis.Stats or {}
+				vis.Stats.HP = math.max(0, step.NewHP)
+				if type(step.MaxHP) == "number" then
+					vis.MaxStats = vis.MaxStats or {}
+					vis.MaxStats.HP = step.MaxHP
+				end
+				self._uiController:UpdateCreatureUI(isPlayer, vis, true)
+				self._uiController:UpdateLevelUI(vis, false)
+				self._uiController:UpdateHPBar(isPlayer, vis, true)
+			else
+				self._uiController:UpdateCreatureUI(isPlayer, serverCreature, true)
+				self._uiController:UpdateLevelUI(serverCreature, false)
+				self._uiController:UpdateHPBar(isPlayer, serverCreature, true)
+			end
 		end
 	end
 	
@@ -591,10 +623,6 @@ function StepProcessor:_processHeal(step: any, isPlayer: boolean, onComplete: St
 	
 	if model and step.Amount then
 		self._combatEffects:PlayHealEffect(model, step.Amount)
-	end
-	
-	if step.Message then
-		self._messageQueue:Enqueue(step.Message)
 	end
 	
 	if onComplete then
@@ -1032,8 +1060,12 @@ function StepProcessor:_processMiss(step: any, isPlayer: boolean, onComplete: St
 		self._combatEffects:PlayMissEffect(model)
 	end
 	
+	-- Block until the miss message fully drains to avoid overlapping the opponent action
+	if self._messageQueue and self._messageQueue.WaitForDrain then
+		self._messageQueue:WaitForDrain()
+	end
 	if onComplete then
-		task.delay(0.5, onComplete)
+		onComplete()
 	end
 end
 
