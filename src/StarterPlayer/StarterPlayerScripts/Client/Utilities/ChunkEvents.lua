@@ -1145,20 +1145,188 @@ return {
 			UI.TopBar:SetSuppressed(true)
 			CharacterFunctions:CanMove(false)
 			CharacterFunctions:SetSuppressed(true)
-			local kf = CurrentChunk.Model.Essentials.KyroFolder
+			local CutsceneFolder = CurrentChunk.Model.Essentials.KyroFolder
 			Say:Say("Kyro", true, {
 				{ Text = nickname .. "!", Emotion = "Happy" },
-			}, kf.Kyro)
-			local kyroHRP = kf.Kyro:FindFirstChild("HumanoidRootPart")
+			}, CutsceneFolder.Kyro)
+			local kyroHRP = CutsceneFolder.Kyro:FindFirstChild("HumanoidRootPart")
 			local character = game.Players.LocalPlayer.Character
 			local phrp: BasePart? = character and character:FindFirstChild("HumanoidRootPart")
 			local look = kyroHRP.CFrame.LookVector
 			local target = Vector3.new(kyroHRP.Position.X, phrp.Position.Y, kyroHRP.Position.Z) - (look * -4)
-			MoveTo.MoveToTarget(target, { minWalkSpeed = 16, timeout = 2.5, preserveFacing = true, arriveRadius = 2.0, retryInterval = 0.35, delayAfter = 0.2 })
 			Say:Say("Kyro", true, {
-				{ Text = "I've been waiting here for you, looks like I must have passed you on the way here.", Emotion = "Happy" },
-				{ Text = "My team is a lot stronger now, and I've found some cool creatures...", Emotion = "Happy" },
-			}, kf.Kyro)
+				{ Text = "A legendary huh.", Emotion = "Thinking" },
+				{ Text = "Interesting...", Emotion = "Thinking" },
+			}, CutsceneFolder.Kyro)
+
+			local aylaHRP: BasePart? = CutsceneFolder.Ayla:FindFirstChild("HumanoidRootPart")
+			-- Ayla greets and gives shoes (Say will auto-face player)
+			Say:Say("Ayla", true, {
+				{ Text = nickname .. "! There you are.", Emotion = "Happy" },
+				{ Text = "Hey! " .. nickname .. "! Before we have our battle, I wanted to help you out and give you these running shoes!", Emotion = "Excited" },
+			}, CutsceneFolder.Ayla)
+
+			Say:Say("", true, {
+				{ Text = nickname .. " obtained the running shoes!", Emotion = "Happy" },
+			})			
+
+			-- Ayla thanks player (Say auto-faces player)
+			Say:Say("Ayla", true, {
+				{ Text = "I really appreciate what you did back there — thank you so much for helping me get Ava back.", Emotion = "Happy" },
+			}, CutsceneFolder.Ayla)
+
+			--kyro runs over
+
+			MoveTo.MoveToTarget(target, { minWalkSpeed = 16, timeout = 2.5, preserveFacing = true, arriveRadius = 2.0, retryInterval = 0.35, delayAfter = 0.2 })
+
+			-- Kyro talks to player first
+			Say:Say("Kyro", true, {
+				{ Text = nickname .. "! Sup, how’d Route 2 go? I kinda came to Cresamore after I gave the Professor the shard piece.", Emotion = "Happy" },
+			}, CutsceneFolder.Kyro)
+			-- Then Kyro notices Ayla
+			Say:Say("Kyro", true, {
+				{ Text = "Oh, who’s this?", Emotion = "Talking" },
+			}, CutsceneFolder.Kyro, CutsceneFolder.Ayla)
+
+			-- Ayla introduces herself to Kyro
+			Say:Say("Ayla", true, {
+				{ Text = "Hi! I’m Ayla. Me and " .. nickname .. " met on Route 2 — he helped me get my Brainrot back from those evil Team Rift members!", Emotion = "Happy" },
+				{ Text = "I actually heard a bit about you from " .. nickname .. ". He says you’re kind of a big deal.", Emotion = "Happy" },
+			}, CutsceneFolder.Ayla, CutsceneFolder.Kyro)
+
+			-- Kyro responds
+			Say:Say("Kyro", true, {
+				{ Text = "Oof… Team Rift, huh? Yeah, they’re up to no good lately.", Emotion = "Talking" },
+				{ Text = "It’s nice to meet you, I’m Kyro — coolest guy in town! …Or, you know, maybe the world.", Emotion = "Smug" },
+			}, CutsceneFolder.Kyro, CutsceneFolder.Ayla)
+
+			-- Ayla playful response and battle setup (to Kyro, then to player)
+			Say:Say("Ayla", true, {
+				{ Text = "*giggles* Ooooh, show-off! It’s nice to meet you, Kyro.", Emotion = "Happy" },
+			}, CutsceneFolder.Ayla, CutsceneFolder.Kyro)
+			Say:Say("Ayla", true, {
+				{ Text = "I hope we can all be great friends. But for now — me and " .. nickname .. " were just about to have a battle.", Emotion = "Happy" },
+			}, CutsceneFolder.Ayla)
+
+			-- Kyro warns player (Say auto-faces player)
+			Say:Say("Kyro", true, {
+				{ Text = "Oooh, be careful — " .. nickname .. " is stronger than he looks.", Emotion = "Talking" },
+			}, CutsceneFolder.Kyro)
+
+			-- Ayla confident reply (Say auto-faces player)
+			Say:Say("Ayla", true, {
+				{ Text = "Trust me, I know. He beat those Team Rift members like they were nothing.", Emotion = "Happy" },
+				{ Text = "But my Ava’s a lot stronger now! Haha, this’ll be fun!", Emotion = "Excited" },
+			}, CutsceneFolder.Ayla)
+
+			-- Kyro final hype (Say auto-faces player)
+			Say:Say("Kyro", true, {
+				{ Text = "Welp, guess it’s time for a battle! " .. nickname .. ", I’ll be watching — don’t disappoint me!", Emotion = "Excited" },
+			}, CutsceneFolder.Kyro)
+
+			local trainerDialogue = {
+				Name = "Ayla",
+				CustomAnimation = false,
+				Emotion = "Bored",
+				LineOfSight = false,
+				TrainerId = "Rival_Ayla_1",
+				TrainerName = "Ayla",
+				Say = {
+					{ Text = "", Emotion = "Bored" },
+				},
+				AfterSayInBattle = {
+					{ Text = "WOW!", Emotion = "Shy" },
+				},
+				AfterSayOverworld = {
+					{ Text = "I'll get better... I know it!", Emotion = "Shy" },
+				},
+			}
+			local trainerSpec = {
+				{ Name = "Avocadini Guffo", Level = 11, 
+				Gender = "1", 
+				IVs = {HP = 31, Attack = 28, Defense = 12, Speed = 19},
+				Nature = "Calm" },
+				
+				{ Name = "Duckaroo", Level = 9, 
+				Gender = "0", 
+				IVs = {HP = 22, Attack = 15, Defense = 8, Speed = 31},
+				Nature = "Calm" },
+			}
+
+			Events.Request:InvokeServer({"StartBattle", "Trainer", {
+				TrainerName = trainerDialogue.TrainerName,
+				TrainerSpec = trainerSpec,
+				TrainerId = trainerDialogue.TrainerId,
+				TrainerDialogue = trainerDialogue,
+			}})
+
+			-- Wait for battle to end and relocation back to overworld, then run post-battle dialogue
+			do
+				local BattleAwait = require(script.Parent.BattleAwait)
+				local ok, _reason = BattleAwait.waitForBattleOverAndRelocation(90)
+				-- Post-battle conversation (Ayla, Kyro, Player)
+				if ok then
+					local pname = nickname
+					-- Ayla to Player
+					Say:Say("Ayla", true, {
+						{ Text = "Woah… you’re so strong!", Emotion = "Excited" },
+						{ Text = "I really gave it my all, but you’re something else, " .. pname .. ".", Emotion = "Happy" },
+					}, CutsceneFolder.Ayla)
+					-- Kyro to Ayla
+					Say:Say("Kyro", true, {
+						{ Text = "Told ya! He’s pretty good — always has been.", Emotion = "Smug" },
+					}, CutsceneFolder.Kyro, CutsceneFolder.Ayla)
+					-- Ayla to Player
+					Say:Say("Ayla", true, {
+						{ Text = "I hope to one day reach your potential, " .. pname .. "!", Emotion = "Happy" },
+						{ Text = "You make me want to train even harder.", Emotion = "Excited" },
+					}, CutsceneFolder.Ayla)
+					-- Kyro to Ayla (curious)
+					Say:Say("Kyro", true, {
+						{ Text = "…Still, I’m curious. Why were those Team Rift members after you two anyway?", Emotion = "Thinking" },
+					}, CutsceneFolder.Kyro, CutsceneFolder.Ayla)
+					-- Ayla to Kyro (shard story)
+					Say:Say("Ayla", true, {
+						{ Text = "Well… see, I was on Route 5 the other day. My Brainrot was caught near this strange shard — it was glowing, and it gave me these really creepy vibes.", Emotion = "Thinking" },
+						{ Text = "I didn’t touch it. I just caught Ava and left.", Emotion = "Talking" },
+					}, CutsceneFolder.Ayla, CutsceneFolder.Kyro)
+					-- Kyro to Ayla (reasoning)
+					Say:Say("Kyro", true, {
+						{ Text = "Hmm… so they probably thought Ava could lead them to the shard.", Emotion = "Thinking" },
+						{ Text = "Do you remember where exactly you saw it?", Emotion = "Talking" },
+					}, CutsceneFolder.Kyro, CutsceneFolder.Ayla)
+					-- Ayla to Kyro (uncertain)
+					Say:Say("Ayla", true, {
+						{ Text = "Not really… it’s all kind of a blur.", Emotion = "Sad" },
+					}, CutsceneFolder.Ayla, CutsceneFolder.Kyro)
+					-- Kyro planning (to Ayla)
+					Say:Say("Kyro", true, {
+						{ Text = "Then we’ll need to find it before they do. If Team Rift’s gathering these shards, the Professor needs to know ASAP.", Emotion = "Talking" },
+					}, CutsceneFolder.Kyro, CutsceneFolder.Ayla)
+					-- Ayla agreeing (to Kyro)
+					Say:Say("Ayla", true, {
+						{ Text = "Yeah… I don’t want anyone else going through what I went through.", Emotion = "Sad" },
+					}, CutsceneFolder.Ayla, CutsceneFolder.Kyro)
+					-- Kyro gives guidance (to Player)
+					Say:Say("Kyro", true, {
+						{ Text = "There’s a CatchCare here in town. " .. pname .. ", you should stop by there — you can heal your Brainrots and stock up on items.", Emotion = "Talking" },
+					}, CutsceneFolder.Kyro)
+					-- Kyro to Ayla
+					Say:Say("Kyro", true, {
+						{ Text = "Ayla, we should go too and heal your Ava.", Emotion = "Talking" },
+					}, CutsceneFolder.Kyro, CutsceneFolder.Ayla)
+					-- Ayla to Player
+					Say:Say("Ayla", true, {
+						{ Text = "You’re right. " .. pname .. ", I’ll see you soon, okay?", Emotion = "Happy" },
+					}, CutsceneFolder.Ayla)
+					-- Kyro to Player
+					Say:Say("Kyro", true, {
+						{ Text = "Later, " .. pname .. ". Don’t slack off now!", Emotion = "Smug" },
+					}, CutsceneFolder.Kyro)
+				end
+			end
+
+
 		else
 				--Destroy the cutscene stuff
 				CurrentChunk.Model.Essentials.KyroFolder:Destroy()
