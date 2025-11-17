@@ -19,6 +19,7 @@ local ChunkList = {
 			["Professor's Lab"] = {
 				ProperName = "Professor's Lab",
 				IsSubRoom = true,
+				ScriptedCam = false,
 				Encounters = {
 
 				},
@@ -28,15 +29,27 @@ local ChunkList = {
 			["PlayersHouse"] = {
 				ProperName = "Your House",
 				IsSubRoom = true,
+				ScriptedCam = false,
 				Encounters = {
 
 				},
 				ValidPrevious = {"Chunk1"},
 			},
 
-			["House1"] = {
+			["Chunk1House1"] = {
 				ProperName = "",
 				IsSubRoom = true,
+				ScriptedCam = true,
+				Encounters = {
+
+				},
+				ValidPrevious = {"Chunk1"},
+			},
+
+			["Chunk1House2"] = {
+				ProperName = "",
+				IsSubRoom = true,
+				ScriptedCam = true,
 				Encounters = {
 
 				},
@@ -50,6 +63,7 @@ local ChunkList = {
 	["Professor's Lab"] = {
 		ProperName = "Professor's Lab",
 		IsSubRoom = true,
+		ScriptedCam = false,
 		Encounters = {},
 		ValidPrevious = {"Chunk1"},
 	},
@@ -57,6 +71,7 @@ local ChunkList = {
 	["PlayersHouse"] = {
 		ProperName = "Your House",
 		IsSubRoom = true,
+		ScriptedCam = false,
 		Encounters = {},
 		ValidPrevious = {"Chunk1"},
 	},
@@ -64,13 +79,15 @@ local ChunkList = {
 	["House1"] = {
 		ProperName = "House 1",
 		IsSubRoom = true,
+		ScriptedCam = true,
 		Encounters = {},
 		ValidPrevious = {"Chunk1"},
 	},
-	
+
 	["CatchCare"] = {
 		ProperName = "CatchCare",
 		IsSubRoom = true,
+		ScriptedCam = false,
 		Encounters = {},
 		ValidPrevious = {"Any"},
 	},
@@ -111,11 +128,22 @@ local ChunkList = {
 
 	--Chunk 5 and sub rooms
 	["Chunk5"] = {
-		ProperName = "Asterden", -- Fredd's city
+		ProperName = "Asterden", -- Fredd's city (grass gym)
 		IsSubRoom = false,
 		Encounters = {},
 		ValidPrevious = {"Chunk4"},
 		HasCatchCareDoor = true,
+	},
+
+	["Chunk6"] = {
+		ProperName = "Route 4", -- desert chunk leading to the wild west town (ground gym)
+		IsSubRoom = false,
+		Encounters = {
+			{"Duckaroo",16,18,20},
+			{"Bombombini Gusini",15,17,20},
+			{"Il Cacto Hipopotamo",15,16,30},
+		},
+		ValidPrevious = {"Chunk5"}
 	},
 	
 }

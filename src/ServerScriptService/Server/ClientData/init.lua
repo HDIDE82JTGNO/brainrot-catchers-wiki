@@ -5,6 +5,7 @@ local UseDebugData = true :: boolean -- Debug data does NOT save.
 local DBG = require(game:GetService("ReplicatedStorage").Shared.DBG)
 local Types = require(game:GetService("ReplicatedStorage").Shared.Types)
 local Moves = require(game:GetService("ReplicatedStorage").Shared.Moves)
+local Abilities = require(game:GetService("ReplicatedStorage").Shared.Abilities)
 
 --[[
 LastChunk = "Chunk1",
@@ -50,9 +51,9 @@ local DebugData = {
 	LastChunk = "Chunk1", 
 	LeaveData = {
 		Position = {
-			X = 260.141,
-			Y = 12, 
-			Z = -155.417
+			X = -11258,
+			Y = 2, 
+			Z = -513
 		},
 		Rotation = {
 			X = 0,
@@ -136,8 +137,12 @@ local DebugData = {
 		FIRST_CREATURE = true,
 		FIRST_BATTLE = true,
 		MET_KYRO_ROUTE_1 = true,
-		AYLA_ROUTE2_DONE = false,
-		MET_KYRO_ROUTE_3 = false,
+		AYLA_ROUTE2_DONE = true,
+
+		MET_KYRO_ROUTE_3 = true, --These two are sorta gated, happen in the same chunk but different cutscenes
+		MET_MAN_ROUTE_3 = true,
+		ASSASSIN_ROUTE_3_INTRO = false,
+		ASSASSIN_ROUTE_3 = false,
 	},
 
 	DefeatedTrainers = {
@@ -151,6 +156,42 @@ local DebugData = {
 	},
 }
 
+-- Ensure every debug creature instance has an assigned ability
+local function ensureInstanceAbility(instance)
+	if type(instance) ~= "table" then
+		return
+	end
+
+	if (instance.Ability == nil or instance.Ability == "") and type(instance.Name) == "string" then
+		local ability = Abilities.SelectAbility(instance.Name, false)
+		if ability ~= nil then
+			instance.Ability = ability
+		end
+	end
+end
+
+local function ensureDebugAbilities()
+	-- Party creatures
+	local party = DebugData.Party
+	if type(party) == "table" then
+		for _, creature in pairs(party) do
+			ensureInstanceAbility(creature)
+		end
+	end
+
+	-- Box creatures
+	local boxes = DebugData.Boxes
+	if type(boxes) == "table" then
+		for _, box in ipairs(boxes) do
+			if box and type(box.Creatures) == "table" then
+				for _, creature in ipairs(box.Creatures) do
+					ensureInstanceAbility(creature)
+				end
+			end
+		end
+	end
+end
+
 local Events = game:GetService("ReplicatedStorage").Events
 local PlayerData = require(script.PlayerData)
 
@@ -162,7 +203,13 @@ function ClientData:UpdateClientData(Player:Player,Data:any)
 end
 
 function ClientData:Get(Player)
-	return UseDebugData and DebugData or PlayerData.GetData(Player)
+	if UseDebugData then
+		-- Backfill abilities into debug data every time it's requested
+		ensureDebugAbilities()
+		return DebugData
+	end
+
+	return PlayerData.GetData(Player)
 end
 
 -- Set the player's live data (bypassing persistence layer for immediate reset)

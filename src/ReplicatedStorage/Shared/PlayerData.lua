@@ -37,7 +37,11 @@ Shared.DEFAULT_PLAYER_DATA = {
 		FIRST_BATTLE = false, --Set after completing the first battle against kyro
 		FINISHED_TUTORIAL = false, --Set after completing the tutorial (Give player 5 capture cubes when setting to true)
 		MET_KYRO_ROUTE_1 = false, --Set after we meet kyro in route 1, 
+		AYLA_ROUTE2_DONE = false,
 		MET_KYRO_ROUTE_3 = false, --Set after we meet kyro in route 2,
+		MET_MAN_ROUTE_3 = false, --Set after we have the cutscene with the old maaayyne
+		ASSASSIN_ROUTE_3_INTRO = false, --Set after Assassin first blocks the Route 3 gate
+		ASSASSIN_ROUTE_3 = false, --Set after we meet the assassin and its owner in route 3
 	},
 }
 

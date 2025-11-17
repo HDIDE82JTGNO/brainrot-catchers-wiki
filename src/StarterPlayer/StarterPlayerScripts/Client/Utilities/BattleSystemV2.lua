@@ -25,6 +25,7 @@ local PartyIntegration = Battle.PartyIntegration
 local SwitchHandler = Battle.SwitchHandler
 local PostBattleHandler = Battle.PostBattleHandler
 local RelocationSignals = require(script.Parent.RelocationSignals)
+local CutsceneRegistry = require(script.Parent:WaitForChild("CutsceneRegistry"))
 local BattleOptionsManager = Battle.BattleOptionsManager
 local BattleMessageGenerator = Battle.MessageGenerator
 
@@ -1238,8 +1239,14 @@ function BattleSystemV2:_startBlackoutSequence()
 	-- Show TopBar after fade out
 	FadeOutTween.Completed:Connect(function()
 		Blackout.Visible = false
+		local cutsceneActive = false
+		pcall(function()
+			if CutsceneRegistry and CutsceneRegistry.IsAnyActive then
+				cutsceneActive = CutsceneRegistry:IsAnyActive() == true
+			end
+		end)
 		if TopBar then
-			TopBar.Visible = true
+			TopBar.Visible = not cutsceneActive
 		end
 		-- Victory music is ended after Caught summary; do not resume chunk here
 		
@@ -1771,8 +1778,19 @@ function BattleSystemV2:_clearBattleState()
 	-- Restore TopBar
 	local UI = getUI()
 	if UI and UI.TopBar then
-		UI.TopBar:SetSuppressed(false)
-		UI.TopBar:Show()
+		local cutsceneActive = false
+		pcall(function()
+			if CutsceneRegistry and CutsceneRegistry.IsAnyActive then
+				cutsceneActive = CutsceneRegistry:IsAnyActive() == true
+			end
+		end)
+		if not cutsceneActive then
+			UI.TopBar:SetSuppressed(false)
+			UI.TopBar:Show()
+		else
+			UI.TopBar:SetSuppressed(true)
+			UI.TopBar:Hide()
+		end
 	end
 	
 	-- End encounter
@@ -2326,8 +2344,19 @@ function BattleSystemV2:_runAwaySequence()
 	-- Restore TopBar
 	local UI = getUI()
 	if UI and UI.TopBar then
-		UI.TopBar:SetSuppressed(false)
-		UI.TopBar:Show()
+		local cutsceneActive = false
+		pcall(function()
+			if CutsceneRegistry and CutsceneRegistry.IsAnyActive then
+				cutsceneActive = CutsceneRegistry:IsAnyActive() == true
+			end
+		end)
+		if not cutsceneActive then
+			UI.TopBar:SetSuppressed(false)
+			UI.TopBar:Show()
+		else
+			UI.TopBar:SetSuppressed(true)
+			UI.TopBar:Hide()
+		end
 	end
 	
 	-- Fade out blackout
@@ -2714,7 +2743,13 @@ function BattleSystemV2:_fadeOutBlackout()
 	-- Show TopBar after fade out
 	FadeOutTween.Completed:Connect(function()
 		Blackout.Visible = false
-		TopBar.Visible = true
+		local cutsceneActive = false
+		pcall(function()
+			if CutsceneRegistry and CutsceneRegistry.IsAnyActive then
+				cutsceneActive = CutsceneRegistry:IsAnyActive() == true
+			end
+		end)
+		TopBar.Visible = not cutsceneActive
 		print("[BattleSystemV2] Blackout fade out completed")
 	end)
 end

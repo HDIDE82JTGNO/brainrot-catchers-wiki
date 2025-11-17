@@ -1,3 +1,4 @@
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 local DBG = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("DBG"))
@@ -167,7 +168,6 @@ return {
                     -- Prompt the player with a brief hint
                     Say:Say("Me", true, { { Text = "I should head to the lab first.", Emotion = "Thinking" } })
 
-                    -- Use reusable MoveTo helper to push the player behind the blocker
                     local behindPoint = Blocker.CFrame.Position - (look * (halfDepth + 10))
                     local target = Vector3.new(behindPoint.X, hrp.Position.Y, behindPoint.Z)
                     local MoveTo = require(script.Parent.MoveTo)
@@ -539,8 +539,90 @@ return {
 		end
 
 		SetupHealer("Camille", "Hey! Let me heal those creatures for you.", "Andddd... All done!")
-		SetupHealer("Damian", "Oh, sup. Need those creatures healing? I got you!", "All done, no need to thank me.")
 		SetupHealer("Miranda", "Oh hi! You need your creatures healed? Allow me!", "Done! Take care of them!")
+
+		local shopController = UI and UI.CatchCareShop
+
+		local function SetupShopKeeper(npcName: string)
+			local npc = NPCFolder:FindFirstChild(npcName)
+			if not npc then
+				return
+			end
+			NPC:Setup(npc, function()
+				UI.TopBar:Hide()
+				Say:Say(npcName, false, {
+					{ Text = "Oh, sup. What can I do for ya?", Emotion = "Happy" },
+				}, npc)
+
+				local pg = Players.LocalPlayer and Players.LocalPlayer:FindFirstChildOfClass("PlayerGui")
+				local sayFrame = pg and pg:FindFirstChild("GameUI")
+				sayFrame = sayFrame and sayFrame:FindFirstChild("Say")
+				local choiceFrame = sayFrame and sayFrame:FindFirstChild("Choice")
+				local yesBtn = choiceFrame and choiceFrame:FindFirstChild("Yes")
+				local noBtn = choiceFrame and choiceFrame:FindFirstChild("No")
+				local yesLabel = yesBtn and yesBtn:FindFirstChild("Label")
+				local noLabel = noBtn and noBtn:FindFirstChild("Label")
+				local originalYes = yesLabel and yesLabel:IsA("TextLabel") and yesLabel.Text or nil
+				local originalNo = noLabel and noLabel:IsA("TextLabel") and noLabel.Text or nil
+				if yesLabel and yesLabel:IsA("TextLabel") then
+					yesLabel.Text = "View shop"
+				elseif yesBtn and yesBtn:IsA("TextButton") then
+					yesBtn.Text = "View shop"
+				end
+				if noLabel and noLabel:IsA("TextLabel") then
+					noLabel.Text = "Nevermind"
+				elseif noBtn and noBtn:IsA("TextButton") then
+					noBtn.Text = "Nevermind"
+				end
+
+				local wantsShop = Say:YieldChoice()
+
+				if originalYes and yesLabel and yesLabel:IsA("TextLabel") then
+					yesLabel.Text = originalYes
+				elseif originalYes and yesBtn and yesBtn:IsA("TextButton") then
+					yesBtn.Text = originalYes
+				end
+				if originalNo and noLabel and noLabel:IsA("TextLabel") then
+					noLabel.Text = originalNo
+				elseif originalNo and noBtn and noBtn:IsA("TextButton") then
+					noBtn.Text = originalNo
+				end
+
+				Say:Exit()
+
+				local function restoreState()
+					UI.TopBar:SetSuppressed(false)
+					UI.TopBar:Show()
+					CharacterFunctions:SetSuppressed(false)
+					CharacterFunctions:CanMove(true)
+				end
+
+				if wantsShop ~= true then
+					Say:Say(npcName, true, {
+						{ Text = "No problem! Come back anytime.", Emotion = "Happy" },
+					}, npc)
+					restoreState()
+					return
+				end
+
+				UI.TopBar:SetSuppressed(true)
+				CharacterFunctions:SetSuppressed(true)
+				CharacterFunctions:CanMove(false)
+
+				local opened = shopController and shopController:Open(function()
+					restoreState()
+				end)
+
+				if opened ~= true then
+					restoreState()
+					Say:Say(npcName, true, {
+						{ Text = "Hm... register's acting up. Try again in a bit.", Emotion = "Confused" },
+					}, npc)
+				end
+			end)
+		end
+
+		SetupShopKeeper("Damian")
 	end,
 	["Load_Chunk2"] = function(CurrentChunk)
 		DBG:print("[ChunkEvents] Load_Chunk2 invoked")
@@ -1138,17 +1220,202 @@ return {
 	end,
 	["Load_Chunk3"] = function(CurrentChunk)
 		local CD = ClientData:Get()
+
+		-- Arm Old Man Franklin trigger 
+		do
+			local events = (CD and CD.Events) or {}
+			if events.MET_MAN_ROUTE_3 ~= true then
+				local essentials = CurrentChunk and CurrentChunk.Model and CurrentChunk.Model.Essentials
+				local cutscene = essentials and essentials:FindFirstChild("Cutscene")
+				local trigger = cutscene and cutscene:FindFirstChild("OldManFranklinTrigger")
+				local oldmanfranklin = cutscene and cutscene:FindFirstChild("Old Man Franklin")
+				local shark = cutscene and cutscene:FindFirstChild("Shark")
+				local sharkanim = shark and shark:FindFirstChild("Animation")
+				local sharkhumanoid = shark and shark:FindFirstChildOfClass("Humanoid")
+
+				if trigger and trigger:IsA("BasePart") then
+					warn("MET_MAN_ROUTE_3 is false, running")
+					if trigger:GetAttribute("FranklinArmed") == true then
+						DBG:print("[Route3] Franklin trigger already armed - skipping duplicate")
+					else
+						trigger:SetAttribute("FranklinArmed", true)
+						DBG:print("[Route3] MET_MAN_ROUTE_3 = false; arming OldManFranklinTrigger (early)")
+						local fired = false
+						local conn
+						conn = trigger.Touched:Connect(function(hit)
+							local player = game:GetService("Players").LocalPlayer
+							local character = player and (player.Character or player.CharacterAdded:Wait())
+							local hrp = character and character:FindFirstChild("HumanoidRootPart")
+							if fired or not hrp or hit ~= hrp then return end
+							fired = true
+							DBG:print("[Route3] OldManFranklinTrigger touched - starting cutscene")
+
+							-- Begin Franklin cutscene
+							UI.TopBar:SetSuppressed(true); UI.TopBar:Hide()
+							CharacterFunctions:SetSuppressed(true); CharacterFunctions:CanMove(false)
+
+							-- Walk player to scenic points
+							do
+								local one = cutscene and cutscene:FindFirstChild("PlayerWalkToONE")
+								local two = cutscene and cutscene:FindFirstChild("PlayerWalkToTWO")
+								local phrp2: BasePart? = character and character:FindFirstChild("HumanoidRootPart")
+								if phrp2 and one and one:IsA("BasePart") then
+									DBG:print("[Route3] Walking player to PlayerWalkToONE")
+									local t1 = Vector3.new(one.Position.X, phrp2.Position.Y, one.Position.Z)
+									pcall(function()
+										MoveTo.MoveToTarget(t1, { minWalkSpeed = 14, timeout = 3.0, preserveFacing = true, arriveRadius = 1.5, retryInterval = 0.35, delayAfter = 0.05 })
+									end)
+								end
+								if phrp2 and two and two:IsA("BasePart") then
+									DBG:print("[Route3] Walking player to PlayerWalkToTWO")
+									local t2 = Vector3.new(two.Position.X, phrp2.Position.Y, two.Position.Z)
+									pcall(function()
+										MoveTo.MoveToTarget(t2, { minWalkSpeed = 14, timeout = 3.0, preserveFacing = true, arriveRadius = 1.5, retryInterval = 0.35, delayAfter = 0.05 })
+									end)
+								end
+							end
+
+							-- Franklin intro
+							Say:Say("Franklin", true, {
+								{ Text = "Hey there, sonny! Name’s Franklin. I was a builder in this town back in the day.", Emotion = "Talking" },
+							}, oldmanfranklin)
+							Say:Say("Franklin", true, {
+								{ Text = "I always come by to greet newcomers. Cresamore was the greatest place for me — no other town ever felt like home quite like this one.", Emotion = "Happy" },
+							}, oldmanfranklin)
+							Say:Say("Franklin", true, {
+								{ Text = "You know, legends say a legendary Brainrot used to roam these waters. They called it Tralalero Tralala.", Emotion = "Thinking" },
+							}, oldmanfranklin)
+							Say:Say("Franklin", true, {
+								{ Text = "But that’s just old folk talk… I’ve never seen it myself.", Emotion = "Sad" },
+							}, oldmanfranklin)
+
+							-- Start rain
+							pcall(function()
+								local rain = cutscene and cutscene:FindFirstChild("Rain")
+								local particles = rain and rain:FindFirstChild("Particles")
+								if particles and particles:IsA("ParticleEmitter") then particles.Enabled = true end
+							end)
+
+							-- Move camera to scenic CameraPart
+							pcall(function()
+								local cameraPart = cutscene and cutscene:FindFirstChild("CameraPart")
+								local cam = workspace.CurrentCamera
+								if cameraPart and cameraPart:IsA("BasePart") and cam then
+									cam.CameraType = Enum.CameraType.Scriptable
+									local tween = TweenService:Create(cam, TweenInfo.new(1.0, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+										CFrame = cameraPart.CFrame,
+									})
+									tween:Play()
+								end
+							end)
+
+							-- Play shark animation
+							local sharkTrack: AnimationTrack? = nil
+							pcall(function()
+								if sharkhumanoid and sharkanim and sharkanim:IsA("Animation") then
+									local animator = sharkhumanoid:FindFirstChildOfClass("Animator") or Instance.new("Animator", sharkhumanoid)
+									local ok, tr = pcall(function() return animator:LoadAnimation(sharkanim) end)
+									if ok and tr then
+										sharkTrack = tr
+										pcall(function() sharkTrack:Play(0.1) end)
+									end
+								end
+							end)
+
+							repeat
+								task.wait(0.01)
+							until sharkTrack and sharkTrack.TimePosition >= 0.01
+							
+							Say:Say("Franklin", false, {
+								{ Text = "My goodness! Son, do you see that?! That’s him! The legend was true!", Emotion = "Excited" },
+							}, oldmanfranklin)
+							task.wait(3.6)
+							Say:Exit()
+							Say:Say("Franklin", false, {
+								{ Text = "By the waters of Cresamore… never in my life did I think I’d see that Brainrot with my own eyes!", Emotion = "Happy" },
+							}, oldmanfranklin)
+							task.wait(3.7)
+							Say:Exit()
+
+							local rain = cutscene and cutscene:FindFirstChild("Rain")
+							local particles = rain and rain:FindFirstChild("Particles")
+							if particles and particles:IsA("ParticleEmitter") then particles.Enabled = false end
+							workspace.CurrentCamera.CameraType = Enum.CameraType.Custom
+
+
+							-- Back to manual
+							Say:Say("Franklin", true, {
+								{ Text = "Surely this has something to do with you! You must radiate a light that only Brainrots can sense — you shine bright to them!", Emotion = "Talking" },
+							}, oldmanfranklin)
+							Say:Say("Franklin", true, {
+								{ Text = "You’ll be a fantastic trainer, I can already tell.", Emotion = "Happy" },
+							}, oldmanfranklin)
+							Say:Say("Franklin", true, {
+								{ Text = "For your journeys, I want to give you something. You’re planning to challenge the Grass Gym in Asterden, right?", Emotion = "Talking" },
+							}, oldmanfranklin)
+							Say:Say("Franklin", true, {
+								{ Text = "Take these potions. They aren’t much, but they’ll surely help you.", Emotion = "Happy" },
+							}, oldmanfranklin)
+
+							do
+								local pname = (ClientData:Get() and ClientData:Get().Nickname) or (game.Players.LocalPlayer and game.Players.LocalPlayer.Name) or "Player"
+								Say:Say("", true, { { Text = pname .. " obtained 3 Potions!", Emotion = "Happy" }, })
+							end
+
+							-- Franklin farewell
+							Say:Say("Franklin", true, {
+								{ Text = "It was a pleasure meeting you, son. If you ever need advice, my house is the last one up the hill!", Emotion = "Smug" },
+								{ Text = "And if you ever find Tralalero Tralala again, please — come show me. I’d love to see it up close.", Emotion = "Happy" },
+							}, oldmanfranklin)
+
+							UIFunctions:Transition(true)
+
+							if shark then shark:Destroy() end
+							if oldmanfranklin then oldmanfranklin:Destroy() end
+		
+							-- Server authoritative event set (grants items server-side)
+							pcall(function()
+								local Events = game:GetService("ReplicatedStorage"):WaitForChild("Events")
+								if Events and Events.Request then
+									Events.Request:InvokeServer({"SetEvent", "MET_MAN_ROUTE_3", true})
+								end
+							end)
+							setClientEventFlag("MET_MAN_ROUTE_3", true)
+
+							task.wait(1.0)
+							UIFunctions:Transition(false)
+
+							UI.TopBar:SetSuppressed(false); UI.TopBar:Show()
+							CharacterFunctions:SetSuppressed(false); CharacterFunctions:CanMove(true)
+
+							if conn then conn:Disconnect() end
+						end)
+					end
+				else
+					DBG:print("[Route3] OldManFranklinTrigger missing; cannot arm")
+				end
+			else
+				local CutsceneFolder = CurrentChunk.Model.Essentials.Cutscene
+				CutsceneFolder:FindFirstChild("Old Man Franklin"):Destroy()
+			end
+		end
+
 		if CD and CD.Events and CD.Events.MET_KYRO_ROUTE_3 ~= true then
 			print("We've not met kyro in route 3 yet, running cutscene")
+			-- Mark Route3 intro as a cutscene so TopBar stays hidden across the battle
+			pcall(function()
+				local CutsceneRegistry = require(script.Parent.CutsceneRegistry)
+				CutsceneRegistry:Start("Route3_KyroIntro")
+			end)
 			local nickname = (CD and CD.Nickname) or "Trainer"
 			UI.TopBar:Hide()
 			UI.TopBar:SetSuppressed(true)
 			CharacterFunctions:CanMove(false)
 			CharacterFunctions:SetSuppressed(true)
-			local CutsceneFolder = CurrentChunk.Model.Essentials.KyroFolder
-			Say:Say("Kyro", true, {
-				{ Text = nickname .. "!", Emotion = "Happy" },
-			}, CutsceneFolder.Kyro)
+			local CutsceneFolder = CurrentChunk.Model.Essentials.Cutscene
+
+			task.wait(0.5)
+
 			local kyroHRP = CutsceneFolder.Kyro:FindFirstChild("HumanoidRootPart")
 			local character = game.Players.LocalPlayer.Character
 			local phrp: BasePart? = character and character:FindFirstChild("HumanoidRootPart")
@@ -1157,13 +1424,13 @@ return {
 			Say:Say("Kyro", true, {
 				{ Text = "A legendary huh.", Emotion = "Thinking" },
 				{ Text = "Interesting...", Emotion = "Thinking" },
-			}, CutsceneFolder.Kyro)
+			})
 
 			local aylaHRP: BasePart? = CutsceneFolder.Ayla:FindFirstChild("HumanoidRootPart")
 			-- Ayla greets and gives shoes (Say will auto-face player)
 			Say:Say("Ayla", true, {
 				{ Text = nickname .. "! There you are.", Emotion = "Happy" },
-				{ Text = "Hey! " .. nickname .. "! Before we have our battle, I wanted to help you out and give you these running shoes!", Emotion = "Excited" },
+				{ Text = "Before we have our battle, I wanted to help you out and give you these running shoes!", Emotion = "Excited" },
 			}, CutsceneFolder.Ayla)
 
 			Say:Say("", true, {
@@ -1175,9 +1442,49 @@ return {
 				{ Text = "I really appreciate what you did back there — thank you so much for helping me get Ava back.", Emotion = "Happy" },
 			}, CutsceneFolder.Ayla)
 
-			--kyro runs over
-
-			MoveTo.MoveToTarget(target, { minWalkSpeed = 16, timeout = 2.5, preserveFacing = true, arriveRadius = 2.0, retryInterval = 0.35, delayAfter = 0.2 })
+			local kyHumanoid = CutsceneFolder.Kyro:FindFirstChildOfClass("Humanoid")
+			if kyHumanoid and kyroHRP and phrp then
+				local toPlayer = phrp.Position - kyroHRP.Position
+				local dir = (toPlayer.Magnitude > 0.001) and toPlayer.Unit or Vector3.new(0, 0, -1)
+				local stopPos = Vector3.new(phrp.Position.X, kyroHRP.Position.Y, phrp.Position.Z) - (dir * 3) + (Vector3.yAxis:Cross(dir).Unit * 2.5)
+				local kyAnimator = kyHumanoid:FindFirstChildOfClass("Animator")
+				if not kyAnimator then
+					kyAnimator = Instance.new("Animator")
+					kyAnimator.Parent = kyHumanoid
+				end
+				local runTrack: AnimationTrack? = nil
+				MoveTo.MoveHumanoidToTarget(kyHumanoid, kyroHRP, stopPos, {
+					minWalkSpeed = 16,
+					timeout = 4,
+					arriveRadius = 5.6,
+					retryInterval = 0.35,
+					onStart = function()
+						if kyAnimator then
+							local anim = Instance.new("Animation")
+							anim.AnimationId = "rbxassetid://120866625087275"
+							local ok, track = pcall(function()
+								return kyAnimator:LoadAnimation(anim)
+							end)
+							if ok and track then
+								runTrack = track
+								runTrack.Priority = Enum.AnimationPriority.Movement
+								runTrack.Looped = true
+								pcall(function()
+									runTrack:Play(0.1)
+								end)
+							end
+						end
+					end,
+					onComplete = function()
+						if runTrack then
+							pcall(function()
+								runTrack:Stop(0.2)
+							end)
+							runTrack = nil
+						end
+					end,
+				})
+			end
 
 			-- Kyro talks to player first
 			Say:Say("Kyro", true, {
@@ -1202,7 +1509,7 @@ return {
 
 			-- Ayla playful response and battle setup (to Kyro, then to player)
 			Say:Say("Ayla", true, {
-				{ Text = "*giggles* Ooooh, show-off! It’s nice to meet you, Kyro.", Emotion = "Happy" },
+				{ Text = "Ooooh, show-off! It’s nice to meet you, Kyro.", Emotion = "Happy" },
 			}, CutsceneFolder.Ayla, CutsceneFolder.Kyro)
 			Say:Say("Ayla", true, {
 				{ Text = "I hope we can all be great friends. But for now — me and " .. nickname .. " were just about to have a battle.", Emotion = "Happy" },
@@ -1242,16 +1549,17 @@ return {
 				},
 			}
 			local trainerSpec = {
-				{ Name = "Avocadini Guffo", Level = 11, 
+				{ Name = "Avocadini Guffo", Level = 12, 
 				Gender = "1", 
 				IVs = {HP = 31, Attack = 28, Defense = 12, Speed = 19},
 				Nature = "Calm" },
-				
-				{ Name = "Duckaroo", Level = 9, 
-				Gender = "0", 
-				IVs = {HP = 22, Attack = 15, Defense = 8, Speed = 31},
-				Nature = "Calm" },
 			}
+
+			-- Prepare trainer intro agent for Ayla so BattleSystemV2 can animate her
+			pcall(function()
+				local TrainerIntroController = require(script.Parent.TrainerIntroController)
+				TrainerIntroController:PrepareFromNPC(CutsceneFolder.Ayla)
+			end)
 
 			Events.Request:InvokeServer({"StartBattle", "Trainer", {
 				TrainerName = trainerDialogue.TrainerName,
@@ -1323,13 +1631,389 @@ return {
 					Say:Say("Kyro", true, {
 						{ Text = "Later, " .. pname .. ". Don’t slack off now!", Emotion = "Smug" },
 					}, CutsceneFolder.Kyro)
+
+					UIFunctions:Transition(true)
+					task.wait(1.5)
+					UIFunctions:Transition(false)
 				end
 			end
 
+			CutsceneFolder.Ayla:Destroy()
+			CutsceneFolder.Kyro:Destroy()
+
+ 			local CutsceneRegistry = require(script.Parent.CutsceneRegistry)
+ 			CutsceneRegistry:End("Route3_KyroIntro")
+			
+			UI.TopBar:SetSuppressed(false)
+			UI.TopBar:Show()
+
+			CharacterFunctions:SetSuppressed(false)
+			CharacterFunctions:CanMove(true)
 
 		else
-				--Destroy the cutscene stuff
-				CurrentChunk.Model.Essentials.KyroFolder:Destroy()
+			local CutsceneFolder = CurrentChunk.Model.Essentials.Cutscene
+			CutsceneFolder.Ayla:Destroy()
+			CutsceneFolder.Kyro:Destroy()
+		end
+
+		local events = (CD and CD.Events) or {}
+		local assassinIntro = events.ASSASSIN_ROUTE_3_INTRO == true
+
+		if events.ASSASSIN_ROUTE_3 ~= true then
+			local essentials = CurrentChunk and CurrentChunk.Model and CurrentChunk.Model.Essentials
+			local cutscene = essentials and essentials:FindFirstChild("Cutscene")
+			if cutscene then
+				-- Phase 1: Assassin blocks the gate when player touches trigger (only if intro hasn't already happened)
+				if not assassinIntro then
+					local trigger = cutscene:FindFirstChild("CappuchinoAssasinoTrigger")
+					if trigger and trigger:IsA("BasePart") then
+						if trigger:GetAttribute("AssassinArmed") == true then
+							DBG:print("[Route3] Assassin trigger already armed - skipping duplicate")
+						else
+							trigger:SetAttribute("AssassinArmed", true)
+							DBG:print("[Route3] ASSASSIN_ROUTE_3 = false; arming CappuchinoAssasinoTrigger")
+
+							local fired = false
+							local conn
+							conn = trigger.Touched:Connect(function(hit)
+								local player = Players.LocalPlayer
+								local character = player and (player.Character or player.CharacterAdded:Wait())
+								local hrp: BasePart? = character and character:FindFirstChild("HumanoidRootPart")
+								if fired or not hrp or (hit ~= hrp and (not hit or not hit:IsDescendantOf(character))) then
+									return
+								end
+								fired = true
+								DBG:print("[Route3] Assassin trigger touched - starting Assassin gate block sequence")
+
+								-- Hide UI / lock player movement during the short animation
+								UI.TopBar:SetSuppressed(true)
+								UI.TopBar:Hide()
+								CharacterFunctions:SetSuppressed(true)
+								CharacterFunctions:CanMove(false)
+
+								workspace.CurrentCamera.CameraType = Enum.CameraType.Scriptable
+								workspace.CurrentCamera.CFrame = cutscene:FindFirstChild("CameraPart2").CFrame
+								workspace.CurrentCamera.FieldOfView = 48
+
+								local assassin = cutscene:FindFirstChild("Assassin")
+								local assassinHRP: BasePart? = assassin and assassin:FindFirstChild("HumanoidRootPart")
+								local assassinHum: Humanoid? = assassin and assassin:FindFirstChildOfClass("Humanoid")
+								local assassinAnim = assassin and assassin:FindFirstChild("Animation")
+								local jumpTarget: BasePart? = cutscene:FindFirstChild("CappuchinoAssasinoJumpToCutscene")
+
+								-- Play Assassin jump-in animation
+								local assassinTrack: AnimationTrack? = nil
+								pcall(function()
+									if assassinHum and assassinAnim and assassinAnim:IsA("Animation") then
+										local animator = assassinHum:FindFirstChildOfClass("Animator") or Instance.new("Animator")
+										animator.Parent = assassinHum
+										local ok, tr = pcall(function()
+											return animator:LoadAnimation(assassinAnim)
+										end)
+										if ok and tr then
+											assassinTrack = tr
+											assassinTrack.Priority = Enum.AnimationPriority.Action
+											assassinTrack.Looped = false
+											pcall(function()
+												assassinTrack:Play(0.1)
+											end)
+										end
+									end
+								end)
+
+								repeat
+									task.wait()
+								until assassinTrack and assassinTrack.TimePosition > 0
+
+								task.wait(2.8)
+
+								-- Move Assassin into blocking position
+								if assassinHRP and jumpTarget and jumpTarget:IsA("BasePart") then
+									assassinHRP.CFrame = jumpTarget.CFrame
+								end
+
+								workspace.CurrentCamera.CameraType = Enum.CameraType.Custom
+								workspace.CurrentCamera.FieldOfView = 70
+
+								-- Mark intro as done so it persists across reloads
+								setClientEventFlag("ASSASSIN_ROUTE_3_INTRO", true)
+
+								-- Player reaction to seeing the Assassin
+								Say:Say("Me", true, {
+									{ Text = "Huh? What the— I think this is someone’s Cappuccino Assassino.", Emotion = "Thinking" },
+									{ Text = "Guess I’ll have to find who it belongs to…", Emotion = "Talking" },
+								})
+
+								-- Return control so player can explore town and find Noah
+								UI.TopBar:SetSuppressed(false)
+								UI.TopBar:Show()
+								CharacterFunctions:SetSuppressed(false)
+								CharacterFunctions:CanMove(true)
+
+								if conn then
+									conn:Disconnect()
+								end
+							end)
+						end
+					else
+						DBG:print("[Route3] CappuchinoAssasinoTrigger missing; cannot arm Assassin cutscene")
+					end
+				else
+					-- Intro already happened earlier (possibly before a reload); ensure Assassin is in blocking position
+					local assassin = cutscene:FindFirstChild("Assassin")
+					local assassinHRP: BasePart? = assassin and assassin:FindFirstChild("HumanoidRootPart")
+					local jumpTarget: BasePart? = cutscene:FindFirstChild("CappuchinoAssasinoJumpToCutscene")
+					if assassinHRP and jumpTarget and jumpTarget:IsA("BasePart") then
+						assassinHRP.CFrame = jumpTarget.CFrame
+					end
+				end
+
+				-- Phase 2: Noah interaction when player clicks on him
+				local noahNpc = cutscene:FindFirstChild("Noah")
+				if noahNpc then
+					NPC:Setup(noahNpc, function()
+						-- Re-read events so we see any changes made since chunk load
+						local cdNow = ClientData:Get()
+						local evNow = (cdNow and cdNow.Events) or {}
+
+						-- If everything is already resolved, just give a small post-event line
+						if evNow.ASSASSIN_ROUTE_3 == true then
+							UI.TopBar:Hide()
+							Say:Say("Noah", true, {
+								{ Text = "Hey again! Cappuccino Assassino’s calm now, so the gate should be clear.", Emotion = "Happy" },
+							}, noahNpc)
+							UI.TopBar:Show()
+							CharacterFunctions:SetSuppressed(false)
+							CharacterFunctions:CanMove(true)
+							return
+						end
+
+						-- If we haven’t seen the Assassin block the gate yet, give pre-dialogue instead of starting the battle
+						if evNow.ASSASSIN_ROUTE_3_INTRO ~= true then
+							UI.TopBar:Hide()
+							Say:Say("Noah", true, {
+								{ Text = "Oh, hey! I’m Noah.", Emotion = "Happy" },
+								{ Text = "I’ve got a Brainrot named Cappuccino Assassino — he can get a little overprotective near the Route 3 gate.", Emotion = "Talking" },
+								{ Text = "If you see him blocking the way, come let me know, alright?", Emotion = "Happy" },
+							}, noahNpc)
+							UI.TopBar:Show()
+							CharacterFunctions:SetSuppressed(false)
+							CharacterFunctions:CanMove(true)
+							return
+						end
+
+						-- At this point, the Assassin intro has happened but the event isn’t resolved yet: run full battle flow
+						UI.TopBar:SetSuppressed(true)
+						UI.TopBar:Hide()
+						CharacterFunctions:SetSuppressed(true)
+						CharacterFunctions:CanMove(false)
+
+						local player = Players.LocalPlayer
+						local character = player and (player.Character or player.CharacterAdded:Wait())
+						local hrp: BasePart? = character and character:FindFirstChild("HumanoidRootPart")
+
+						local playerPos: BasePart? = cutscene:FindFirstChild("CapuchinoPlayerPos")
+						local noahPosAfter: BasePart? = cutscene:FindFirstChild("NoahPositionAfter")
+
+						local noahHRP: BasePart? = noahNpc:FindFirstChild("HumanoidRootPart")
+
+						-- Noah dialogue sequence explaining the situation
+						Say:Say("Noah", true, {
+							{ Text = "You said a Brainrot’s blocking the gate?", Emotion = "Thinking" },
+							{ Text = "Oh man, that’s mine! Sorry about that. Cappuccino Assassino’s always been protective of trainers — he won’t let people through if he feels they’re not ready yet.", Emotion = "Happy" },
+						}, noahNpc)
+						Say:Say("Noah", true, {
+							{ Text = "It’s kind of his thing, y’know? Helping trainers by testing them.", Emotion = "Talking" },
+							{ Text = "If you want to pass, you’ll have to prove yourself and beat him in battle.", Emotion = "Excited" },
+						}, noahNpc)
+						Say:Say("Me", true, {
+							{ Text = "So… I have to battle him to earn my way through, huh?", Emotion = "Thinking" },
+						})
+						Say:Say("Noah", true, {
+							{ Text = "Exactly! Let’s go together — I’ll tell him it’s a friendly match.", Emotion = "Happy" },
+							{ Text = "Don’t hold back though, he loves a real challenge.", Emotion = "Excited" },
+						}, noahNpc)
+
+						-- Transition and teleport to battle positions
+						UIFunctions:Transition(true)
+						task.wait(1.5)
+
+						if hrp and playerPos and playerPos:IsA("BasePart") then
+							hrp.CFrame = playerPos.CFrame
+						end
+						if noahHRP and noahPosAfter and noahPosAfter:IsA("BasePart") then
+							noahHRP.CFrame = noahPosAfter.CFrame
+						end
+
+						UIFunctions:Transition(false)
+
+						Say:Say("Noah", true, {
+							{ Text = "Awesome! Now we're here, let's do this!", Emotion = "Excited" },
+						}, noahNpc)
+
+						-- Start Trainer battle: Noah with Cappuccino Assassino (level 12)
+						local trainerDialogue = {
+							Name = "Noah",
+							CustomAnimation = false,
+							Emotion = "Bored",
+							LineOfSight = false,
+							TrainerId = "Route3_Noah_Assassin",
+							TrainerName = "Noah",
+							Say = {
+								{ Text = "", Emotion = "Bored" },
+							},
+							AfterSayInBattle = {
+								{ Text = "Cappuccino Assassino really went all out!", Emotion = "Happy" },
+							},
+							AfterSayOverworld = {
+								{ Text = "He definitely respects you now.", Emotion = "Happy" },
+							},
+						}
+
+						local trainerSpec = {
+							{
+								Name = "Cappuccino Assassino",
+								Level = 12,
+								Gender = "1",
+								IVs = { HP = 31, Attack = 20, Defense = 18, Speed = 22 },
+								Nature = "Brave",
+							},
+						}
+
+						local TrainerIntroController = require(script.Parent.TrainerIntroController)
+						TrainerIntroController:PrepareFromNPC(noahNpc)
+
+						Events.Request:InvokeServer({ "StartBattle", "Trainer", {
+							TrainerName = trainerDialogue.TrainerName,
+							TrainerSpec = trainerSpec,
+							TrainerId = trainerDialogue.TrainerId,
+							TrainerDialogue = trainerDialogue,
+						} })
+
+						-- Wait for battle to finish and then run post-battle cleanup/dialogue
+						do
+							local ok, reason = pcall(function()
+								local BattleAwait = require(script.Parent.BattleAwait)
+								return BattleAwait.waitForBattleOverAndRelocation(90)
+							end)
+
+							if ok and reason == true then
+								Say:Say("Noah", true, {
+									{ Text = "Haha! He respects you now. See that little nod? That’s his way of saying, \"You’re ready.\"", Emotion = "Happy" },
+								}, noahNpc)
+								Say:Say("Noah", true, {
+									{ Text = "Seems like you’re good to go! Good luck with the Asterden Gym Leader — he’s tough, but you’ve got this.", Emotion = "Excited" },
+								}, noahNpc)
+
+								UIFunctions:Transition(true)
+								task.wait(1.5)
+
+								-- Clean up Assassin and Noah from cutscene after battle
+								local assassin = cutscene:FindFirstChild("Assassin")
+								if assassin then assassin:Destroy() end
+								if noahNpc then noahNpc:Destroy() end
+
+								setClientEventFlag("ASSASSIN_ROUTE_3", true)
+
+								UIFunctions:Transition(false)
+							else
+								DBG:warn("[Route3] Assassin/Noah battle did not complete successfully: " .. tostring(reason))
+							end
+						end
+
+						UI.TopBar:SetSuppressed(false)
+						UI.TopBar:Show()
+						CharacterFunctions:SetSuppressed(false)
+						CharacterFunctions:CanMove(true)
+					end)
+
+					-- Soft gate in front of the Route 3 gate so player can't proceed to Chunk4
+					-- until the Assassin/Noah event is fully resolved.
+					do
+						local blocker: BasePart? = cutscene:FindFirstChild("CappuchinoAssasinoBlocker")
+						if blocker and blocker:IsA("BasePart") then
+							local Player = Players.LocalPlayer
+							local lastTriggerTime = 0
+							local proximityAhead = 3 -- studs in front of blocker front face
+							local lateralPadding = 2 -- side padding
+							local hbConn: RBXScriptConnection? = nil
+
+							hbConn = RunService.Heartbeat:Connect(function()
+								local cdNow = ClientData:Get()
+								local evNow = (cdNow and cdNow.Events) or {}
+
+								-- If event finished, stop gating
+								if evNow.ASSASSIN_ROUTE_3 == true then
+									if hbConn then hbConn:Disconnect() hbConn = nil end
+									return
+								end
+
+								-- Only gate after the Assassin has actually blocked the gate
+								if evNow.ASSASSIN_ROUTE_3_INTRO ~= true then
+									return
+								end
+
+								local character = Player and Player.Character
+								local hrp: BasePart? = character and character:FindFirstChild("HumanoidRootPart")
+								local humanoid: Humanoid? = character and character:FindFirstChildOfClass("Humanoid")
+								if not hrp or not humanoid then return end
+
+								-- Compute relative position using blocker orientation
+								local toPlayer = hrp.Position - blocker.Position
+								local look = blocker.CFrame.LookVector
+								local right = blocker.CFrame.RightVector
+								local halfDepth = (blocker.Size.Z or 0) * 0.5
+								local halfWidth = (blocker.Size.X or 0) * 0.5
+								local axisDist = toPlayer:Dot(look) -- + in front, - behind
+								local lateralDist = math.abs(toPlayer:Dot(right))
+								local frontFace = halfDepth
+								local inFrontBand = axisDist >= (frontFace - 0.25) and axisDist <= (frontFace + proximityAhead)
+								local withinWidth = lateralDist <= (halfWidth + lateralPadding)
+								if not (inFrontBand and withinWidth) then
+									return
+								end
+
+								local now = os.clock()
+								if now - lastTriggerTime < 1.2 then
+									return
+								end
+								lastTriggerTime = now
+
+								-- Prompt and push the player back
+								Say:Say("Cappuccino Assassino", true, { { Text = "Assassino!", Emotion = "Thinking" } })
+
+								local behindPoint = blocker.CFrame.Position - (look * (halfDepth + 10))
+								local target = Vector3.new(behindPoint.X, hrp.Position.Y, behindPoint.Z)
+
+								MoveTo.MoveToTarget(target, {
+									minWalkSpeed = 12,
+									timeout = 1.5,
+									delayAfter = 0.5,
+									preserveFacing = true,
+								})
+
+								pcall(function() Say:Exit() end)
+							end)
+
+							-- Clean up when chunk unloads
+							if CurrentChunk and CurrentChunk.Model then
+								CurrentChunk.Model.AncestryChanged:Connect(function(_, parent)
+									if not parent and hbConn then
+										hbConn:Disconnect()
+										hbConn = nil
+									end
+								end)
+							end
+						end
+					end
+				else
+					DBG:print("[Route3] Noah NPC missing; cannot arm Noah interaction")
+				end
+			end
+		else
+			local CutsceneFolder = CurrentChunk.Model.Essentials.Cutscene
+			CutsceneFolder.Assassin:Destroy()
+			CutsceneFolder.Noah:Destroy()
 		end
 	end,
 ["Load_Professor's Lab"] = function(CurrentChunk)

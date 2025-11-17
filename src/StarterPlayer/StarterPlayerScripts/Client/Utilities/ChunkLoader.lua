@@ -1,6 +1,7 @@
 local ChunkManager = {}
 
 local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local DBG = require(ReplicatedStorage.Shared.DBG)
@@ -13,6 +14,7 @@ local MusicManager = require(script.Parent.MusicManager)
 local UIFunctions = require(script.Parent.Parent.UI.UIFunctions)
 local UI = require(script.Parent.Parent.UI)
 local CutsceneRegistry = require(script.Parent:WaitForChild("CutsceneRegistry"))
+local IndoorCamera = require(script.Parent:WaitForChild("IndoorCamera"))
 
 local Events = game.ReplicatedStorage.Events
 
@@ -24,6 +26,9 @@ ChunkManager.CurrentChunk = {
 	EncounterZones = nil,
 	Connections = nil,
 }
+
+-- Shared indoor camera instance for scripted interior chunks
+local indoorCam
 
 -- Track pending UI actions for location banner after transition hides
 ChunkManager._pendingShowLocation = false
@@ -83,6 +88,11 @@ end)
 
 function ChunkManager:ClearCurrentChunk()
 	if ChunkManager.CurrentChunk then
+		-- Disable indoor camera when clearing chunks
+		if indoorCam then
+			indoorCam:disable()
+		end
+
 		-- Clean up encounter zones before destroying chunk
 		EncounterZone:Cleanup()
 		
@@ -122,6 +132,58 @@ function ChunkManager:Load(Chunk: Folder, Visual: boolean, ClearCurrentChunk)
 	local LightingPreset = ChunkManager.CurrentChunk.Essentials:FindFirstChild("Lighting")
 	if LightingPreset then
 		LightingManager:SetLighting(LightingPreset)
+	end
+
+	-- Setup indoor scripted camera for qualifying chunks
+	do
+		local scriptedCam = false
+		pcall(function()
+			scriptedCam = Chunk:GetAttribute("ScriptedCam") == true
+		end)
+
+		if scriptedCam then
+			if not indoorCam then
+				indoorCam = IndoorCamera.new()
+			end
+
+			-- Target the local player's HumanoidRootPart
+			local player = Players.LocalPlayer
+			local character = player and (player.Character or player.CharacterAdded:Wait())
+			local hrp = character and character:FindFirstChild("HumanoidRootPart")
+			if hrp then
+				indoorCam:setTarget(hrp)
+			end
+
+			-- Compute simple X-bounds from all BaseParts in the chunk model
+			local minX = math.huge
+			local maxX = -math.huge
+			for _, descendant in ipairs(Chunk:GetDescendants()) do
+				if descendant:IsA("BasePart") then
+					local x = descendant.Position.X
+					if x < minX then
+						minX = x
+					end
+					if x > maxX then
+						maxX = x
+					end
+				end
+			end
+
+			if minX <= maxX then
+				indoorCam:setBounds(minX, maxX)
+			else
+				indoorCam:setBounds(-math.huge, math.huge)
+			end
+
+			indoorCam:setAngleAndDistance(40, 18)
+			indoorCam:setYHeight(1.5)
+			indoorCam:setExtraOffset(Vector3.new(0, 0, 0))
+			indoorCam:enable()
+		else
+			if indoorCam then
+				indoorCam:disable()
+			end
+		end
 	end
 	
 	-- Set music if chunk has music

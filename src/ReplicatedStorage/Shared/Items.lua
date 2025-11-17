@@ -59,6 +59,14 @@ return {
 		HP = 0, Attack = 0, Defense = 0, Speed = 0,
 	}, "The best invention of the century, use it to capture creatures!", "CaptureCubes", true, false, "rbxassetid://78797852452861"),
 
+	["Premium Cube"] = createItem({
+		HP = 0, Attack = 0, Defense = 0, Speed = 0,
+	}, "A more expensive capture cube that has a higher success rate.", "CaptureCubes", true, false, "rbxassetid://78797852452861"),
+
+	["Excellence Cube"] = createItem({
+		HP = 0, Attack = 0, Defense = 0, Speed = 0,
+	}, "A very expensive capture cube that has a very high success rate.", "CaptureCubes", true, false, "rbxassetid://78797852452861"),
+
 	["Rot Cube"] = createItem({
 		HP = 0, Attack = 0, Defense = 0, Speed = 0,
 	}, "Infused with chaotic energy. Said to have the highest success rate out of any cubes.", "CaptureCubes", true, false),
@@ -66,6 +74,10 @@ return {
 	["Glitch Cube"] = createItem({
 		HP = 0, Attack = 0, Defense = 0, Speed = 0,
 	}, "A strange unstable cube. Has a very small chance to duplicate the captured creature... or fail completely.", "CaptureCubes", true, false),
+
+	["Rapid Cube"] = createItem({
+		HP = 0, Attack = 0, Defense = 0, Speed = 0,
+	}, "When used on the first turn of a battle, it has a higher success rate.", "CaptureCubes", true, false),
 
 
 	-- 🎒 Items (Holdables, Buffs, Evolutions)

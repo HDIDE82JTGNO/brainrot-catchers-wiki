@@ -20,6 +20,9 @@ local StatCalc = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("
 local Natures = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Natures"))
 local CreatureFactory = require(script.Parent:WaitForChild("CreatureFactory"))
 local DayNightCycle = require(ServerStorage:WaitForChild("Server"):WaitForChild("DayNightCycle"))
+local CatchCareShopConfig = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("CatchCareShopConfig"))
+
+type ShopItem = CatchCareShopConfig.ShopItem
 
 --// Battle System Modules (Refactored)
 local Battle = require(script.Parent.Battle)
@@ -108,6 +111,94 @@ function ServerFunctions:GiveItem(Player, payload)
     return true
 end
 
+function ServerFunctions:PurchaseCatchCareItem(Player: Player, payload: any)
+	if typeof(payload) ~= "table" then
+		return { Success = false, Message = "Invalid request." }
+	end
+
+	local itemName = payload.ItemName
+	if type(itemName) ~= "string" or itemName == "" then
+		return { Success = false, Message = "Invalid item." }
+	end
+
+	local quantity = tonumber(payload.Quantity) or 1
+	if quantity < 1 then
+		quantity = 1
+	end
+
+	local PlayerData = ClientData:Get(Player)
+	if not PlayerData then
+		return { Success = false, Message = "No player data." }
+	end
+
+	if tostring(PlayerData.Chunk) ~= "CatchCare" then
+		return { Success = false, Message = "You're not at a CatchCare counter." }
+	end
+
+	local lastChunk = tostring(PlayerData.LastChunk or "")
+	if lastChunk == "CatchCare" then
+		lastChunk = ""
+	end
+	local locationConfig = (lastChunk ~= "" and CatchCareShopConfig.Locations[lastChunk]) or nil
+	local effectiveTier = (locationConfig and locationConfig.Tier) or CatchCareShopConfig.DefaultTier
+	local tierDefinition = CatchCareShopConfig.Tiers[effectiveTier]
+	if not tierDefinition then
+		return { Success = false, Message = "Shop data unavailable." }
+	end
+
+	local targetEntry: ShopItem?
+	for _, entry in ipairs(tierDefinition.Items or {}) do
+		if entry.ItemName == itemName then
+			targetEntry = entry
+			break
+		end
+	end
+
+	if not targetEntry then
+		return { Success = false, Message = "That item isn't sold here." }
+	end
+
+	local unitPrice = tonumber(targetEntry.Price)
+	if not unitPrice or unitPrice <= 0 then
+		return { Success = false, Message = "Invalid price data." }
+	end
+	local totalPrice = unitPrice * quantity
+
+	local itemsCatalog = GameData.Items
+	if not itemsCatalog[itemName] then
+		return { Success = false, Message = "Unknown item." }
+	end
+
+	if type(PlayerData.Studs) ~= "number" then
+		PlayerData.Studs = 0
+		ClientData:UpdateClientData(Player, PlayerData)
+	end
+
+	if PlayerData.Studs < totalPrice then
+		return { Success = false, Message = "You don't have enough Studs." }
+	end
+
+	PlayerData.Studs -= totalPrice
+	PlayerData.Items = PlayerData.Items or {}
+	PlayerData.Items[itemName] = (PlayerData.Items[itemName] or 0) + quantity
+	ClientData:UpdateClientData(Player, PlayerData)
+
+	DBG:print(string.format("[CatchCareShop] %s purchased %dx %s for %d studs", Player.Name, quantity, itemName, totalPrice))
+
+	local message: string
+	if quantity == 1 then
+		message = string.format("%s purchased!", itemName)
+	else
+		message = string.format("%dx %s purchased!", quantity, itemName)
+	end
+
+	return {
+		Success = true,
+		Message = message,
+		Studs = PlayerData.Studs,
+	}
+end
+
 -- Manual save rate limiting (per-player)
 local _lastManualSaveAt: {[Player]: number} = {}
 local MANUAL_SAVE_MIN_INTERVAL = 15 -- seconds
@@ -154,6 +245,7 @@ local _ALLOWED_VERBS: {[string]: boolean} = {
     SetBlackoutReturnChunk = true,
     GiveItem = true,
     GetUnstuck = true,
+    PurchaseCatchCareItem = true,
 }
 
 local function _rateLimitOk(player: Player): boolean
@@ -359,6 +451,17 @@ function ServerFunctions:LoadChunkPlayer(Player, ChunkName)
 	local ParentChunk
 
 	ChunkData = GameData.ChunkList[ChunkName]
+	-- Fallback: allow resolving sub-chunks defined under parent entries (ChunkList[Parent].SubChunks[ChunkName])
+	if not ChunkData then
+		for parentName, record in pairs(GameData.ChunkList) do
+			local sc = record and record.SubChunks
+			if sc and sc[ChunkName] then
+				ParentChunk = parentName
+				ChunkData = sc[ChunkName]
+				break
+			end
+		end
+	end
 
 	if not ChunkData then
 		DBG:warn("Chunk not found in GameData:", tostring(ChunkName))
@@ -559,9 +662,10 @@ function ServerFunctions:LoadChunkPlayer(Player, ChunkName)
 	local ClonedChunk = SourceFolder:Clone()
 	ClonedChunk.Name = ChunkName
 	ClonedChunk.Parent = Player.PlayerGui
-	-- Mark interior status on the cloned chunk for client logic
+	-- Mark interior + scripted camera status on the cloned chunk for client logic
 	pcall(function()
 		ClonedChunk:SetAttribute("IsInterior", ChunkData.IsSubRoom == true)
+		ClonedChunk:SetAttribute("ScriptedCam", ChunkData.ScriptedCam == true)
 	end)
 	
 	-- Validate LeaveData vs chunk fallback spawn: if too far (>=600 studs on any axis), clear LeaveData so client uses start door
@@ -1369,53 +1473,79 @@ local function GetMovesForLevel(LearnableMoves, level)
 	return moves
 end
 
+-- Ensure all party creatures have an Ability assigned (backfill for older data/debug)
+local function EnsurePartyAbilities(party)
+	if not party then
+		return
+	end
+
+	for _, creature in ipairs(party) do
+		if creature and (creature.Ability == nil or creature.Ability == "") and type(creature.Name) == "string" then
+			-- Use shared species ability table; treat party creatures as non-wild
+			local ability = AbilitiesModule.SelectAbility(creature.Name, false)
+			if ability ~= nil then
+				creature.Ability = ability
+			end
+		end
+	end
+end
+
 -- Ensure all party creatures have CurrentMoves derived from species Learnset
 local function EnsurePartyMoves(party)
-    if not party then return end
-    local Creatures = require(game:GetService("ReplicatedStorage").Shared.Creatures)
-    for _, creature in ipairs(party) do
-        if creature and (creature.CurrentMoves == nil or #creature.CurrentMoves == 0) then
-            local def = creature.Name and Creatures[creature.Name]
-            if def and def.Learnset then
-                local level = creature.Level or 1
-                -- Build starting moves from learnset without external refs
-                local all = {}
-                for lvl, moveList in pairs(def.Learnset) do
-                    for _, mv in ipairs(moveList) do
-                        table.insert(all, { lvl = lvl, move = mv })
-                    end
-                end
-                table.sort(all, function(a, b)
-                    if a.lvl == b.lvl then return a.move < b.move end
-                    return a.lvl < b.lvl
-                end)
-                local current, learned = {}, {}
-                local recent = {}
-                for i = #all, 1, -1 do
-                    local entry = all[i]
-                    if entry.lvl <= level and not table.find(recent, entry.move) then
-                        table.insert(recent, entry.move)
-                        if #recent == 4 then break end
-                    end
-                end
-                for i = #recent, 1, -1 do
-                    table.insert(current, recent[i])
-                    learned[recent[i]] = true
-                end
-                if #current < 4 then
-                    for _, entry in ipairs(all) do
-                        if entry.lvl <= level and not learned[entry.move] then
-                            table.insert(current, entry.move)
-                            learned[entry.move] = true
-                            if #current == 4 then break end
-                        end
-                    end
-                end
-                creature.CurrentMoves = current
-                creature.LearnedMoves = learned
-            end
-        end
-    end
+	if not party then
+		return
+	end
+
+	local Creatures = require(game:GetService("ReplicatedStorage").Shared.Creatures)
+	for _, creature in ipairs(party) do
+		if creature and (creature.CurrentMoves == nil or #creature.CurrentMoves == 0) then
+			local def = creature.Name and Creatures[creature.Name]
+			if def and def.Learnset then
+				local level = creature.Level or 1
+				-- Build starting moves from learnset without external refs
+				local all = {}
+				for lvl, moveList in pairs(def.Learnset) do
+					for _, mv in ipairs(moveList) do
+						table.insert(all, { lvl = lvl, move = mv })
+					end
+				end
+				table.sort(all, function(a, b)
+					if a.lvl == b.lvl then
+						return a.move < b.move
+					end
+					return a.lvl < b.lvl
+				end)
+				local current, learned = {}, {}
+				local recent = {}
+				for i = #all, 1, -1 do
+					local entry = all[i]
+					if entry.lvl <= level and not table.find(recent, entry.move) then
+						table.insert(recent, entry.move)
+						if #recent == 4 then
+							break
+						end
+					end
+				end
+				for i = #recent, 1, -1 do
+					table.insert(current, recent[i])
+					learned[recent[i]] = true
+				end
+				if #current < 4 then
+					for _, entry in ipairs(all) do
+						if entry.lvl <= level and not learned[entry.move] then
+							table.insert(current, entry.move)
+							learned[entry.move] = true
+							if #current == 4 then
+								break
+							end
+						end
+					end
+				end
+				creature.CurrentMoves = current
+				creature.LearnedMoves = learned
+			end
+		end
+	end
 end
 
 -- Returns list of move names to learn at this level from a Learnset {[level]={moves}}
@@ -1652,8 +1782,9 @@ function ServerFunctions:StartBattle(Player, BattleType, BattleData)
 	end
 	
     -- Build battle creature from compact save (Name, Level, CurrentHP, Gender, Shiny, Nickname)
-    -- Ensure all party members have moves before we start (helps debug data)
+    -- Ensure all party members have moves and abilities before we start (helps debug data/old saves)
     EnsurePartyMoves(PlayerData.Party)
+    EnsurePartyAbilities(PlayerData.Party)
     local Creatures = require(game:GetService("ReplicatedStorage").Shared.Creatures)
     -- YOffset deprecated; no longer used
     local stats, maxStats = StatCalc.ComputeStats(PlayerCreature.Name, PlayerCreature.Level, PlayerCreature.IVs, PlayerCreature.Nature)
@@ -2161,6 +2292,9 @@ end
         local COOLDOWN = 180
         _unstuckCooldown[Player] = now + COOLDOWN
         return { Success = true, CooldownSeconds = COOLDOWN }
+    end
+    if Request[1] == "PurchaseCatchCareItem" then
+        return ServerFunctions:PurchaseCatchCareItem(Player, Request[2])
     end
     if Request[1] == "TakeHeldItem" then
         local payload = Request[2]

@@ -9,4 +9,5 @@ return {
 	TopBar = require(script.TopBar):Create(),
 	PlayerList = require(script.PlayerList),
 	NameInput = require(script:WaitForChild("NameInput")),
+	CatchCareShop = require(script:WaitForChild("CatchCareShop")),
 }
