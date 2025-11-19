@@ -2016,7 +2016,67 @@ return {
 			CutsceneFolder.Noah:Destroy()
 		end
 	end,
-["Load_Professor's Lab"] = function(CurrentChunk)
+
+	["Load_Chunk4"] = function(CurrentChunk)
+		local CD = ClientData:Get()
+		local events = (CD and CD.Events) or {}
+		if events.MET_FREINDS_ROUTE_4 ~= true then
+			local CutsceneFolder = CurrentChunk.Model.Essentials.Cutscene
+			local nickname = (CD and CD.Nickname) or "Trainer"
+			UI.TopBar:Hide()
+			UI.TopBar:SetSuppressed(true)
+			CharacterFunctions:CanMove(false)
+			CharacterFunctions:SetSuppressed(true)
+			local CutsceneFolder = CurrentChunk.Model.Essentials.Cutscene
+
+			task.wait(0.5)
+
+			Say:Say("Kyro", true, {
+				{ Text = "Hey there " .. nickname .. "!", Emotion = "Happy" },
+				{ Text = "After this route is Asterden. We could fight the Gym Leader there and get our first badge!", Emotion = "Thinking" },
+			},CutsceneFolder.Kyro)
+
+			Say:Say("Ayla", true, {
+				{ Text = "Ohhh yeah! I’ve passed by there plenty of times. We should all try and beat the gym!", Emotion = "Happy" },
+			},CutsceneFolder.Ayla)
+
+			Say:Say("Kyro", true, {
+				{ Text = "There are a bunch of cool things we can check out as well.", Emotion = "Happy" },
+				{ Text = "It’s got a big college for Brainrot researchers.", Emotion = "Happy" },
+				{ Text = "I’ve got some business to take care of over there, so I’m going to head there as fast as possible! I’ll see you guys there.", Emotion = "Happy" },
+			},CutsceneFolder.Kyro)
+
+			Say:Say("Ayla", true, {
+				{ Text = "Alright, see you there!", Emotion = "Happy" },
+			},CutsceneFolder.Ayla)
+
+			UIFunctions:Transition(true)
+			task.wait(1.5)
+			CutsceneFolder.Kyro:Destroy()
+			UIFunctions:Transition(false)
+			Say:Say("Ayla", true, {
+				{ Text = "Let’s beat the trainers on this route quickly and get that gym badge! I know we can do it! I’ll meet you at the gate.", Emotion = "Happy" },
+					{ Text = "See you there!", Emotion = "Happy" },
+			},CutsceneFolder.Ayla)
+			UIFunctions:Transition(true)
+			task.wait(1.5)
+			CutsceneFolder.Ayla:Destroy()
+			UIFunctions:Transition(false)
+
+			UI.TopBar:SetSuppressed(false)
+			CharacterFunctions:SetSuppressed(false)
+			UI.TopBar:Show()
+			CharacterFunctions:CanMove(true)
+
+			setClientEventFlag("MET_FREINDS_ROUTE_4", true)
+
+		else
+			local CutsceneFolder = CurrentChunk.Model.Essentials.Cutscene
+			CutsceneFolder:Destroy()
+		end
+	end,
+
+	["Load_Professor's Lab"] = function(CurrentChunk)
         -- If player hasn't chosen a starter yet, re-run the professor intro cutscene on (re)entry
         local pd = ClientData:Get()
         local hasStarter = (pd and ((pd.SelectedStarter ~= nil) or (pd.Party and #pd.Party > 0))) and true or false
@@ -2025,9 +2085,337 @@ return {
 		else
 			CurrentChunk.Essentials.RivalCutscene:Destroy()
         end
-end,
-	
-	
+	end,
+	["Load_Gym1"] = function(CurrentChunk)
+		DBG:print("[ChunkEvents] Load_Gym1 invoked")
+
+		local Essentials = CurrentChunk and CurrentChunk.Essentials
+		local NPCFolder = CurrentChunk and CurrentChunk.Model and CurrentChunk.Model:FindFirstChild("NPCs")
+		if not (Essentials and NPCFolder) then
+			return
+		end
+
+		-- Allow jumping inside this gym; revert when the chunk unloads.
+		pcall(function()
+			CharacterFunctions:CanJump(true)
+		end)
+		if CurrentChunk and CurrentChunk.Model then
+			CurrentChunk.Model.AncestryChanged:Connect(function(_, parent)
+				if not parent then
+					pcall(function()
+						CharacterFunctions:CanJump(false)
+					end)
+				end
+			end)
+		end
+
+		local platformModels = {}
+		for _, name in ipairs({ "Platform", "Platform2", "Platform3" }) do
+			local model = Essentials:FindFirstChild(name)
+			if model and model:IsA("Model") then
+				local bottom = model:FindFirstChild("Bottom")
+				local top = model:FindFirstChild("Top")
+				if bottom and top and bottom:IsA("BasePart") and top:IsA("BasePart") then
+					table.insert(platformModels, { Bottom = bottom, Top = top })
+				end
+			end
+		end
+
+		local function offsetPlatforms(offsetY: number, tweenTime: number?)
+			if #platformModels == 0 or offsetY == 0 then return end
+			for _, info in ipairs(platformModels) do
+				local bottom = info.Bottom
+				local top = info.Top
+				if bottom and top and bottom.Parent and top.Parent then
+					local goalBottom = bottom.CFrame * CFrame.new(0, offsetY, 0)
+					local goalTop = top.CFrame * CFrame.new(0, offsetY, 0)
+					if tweenTime and tweenTime > 0 then
+						local ti = TweenInfo.new(tweenTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+						TweenService:Create(bottom, ti, { CFrame = goalBottom }):Play()
+						TweenService:Create(top, ti, { CFrame = goalTop }):Play()
+					else
+						bottom.CFrame = goalBottom
+						top.CFrame = goalTop
+					end
+				end
+			end
+		end
+
+		local function isTrainerDefeated(trainerId: string): boolean
+			local cd = ClientData:Get()
+			local defeated = cd and cd.DefeatedTrainers
+			return defeated ~= nil and defeated[trainerId] == true
+		end
+
+		-- If Sabrina has already been beaten in a prior visit, raise platforms instantly on load.
+		if isTrainerDefeated("Gym1_Sabrina") then
+			offsetPlatforms(20, nil)
+		end
+
+		local RelocationSignals = require(script.Parent.RelocationSignals)
+		local TrainerIntroController = require(script.Parent.TrainerIntroController)
+
+		-- Trainer Sabrina (click-to-battle; raises platforms on first victory)
+		do
+			local sabrina = NPCFolder:FindFirstChild("Trainer Sabrina")
+			if sabrina and sabrina:IsA("Model") then
+				NPC:Setup(sabrina, function()
+					local alreadyDefeated = isTrainerDefeated("Gym1_Sabrina")
+					if alreadyDefeated then
+						UI.TopBar:Hide()
+						Say:Say("Trainer Sabrina", true, {
+							{ Text = "You already proved yourself. Those platforms will stay up for you.", Emotion = "Happy" },
+						}, sabrina)
+						UI.TopBar:Show()
+						return
+					end
+
+					UI.TopBar:Hide()
+					Say:Say("Trainer Sabrina", true, {
+						{ Text = "Welcome! I'm your first challenge, if you can beat me in a battle, I'll let you pass.", Emotion = "Talking" },
+					}, sabrina)
+					UI.TopBar:Show()
+
+					pcall(function()
+						TrainerIntroController:PrepareFromNPC(sabrina)
+					end)
+
+					local conn
+					conn = Events.Communicate.OnClientEvent:Connect(function(eventType, data)
+						if eventType ~= "BattleOver" then return end
+						if conn then conn:Disconnect() conn = nil end
+						local reason = typeof(data) == "table" and data.Reason or nil
+						local defeatedId = typeof(data) == "table" and data.DefeatedTrainerId or nil
+						if reason ~= "Win" or defeatedId ~= "Gym1_Sabrina" then
+							return
+						end
+
+						local rc
+						rc = RelocationSignals.OnPostBattleRelocated(function()
+							if rc then rc:Disconnect() rc = nil end
+							UI.TopBar:Hide()
+							Say:Say("Trainer Sabrina", true, {
+								{ Text = "Well done! I'll raise the platforms for you now.", Emotion = "Happy" },
+							}, sabrina)
+							UI.TopBar:Show()
+							offsetPlatforms(20, 1.25)
+						end)
+					end)
+
+					pcall(function()
+						Events.Request:InvokeServer({
+							"StartBattle",
+							"Trainer",
+							{
+								TrainerName = "Trainer Sabrina",
+								TrainerId = "Gym1_Sabrina",
+								TrainerSpec = {
+									{ Name = "Tadbalabu", Level = 13 },
+									{ Name = "Chimpanini", Level = 14 },
+								},
+								TrainerDialogue = {
+									Name = "Trainer Sabrina",
+									TrainerId = "Gym1_Sabrina",
+									TrainerName = "Trainer Sabrina",
+									LineOfSight = false,
+									Say = {},
+									AfterSayInBattle = {
+										{ Text = "Well done! I'll raise the platforms for you now.", Emotion = "Happy" },
+									},
+									AfterSayOverworld = {
+										{ Text = "Well done! I'll raise the platforms for you now.", Emotion = "Happy" },
+									},
+								},
+							},
+						})
+					end)
+				end)
+			end
+		end
+
+		-- Helper for simple LOS trainers used in this gym
+		local function setupGymLosTrainer(npcName: string, trainerId: string, trainerSpec: {any}, firstLines: {any})
+			local npc = NPCFolder:FindFirstChild(npcName)
+			if not npc or not npc:IsA("Model") then return end
+
+			local function onEngage(npcModel: Model, npcHRP: BasePart?)
+				local player = Players.LocalPlayer
+				local character = player and (player.Character or player.CharacterAdded:Wait())
+				local hrp = character and character:FindFirstChild("HumanoidRootPart")
+				if not hrp then return end
+
+				-- Face each other quickly, say a short line, then start battle.
+				if npcHRP then
+					local tweenA = TweenService:Create(npcHRP, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+						CFrame = CFrame.new(npcHRP.Position, Vector3.new(hrp.Position.X, npcHRP.Position.Y, hrp.Position.Z)),
+					})
+					local tweenB = TweenService:Create(hrp, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+						CFrame = CFrame.new(hrp.Position, Vector3.new(npcHRP.Position.X, hrp.Position.Y, npcHRP.Position.Z)),
+					})
+					tweenA:Play()
+					tweenB:Play()
+				end
+
+				UI.TopBar:Hide()
+				Say:Say(npcName, true, firstLines, npcModel)
+				UI.TopBar:Show()
+
+				pcall(function()
+					TrainerIntroController:PrepareFromNPC(npcModel)
+				end)
+
+				pcall(function()
+					Events.Request:InvokeServer({
+						"StartBattle",
+						"Trainer",
+						{
+							TrainerName = npcName,
+							TrainerId = trainerId,
+							TrainerSpec = trainerSpec,
+							TrainerDialogue = {
+								Name = npcName,
+								TrainerId = trainerId,
+								TrainerName = npcName,
+								LineOfSight = true,
+								Say = firstLines,
+							},
+						},
+					})
+				end)
+			end
+
+			-- Fire once per join; if the player loses they are relocated out of the gym anyway.
+			LOS:SetupOnceTrigger(npc, {
+				MaxDistance = 28,
+				FOV = 18,
+				UniqueKey = "Gym1_LOS_" .. trainerId,
+				OnTrigger = function(npcModel, npcHRP)
+					onEngage(npcModel, npcHRP)
+				end,
+			})
+		end
+
+		-- Trainer Cameron – LOS trainer in the maze
+		setupGymLosTrainer(
+			"Trainer Cameron",
+			"Gym1_Cameron",
+			{
+				{ Name = "Chimpanini", Level = 15 },
+				{ Name = "Bolasaeg Selluaim", Level = 15 },
+			},
+			{
+				{ Text = "Lost in the maze already? Let me make this even tougher for you!", Emotion = "Smug" },
+			}
+		)
+
+		-- Trainer Malachi – LOS trainer near the end of the maze
+		setupGymLosTrainer(
+			"Trainer Malachi",
+			"Gym1_Malachi",
+			{
+				{ Name = "Tadbalabu", Level = 15 },
+				{ Name = "Chimpanini", Level = 16 },
+			},
+			{
+				{ Text = "You made it this far, but I’ll be your last obstacle before the leader!", Emotion = "Talking" },
+			}
+		)
+
+		-- Gym Leader Vincent – click-to-battle, awards first badge on win
+		do
+			local vincent = NPCFolder:FindFirstChild("Gym Leader Vincent")
+			if vincent and vincent:IsA("Model") then
+				NPC:Setup(vincent, function()
+					local cd = ClientData:Get()
+					local defeated = cd and cd.DefeatedTrainers and cd.DefeatedTrainers["Gym1_Leader_Vincent"] == true
+
+					UI.TopBar:Hide()
+					if defeated then
+						Say:Say("Gym Leader Vincent", true, {
+							{ Text = "You’ve already earned my badge. Route 4 awaits you now—go show them your strength.", Emotion = "Happy" },
+						}, vincent)
+						UI.TopBar:Show()
+						return
+					end
+
+					Say("Gym Leader Vincent", true, {
+						{ Text = "So, you actually made it through my gym’s trials.", Emotion = "Happy" },
+						{ Text = "Most challengers talk big… until they hit the real test.", Emotion = "Happy" },
+					
+						{ Text = "I’m Vincent, Asterden’s Gym Leader.", Emotion = "Talking" },
+						{ Text = "Around here, strength isn’t just about power — it’s about control, clarity, and the bond you’ve built with your Brainrots.", Emotion = "Talking" },
+					
+						{ Text = "Anyone can swing wildly in a battle.", Emotion = "Smug" },
+						{ Text = "But only a real challenger can stay sharp when everything’s on the line.", Emotion = "Smug" },
+					
+						{ Text = "Now let’s see what you really are.", Emotion = "Smug" },
+						{ Text = "Show me if your team can push past pressure… or crumble under it.", Emotion = "Smug" }
+					}, vincent)
+					
+					UI.TopBar:Show()
+
+					pcall(function()
+						TrainerIntroController:PrepareFromNPC(vincent)
+					end)
+
+					local conn
+					conn = Events.Communicate.OnClientEvent:Connect(function(eventType, data)
+						if eventType ~= "BattleOver" then return end
+						if conn then conn:Disconnect() conn = nil end
+						local reason = typeof(data) == "table" and data.Reason or nil
+						local defeatedId = typeof(data) == "table" and data.DefeatedTrainerId or nil
+						if reason ~= "Win" or defeatedId ~= "Gym1_Leader_Vincent" then
+							return
+						end
+
+						local rc
+						rc = RelocationSignals.OnPostBattleRelocated(function()
+							if rc then rc:Disconnect() rc = nil end
+							UI.TopBar:Hide()
+							Say("Gym Leader Vincent", true, {
+								{ Text = "Impressive! You’ve truly earned your first badge.", Emotion = "Happy" },
+								{ Text = "Most challengers fall apart long before this point… but you held your ground.", Emotion = "Talking" },
+								{ Text = "Take this badge and wear it like proof of your discipline and your bond with your Brainrots.", Emotion = "Talking" },
+								{ Text = "Your next step is Route 4. New challengers, new threats. Keep pushing forward!", Emotion = "Excited" },
+								{ Text = "If you can handle what’s ahead, we’ll be hearing your name across the region soon enough! Good luck out there.", Emotion = "Smug" }
+							}, vincent)							
+							UI.TopBar:Show()
+						end)
+					end)
+
+					pcall(function()
+						Events.Request:InvokeServer({
+							"StartBattle",
+							"Trainer",
+							{
+								TrainerName = "Gym Leader Vincent",
+								TrainerId = "Gym1_Leader_Vincent",
+								TrainerSpec = {
+									{ Name = "Chimpanini", Level = 18 },
+									{ Name = "Brr Brr Patapim", Level = 18 },
+								},
+								TrainerDialogue = {
+									Name = "Gym Leader Vincent",
+									TrainerId = "Gym1_Leader_Vincent",
+									TrainerName = "Gym Leader Vincent",
+									LineOfSight = false,
+									Say = {
+										{ Text = "Let’s see how you handle the rhythm of a true Grass specialist.", Emotion = "Smug" },
+									},
+									AfterSayInBattle = {
+										{ Text = "Impressive. You cut through my canopy with ease.", Emotion = "Happy" },
+									},
+									AfterSayOverworld = {
+										{ Text = "With this badge, Route 4 should be your next destination.", Emotion = "Talking" },
+									},
+								},
+							},
+						})
+					end)
+				end)
+			end
+		end
+	end,
 }
 
 

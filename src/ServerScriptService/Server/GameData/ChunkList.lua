@@ -133,6 +133,23 @@ local ChunkList = {
 		Encounters = {},
 		ValidPrevious = {"Chunk4"},
 		HasCatchCareDoor = true,
+		SubChunks = {
+			["Gym1"] = {
+				ProperName = "Asterden Gym",
+				IsSubRoom = true,
+				ScriptedCam = false,
+				Encounters = {},
+				ValidPrevious = {"Chunk5"},
+			},
+		},
+	},
+	
+	["Gym1"] = {
+		ProperName = "Asterden Gym",
+		IsSubRoom = true,
+		ScriptedCam = false,
+		Encounters = {},
+		ValidPrevious = {"Chunk5"},
 	},
 
 	["Chunk6"] = {

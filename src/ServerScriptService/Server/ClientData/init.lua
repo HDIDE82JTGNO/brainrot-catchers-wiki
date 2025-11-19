@@ -41,6 +41,29 @@ LeaveData = {
 	},
 ]]
 
+--[[
+-1171.74, 2.821, -827.953
+]]
+
+--[[
+Outside 1st gym
+
+LastChunk = "Chunk5", 
+	LeaveData = {
+		Position = { 
+			X = -84,
+			Y = 2040, 
+			Z = 1851
+		},
+		Rotation = {
+			X = 0,
+			Y = 0,
+			Z = 0,
+			W = 1
+		}
+	},
+]]
+
 local DebugData = {
 	Studs = 9999,
 	Badges = 0,
@@ -48,12 +71,12 @@ local DebugData = {
 	Nickname = "DEBUG",
 	Sequence = nil,
 	Chunk = nil,
-	LastChunk = "Chunk1", 
+	LastChunk = "Chunk3", 
 	LeaveData = {
-		Position = {
-			X = -11258,
-			Y = 2, 
-			Z = -513
+		Position = { 
+			X = -1171,
+			Y = 3, 
+			Z = -827
 		},
 		Rotation = {
 			X = 0,
@@ -63,7 +86,7 @@ local DebugData = {
 		}
 	},
 	Party = {
-		[1] = { Name = "Frulli Frulla", Level = 3, Gender = 1, Shiny = true, Nickname = nil, CurrentHP = 33, XPProgress = 0, IVs = {HP = 18, Attack = 16, Defense = 14, Speed = 17}, OT = 4788714726, TradeLocked = false, Nature = "Timid", CatchData = { CaughtWhen = os.time(), CaughtBy = 4788714726 }, WeightKg = 6, CurrentMoves = {"Peck","Perch","Fast Attack","Bite"}, HeldItem = "Crumbs" },
+		[1] = { Name = "Frulli Frulla", Level = 15, Gender = 1, Shiny = true, Nickname = nil, CurrentHP = 100, XPProgress = 0, IVs = {HP = 18, Attack = 16, Defense = 14, Speed = 17}, OT = 4788714726, TradeLocked = false, Nature = "Timid", CatchData = { CaughtWhen = os.time(), CaughtBy = 4788714726 }, WeightKg = 6, CurrentMoves = {"Peck","Perch","Fast Attack","Bite"}, HeldItem = "Crumbs" },
 		[2] = { Name = "Sir Tung", Level = 18, Gender = 0, Shiny = false, CurrentHP = 62, XPProgress = 0, IVs = {HP = 14, Attack = 14, Defense = 12, Speed = 10}, Nature = "Adamant", CatchData = { CaughtWhen = os.time(), CaughtBy = 4788714726 }, CurrentMoves = {"Fast Attack","Double Kick","Uppercut"} },
 		[3] = { Name = "Tim Cheese", Level = 22, Gender = 1, Shiny = true, CurrentHP = 70, XPProgress = 0, IVs = {HP = 14, Attack = 15, Defense = 12, Speed = 12}, Nature = "Modest", CatchData = { CaughtWhen = os.time(), CaughtBy = 4788714726 }, CurrentMoves = {"Scratch","Tackle","Bite","Crunch"}, HeldItem = "Capture Cube" },
 		[4] = { Name = "Kitung", Level = 5, Gender = 1, Shiny = true, CurrentHP = 28, XPProgress = 0, IVs = {HP = 12, Attack = 11, Defense = 10, Speed = 13}, Nature = "Hardy", CatchData = { CaughtWhen = os.time(), CaughtBy = 4788714726 }, CurrentMoves = {"Scratch","Fast Attack"} },
@@ -143,6 +166,8 @@ local DebugData = {
 		MET_MAN_ROUTE_3 = true,
 		ASSASSIN_ROUTE_3_INTRO = false,
 		ASSASSIN_ROUTE_3 = false,
+
+		MET_FREINDS_ROUTE_4 = false, --Set after we meet our friends in route 4
 	},
 
 	DefeatedTrainers = {

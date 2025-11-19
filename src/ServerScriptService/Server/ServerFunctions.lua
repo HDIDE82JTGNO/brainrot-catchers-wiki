@@ -11,6 +11,7 @@ local WebhookService = require(ServerScriptService.Packages.WebhookService)
 local DBG = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("DBG"))
 local ClientData = require(script.Parent.ClientData)
 local GameData = require(script.Parent:WaitForChild("GameData"))
+local ChunkService = require(script.Parent:WaitForChild("ChunkService"))
 local GameConfig = require(script.Parent.GameData.Config)
 local TypesModule = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Types"))
 local MovesModule = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Moves"))
@@ -447,21 +448,7 @@ function ServerFunctions:LoadChunkPlayer(Player, ChunkName)
 		end
 	end
 
-	local ChunkData
-	local ParentChunk
-
-	ChunkData = GameData.ChunkList[ChunkName]
-	-- Fallback: allow resolving sub-chunks defined under parent entries (ChunkList[Parent].SubChunks[ChunkName])
-	if not ChunkData then
-		for parentName, record in pairs(GameData.ChunkList) do
-			local sc = record and record.SubChunks
-			if sc and sc[ChunkName] then
-				ParentChunk = parentName
-				ChunkData = sc[ChunkName]
-				break
-			end
-		end
-	end
+	local ChunkData, ParentChunk = ChunkService:GetChunkRecord(ChunkName)
 
 	if not ChunkData then
 		DBG:warn("Chunk not found in GameData:", tostring(ChunkName))
@@ -474,124 +461,11 @@ function ServerFunctions:LoadChunkPlayer(Player, ChunkName)
 		DBG:warn("Player came from same chunk: Authorized")
 	end
 
-	local ValidPrevious = ChunkData.ValidPrevious
-
-	local ValidFromChunk = table.find(ValidPrevious, PlayerData.Chunk)
-	local ValidFromSubChunk = table.find(ValidPrevious, PlayerData.SubChunk)
-	local ValidFromLastChunk = table.find(ValidPrevious, PlayerData.LastChunk)
-	local AnyAllowed = table.find(ValidPrevious, "Any")
-	local LoadingSelf = PlayerData.Chunk == ChunkName or PlayerData.SubChunk == ChunkName
-	
-	-- Special case: Allow returning from universal facilities (like CatchCare) ONLY to their LastChunk
-	-- This handles the "Previous" door functionality for universal facilities while preventing exploits
-	local ReturningFromUniversalFacility = false
-	if PlayerData.Chunk and PlayerData.LastChunk and ChunkName == PlayerData.LastChunk then
-		local CurrentChunkData = GameData.ChunkList[PlayerData.Chunk]
-		if CurrentChunkData and table.find(CurrentChunkData.ValidPrevious, "Any") then
-			-- Player is currently in a universal facility (like CatchCare)
-			-- AND they're trying to return to their LastChunk (not some other chunk)
-			ReturningFromUniversalFacility = true
-			DBG:warn(string.format("Authorized via universal facility return: from %s to %s", tostring(PlayerData.Chunk), tostring(PlayerData.LastChunk)))
-		end
-	end
-
-    -- Special case: Title/Cold start "Continue" logic
-    -- When coming from Title (no active session chunk), prefer resuming at LastChunk.
-    -- If LastChunk is a universal facility (e.g., CatchCare) or missing, redirect to a sensible fallback.
-    local ContinuingFromTitle = false
-    do
-        local sessionChunk = PlayerData.Chunk
-        local atTitle = (sessionChunk == nil or sessionChunk == "nil" or sessionChunk == "Title")
-        if atTitle then
-            local ChunkList = GameData.ChunkList
-            local desired = tostring(PlayerData.LastChunk or "")
-            local fallback: string? = nil
-            if desired == "" or desired == "CatchCare" then
-                -- Prefer LeaveData.Chunk if valid and not CatchCare
-                local ld = PlayerData.LeaveData
-                local ldChunk = (type(ld) == "table" and tostring(ld.Chunk or "")) or ""
-                if ldChunk ~= "" and ldChunk ~= "CatchCare" and ChunkList[ldChunk] then
-                    fallback = ldChunk
-                end
-                -- Final fallback to Chunk1 if still unknown
-                if not fallback and ChunkList["Chunk1"] then
-                    fallback = "Chunk1"
-                end
-            end
-            local target = desired ~= "" and desired or fallback
-            if target and target ~= "" then
-                if ChunkName ~= target then
-                    DBG:warn(string.format("[Title Continue] Redirecting requested chunk %s -> %s", tostring(ChunkName), tostring(target)))
-                    ChunkName = target
-                end
-                ContinuingFromTitle = true
-                DBG:warn(string.format("Authorized via Title Continue to: %s", tostring(ChunkName)))
-            else
-                -- As a last resort, allow a safe gameplay chunk requested by client (not CatchCare)
-                if ChunkList[ChunkName] and ChunkName ~= "CatchCare" then
-                    ContinuingFromTitle = true
-                    DBG:warn(string.format("Authorized via Title Continue (client-requested safe chunk): %s", tostring(ChunkName)))
-                end
-            end
-        end
-        -- Additional recovery: if profile says we're in CatchCare but the client is effectively starting fresh,
-        -- allow a safe gameplay chunk (not CatchCare) to load (e.g., Chunk1).
-        if not ContinuingFromTitle and sessionChunk == "CatchCare" then
-            local ChunkList = GameData.ChunkList
-            if ChunkName ~= "CatchCare" and ChunkList[ChunkName] then
-                ContinuingFromTitle = true
-                DBG:warn(string.format("Authorized via CatchCare recovery from Title: %s", tostring(ChunkName)))
-            end
-        end
-    end
-
-    -- Special case: Allow defeat scenarios to load previous chunk for healing
-    -- This allows Chunk2 defeats to teleport to Chunk1 for healing, even if Chunk2 isn't in Chunk1's ValidPrevious
-    local DefeatScenario = false
-    do
-        local currentChunk = PlayerData.Chunk
-        if currentChunk and currentChunk ~= "Title" and currentChunk ~= "nil" and currentChunk ~= ChunkName then
-            -- Check if this is a defeat scenario by looking for specific chunk patterns
-            -- Allow Chunk2 -> Chunk1, Chunk3 -> Chunk2, etc. for healing purposes
-            if PlayerData.LastChunk and (ChunkName == PlayerData.LastChunk) then
-                -- This is a cross-chunk request to the LastChunk (likely for healing after defeat)
-                DefeatScenario = true
-                DBG:warn(string.format("Authorized via Defeat Scenario: from %s to %s (LastChunk)", tostring(currentChunk), tostring(PlayerData.LastChunk)))
-            elseif currentChunk == "Chunk2" and ChunkName == "Chunk1" then
-                -- Special case: Chunk2 defeats can go to Chunk1 for healing
-                DefeatScenario = true
-                DBG:warn(string.format("Authorized via Defeat Scenario: from %s to %s (healing)", tostring(currentChunk), tostring(ChunkName)))
-            elseif currentChunk == "Chunk3" and ChunkName == "Chunk2" then
-                -- Special case: Chunk3 defeats can go to Chunk2 for healing
-                DefeatScenario = true
-                DBG:warn(string.format("Authorized via Defeat Scenario: from %s to %s (healing)", tostring(currentChunk), tostring(ChunkName)))
-            end
-        end
-    end
-
-    if ValidFromChunk or ValidFromSubChunk or ValidFromLastChunk or AnyAllowed or LoadingSelf or ReturningFromUniversalFacility or ContinuingFromTitle or DefeatScenario then
+	local ok, errMsg = ChunkService:IsChunkTransitionAuthorized(Player, PlayerData, ChunkName)
+	if ok then
 		Authorized = true
-		if ValidFromChunk then
-			DBG:warn(string.format("Authorized via Chunk match: %s", tostring(PlayerData.Chunk)))
-		elseif ValidFromLastChunk then
-			DBG:warn(string.format("Authorized via LastChunk match: %s", tostring(PlayerData.LastChunk)))
-		elseif AnyAllowed then
-			DBG:warn("Authorized via 'Any' wildcard")
-		elseif ReturningFromUniversalFacility then
-			DBG:warn(string.format("Authorized via universal facility return: %s -> %s", tostring(PlayerData.Chunk), tostring(PlayerData.LastChunk)))
-        elseif ContinuingFromTitle then
-            DBG:warn("Authorized via Title Continue rule")
-        elseif DefeatScenario then
-            DBG:warn(string.format("Authorized via Defeat Scenario: %s -> %s", tostring(PlayerData.Chunk), tostring(PlayerData.LastChunk)))
-		end
 	else
-		DBG:warn(string.format(
-			"Unauthorized request. ValidPrevious does not include:\n - Session Chunk: %s\n - Session SubChunk: %s\n - LastChunk: %s\n - ValidPrevious list: %s",
-			tostring(PlayerData.Chunk),
-			tostring(PlayerData.SubChunk),
-			tostring(PlayerData.LastChunk),
-			table.concat(ValidPrevious, ", ")
-			))
+		DBG:warn(errMsg or ("Unauthorized chunk transition to " .. tostring(ChunkName)))
 	end
 
 	-- Starter gate: prevent leaving Professor's Lab without a starter
@@ -642,16 +516,7 @@ function ServerFunctions:LoadChunkPlayer(Player, ChunkName)
 	PlayerData.Chunk = ChunkName
 
 	-- Get the source folder - check both Chunks and Interiors based on ChunkList
-	local SourceFolder
-	if ChunkData.IsSubRoom then
-		-- This is an interior/subroom, look in Interiors
-		SourceFolder = ServerStorage.Interiors:FindFirstChild(ChunkName)
-		DBG:warn("Looking for interior chunk:", ChunkName, "in ServerStorage.Interiors")
-	else
-		-- This is a main chunk, look in Chunks
-		SourceFolder = ServerStorage.Chunks:FindFirstChild(ChunkName)
-		DBG:warn("Looking for main chunk:", ChunkName, "in ServerStorage.Chunks")
-	end
+	local SourceFolder = ChunkService:GetSourceFolder(ChunkName)
 
 	if not SourceFolder then
 		DBG:warn("Could not locate chunk in storage:", ChunkName, "IsSubRoom:", ChunkData.IsSubRoom)
@@ -1007,108 +872,17 @@ function ServerFunctions:UpdateSettings(Player, SettingName, SettingValue)
 end
 
 function ServerFunctions:UpdateLastChunk(Player, ChunkName)
-	local PlayerData = ClientData:Get(Player)
-	
-	PlayerData.LastChunk = ChunkName
-	
-	-- Update the client's data
-	ClientData:UpdateClientData(Player, PlayerData)
-	
-	DBG:print("Updated LastChunk for player:", Player.Name, "to:", ChunkName)
-	return true
+	return ChunkService:UpdateLastChunk(Player, ChunkName)
 end
 
 -- Compute and set the nearest previous chunk that has a CatchCare door
 -- Used on blackout so exiting CatchCare via a "Previous" door returns to the correct location
 function ServerFunctions:SetBlackoutReturnChunk(Player: Player)
-    local PlayerData = ClientData:Get(Player)
-    if not PlayerData then return false end
-
-    local ChunkList = GameData.ChunkList
-    local function isValidChunk(name: string?): boolean
-        return type(name) == "string" and name ~= "" and name ~= "CatchCare" and ChunkList[name] ~= nil
-    end
-    local function hasCatchCareDoor(chunkName: string?): boolean
-        local c = chunkName and ChunkList[chunkName]
-        return c ~= nil and c.HasCatchCareDoor == true
-    end
-    local function firstPrev(chunkName: string?): string?
-        if not chunkName then return nil end
-        local c = ChunkList[chunkName]
-        if not c or type(c.ValidPrevious) ~= "table" then return nil end
-        -- Prefer the first real chunk entry; skip tokens like "Any" or "nil"
-        for _, prev in ipairs(c.ValidPrevious) do
-            if type(prev) == "string" and prev ~= "Any" and prev ~= "nil" and ChunkList[prev] then
-                return prev
-            end
-        end
-        return nil
-    end
-
-    -- Build ordered start candidates: prefer leave chunk, then current, then last
-    local leaveChunk = (type(PlayerData.LeaveData) == "table") and tostring(PlayerData.LeaveData.Chunk or "") or ""
-    local candidates: {string} = {}
-    if isValidChunk(leaveChunk) then table.insert(candidates, leaveChunk) end
-    if isValidChunk(PlayerData.Chunk) then table.insert(candidates, tostring(PlayerData.Chunk)) end
-    if isValidChunk(PlayerData.LastChunk) then table.insert(candidates, tostring(PlayerData.LastChunk)) end
-    -- Ensure at least something to start from
-    if #candidates == 0 then
-        -- As a last resort, try any chunk in PlayerData that isn't CatchCare
-        -- (will likely fall back below)
-        table.insert(candidates, tostring(PlayerData.LastChunk or ""))
-    end
-
-    local target: string? = nil
-    -- Try each candidate's prev-chain to find a chunk with a CatchCare door
-    for _, start in ipairs(candidates) do
-        local cur = start
-        local visited: {[string]: boolean} = {}
-        while cur and not visited[cur] do
-            visited[cur] = true
-            if hasCatchCareDoor(cur) then
-                target = cur
-                break
-            end
-            cur = firstPrev(cur)
-        end
-        if target then break end
-    end
-    -- If still not found, prefer a valid candidate directly
-    if not target then
-        for _, cand in ipairs(candidates) do
-            if isValidChunk(cand) then
-                target = cand
-                break
-            end
-        end
-    end
-    -- Final fallback: earliest town
-    if not target then
-        target = "Chunk1"
-    end
-
-    PlayerData.LastChunk = target
-    ClientData:UpdateClientData(Player, PlayerData)
-    DBG:print("[Blackout] Set LastChunk for", Player.Name, "to", target, "(candidates tried)")
-    return target
+	return ChunkService:SetBlackoutReturnChunk(Player)
 end
 
 function ServerFunctions:ClearLeaveDataCFrame(Player)
-	local PlayerData = ClientData:Get(Player)
-	
-	if PlayerData and PlayerData.LeaveData then
-		PlayerData.LeaveData.Position = nil
-		PlayerData.LeaveData.Rotation = nil
-		
-		-- Update the client's data
-		ClientData:UpdateClientData(Player, PlayerData)
-		
-		DBG:print("Cleared LeaveData for player:", Player.Name)
-		return true
-	end
-	
-	DBG:warn("No LeaveData found for player:", Player.Name)
-	return false
+	return ChunkService:ClearLeaveDataCFrame(Player)
 end
 
 -- Provide reference to active battles map for other modules
@@ -3516,6 +3290,7 @@ function ServerFunctions:ProcessTurn(Player)
                 end
                 pd.DefeatedTrainers[battle.TrainerId] = true
                 DBG:print("[BattleEnd] Marked trainer", battle.TrainerId, "as defeated for player:", Player.Name)
+
                 -- Special case: first rival battle vs Kyro
                 if tostring(battle.TrainerId) == "Rival_Kyro_Intro" then
                     pd.Events = pd.Events or {}
@@ -3523,6 +3298,16 @@ function ServerFunctions:ProcessTurn(Player)
                         pd.Events.FIRST_BATTLE = true
                         DBG:print("[BattleEnd] Marked FIRST_BATTLE for player:", Player.Name)
                     end
+                end
+
+                -- Special case: first gym leader (Vincent) – award first badge
+                if tostring(battle.TrainerId) == "Gym1_Leader_Vincent" then
+                    pd.Badges = math.max(pd.Badges or 0, 1)
+                    pd.Events = pd.Events or {}
+                    if pd.Events.FIRST_GYM_COMPLETED ~= true then
+                        pd.Events.FIRST_GYM_COMPLETED = true
+                    end
+                    DBG:print("[BattleEnd] Awarded first gym badge to player:", Player.Name, "Badges now:", pd.Badges)
                 end
             else
                 DBG:warn("[BattleEnd] Could not mark trainer as defeated - PlayerData missing")

@@ -833,7 +833,7 @@ local Creatures: { [string]: Creature_Type } = {
 				HP = 70,
 				Attack = 45,
 				Defense = 55,
-				Speed = 30,
+				Speed = 40,
 			},
 			{
 				
@@ -842,6 +842,31 @@ local Creatures: { [string]: Creature_Type } = {
 			nil,
 			2, 
 			{["Beak"]=Color3.new(0.855,0.522,0.255),["BlackNose"]=Color3.new(0.067,0.067,0.067),["Torso"]=Color3.new(0.961,0.804,0.188),["WingR"]=Color3.new(0.973,0.973,0.973),["Eye"]=Color3.new(0.067,0.067,0.067),["EyeWhite"]=Color3.new(0.973,0.973,0.973),["FootL"]=Color3.new(0.886,0.608,0.251),["FootR"]=Color3.new(0.886,0.608,0.251),["Head"]=Color3.new(0.961,0.804,0.188),["LegL"]=Color3.new(0.886,0.608,0.251),["Middle"]=Color3.new(0.973,0.973,0.973),["ThighL"]=Color3.new(0.961,0.804,0.188),["ThighR"]=Color3.new(0.961,0.804,0.188),["C_R"]=Color3.new(0.035,0.537,0.812),["WingL"]=Color3.new(0.973,0.973,0.973),["WingBack"]=Color3.new(0.973,0.973,0.973),["WingBackBottom"]=Color3.new(0.973,0.973,0.973),["C_L"]=Color3.new(0.035,0.537,0.812),["HumanoidRootPart"]=Color3.new(0.639,0.635,0.647),["LegR"]=Color3.new(0.886,0.608,0.251)},
+			"Basic",
+			45,
+			50
+		),
+
+		["Brr Brr Patapim"] = createCreature(
+			30,
+			"Brr Brr Patapim",
+			"rbxassetid://0",
+			"rbxassetid://0",
+			"Brr Brr Patapim",
+			{ "Grass" },
+			{
+				HP = 80,
+				Attack = 40,
+				Defense = 65,
+				Speed = 25,
+			},
+			{
+				
+			},
+			nil,
+			nil,
+			2, 
+			{["rightmiddlefinger2"]=Color3.new(0.918,0.722,0.573),["rightindex2"]=Color3.new(0.918,0.722,0.573),["rightringfinger2"]=Color3.new(0.918,0.722,0.573),["rightindex1"]=Color3.new(0.918,0.722,0.573),["rightmiddlefinger1"]=Color3.new(0.918,0.722,0.573),["rightringfinger1"]=Color3.new(0.918,0.722,0.573),["rightthumb2"]=Color3.new(0.918,0.722,0.573),["rightthumb1"]=Color3.new(0.918,0.722,0.573),["rightpalm"]=Color3.new(0.918,0.722,0.573),["rightforearm"]=Color3.new(0.667,0.333,0.000),["rightpinky2"]=Color3.new(0.918,0.722,0.573),["rightpinky1"]=Color3.new(0.918,0.722,0.573),["rightarm"]=Color3.new(0.667,0.333,0.000),["beard"]=Color3.new(0.337,0.259,0.212),["rightleg1"]=Color3.new(0.667,0.333,0.000),["rightleg2"]=Color3.new(0.918,0.722,0.573),["backofhead"]=Color3.new(0.667,0.333,0.000),["pupils"]=Color3.new(0.067,0.067,0.067),["nose"]=Color3.new(0.918,0.722,0.573),["mouth"]=Color3.new(0.067,0.067,0.067),["hat"]=Color3.new(0.667,0.333,0.000),["face"]=Color3.new(0.918,0.722,0.573),["eyes"]=Color3.new(0.016,0.686,0.925),["rightfoot"]=Color3.new(0.918,0.722,0.573),["leftfoot"]=Color3.new(0.918,0.722,0.573),["leftarm"]=Color3.new(0.667,0.333,0.000),["leftleg1"]=Color3.new(0.667,0.333,0.000),["leftleg2"]=Color3.new(0.918,0.722,0.573),["lefttoes"]=Color3.new(0.973,0.973,0.973),["righttoes"]=Color3.new(0.973,0.973,0.973),["leftforearm"]=Color3.new(0.667,0.333,0.000),["leftpalm"]=Color3.new(0.918,0.722,0.573),["leftpinky1"]=Color3.new(0.918,0.722,0.573),["leftringfinger1"]=Color3.new(0.918,0.722,0.573),["leftthumb2"]=Color3.new(0.918,0.722,0.573),["leftthumb1"]=Color3.new(0.918,0.722,0.573),["leftmiddlefinger1"]=Color3.new(0.918,0.722,0.573),["leftpinky2"]=Color3.new(0.918,0.722,0.573),["leftringfinger2"]=Color3.new(0.918,0.722,0.573),["leftindex1"]=Color3.new(0.918,0.722,0.573),["leftindex2"]=Color3.new(0.918,0.722,0.573),["HumanoidRootPart"]=Color3.new(0.639,0.635,0.647),["Torso"]=Color3.new(0.639,0.635,0.647),["leftmiddlefinger2"]=Color3.new(0.918,0.722,0.573)},
 			"Basic",
 			45,
 			50
