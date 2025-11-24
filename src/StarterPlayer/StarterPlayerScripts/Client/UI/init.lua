@@ -3,6 +3,7 @@ return {
 	Party = require(script.Party),
     Vault = require(script:WaitForChild("Vault")),
 	CreatureViewer = require(script:WaitForChild("CreatureViewer")),
+	Dex = require(script:WaitForChild("Dex")),
 	Caught = require(script:WaitForChild("Caught")),
 	Save = require(script.Save),
 	Settings = require(script.Settings),
@@ -10,4 +11,5 @@ return {
 	PlayerList = require(script.PlayerList),
 	NameInput = require(script:WaitForChild("NameInput")),
 	CatchCareShop = require(script:WaitForChild("CatchCareShop")),
+	BadgeAnimation = require(script:WaitForChild("BadgeAnimation")),
 }

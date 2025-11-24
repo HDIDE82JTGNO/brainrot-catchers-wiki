@@ -279,7 +279,7 @@ function UIFunctions:DoExclamationMark(ExclamationMark, opts)
 	TweenService:Create(workspace.CurrentCamera, TweenInfo.new(FirstTimer,Enum.EasingStyle.Back,Enum.EasingDirection.Out), {FieldOfView = 70}):Play()
 	task.wait(FirstTimer)
 	local SecondTimer:number = 0.4
-	TweenService:Create(ExclamationMark, TweenInfo.new(SecondTimer,Enum.EasingStyle.Back,Enum.EasingDirection.InOut), {Size = UDim2.fromScale(3.142,11.026)}):Play()
+	TweenService:Create(ExclamationMark, TweenInfo.new(SecondTimer,Enum.EasingStyle.Back,Enum.EasingDirection.InOut), {Size = UDim2.fromScale(3.6133,12.6799)}):Play()
 	task.wait(SecondTimer/3)
 	TweenService:Create(workspace.CurrentCamera, TweenInfo.new(SecondTimer*1.5,Enum.EasingStyle.Back,Enum.EasingDirection.Out), {FieldOfView = 10}):Play()
 	

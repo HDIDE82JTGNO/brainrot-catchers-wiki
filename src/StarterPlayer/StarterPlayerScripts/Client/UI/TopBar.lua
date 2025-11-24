@@ -8,9 +8,13 @@ local UIFunctions = require(script.Parent:WaitForChild("UIFunctions"))
 local TopBarControl = require(script.Parent:WaitForChild("TopBarControl"))
 local BagModule = require(script.Parent:WaitForChild("Bag"))
 local PartyModule = require(script.Parent:WaitForChild("Party"))
+local DexModule = require(script.Parent:WaitForChild("Dex"))
 local SaveModule = require(script.Parent:WaitForChild("Save"))
 local SettingsModule = require(script.Parent:WaitForChild("Settings"))
+local CTRLModule = require(script.Parent:WaitForChild("CTRL"))
 local CharacterFunctions = require(script.Parent.Parent.Utilities.CharacterFunctions)
+local ClientData = require(script.Parent.Parent:WaitForChild("Plugins"):WaitForChild("ClientData"))
+local Say = require(script.Parent.Parent.Utilities.Say)
 
 local Audio = script.Parent.Parent:WaitForChild("Assets"):WaitForChild("Audio")
 local LocalPlayer = Players.LocalPlayer
@@ -148,7 +152,7 @@ function TopBar:Create()
 	end
 	
 
-	local TopButtons = {"Party", "Bag", "Save", "Settings"}
+	local TopButtons = {"Party", "Bag", "Dex", "Save", "Settings", "CTRL"}
 
 	local function StateVisualChange()
 		for _, name in ipairs(TopButtons) do
@@ -165,10 +169,14 @@ function TopBar:Create()
 			SaveModule:Close()
         elseif self.CurrentState == "Settings" then
 			SettingsModule:Close()
-         elseif self.CurrentState == "Party" then
+        elseif self.CurrentState == "Party" then
 			PartyModule:Close()
         elseif self.CurrentState == "Bag" then
 			BagModule:Close()
+		elseif self.CurrentState == "Dex" then
+			DexModule:Close()
+		elseif self.CurrentState == "CTRL" then
+			CTRLModule:Close()
 		end
 		
 		-- Stop TopBar animations and re-enable movement when closing menus
@@ -271,6 +279,63 @@ function TopBar:Create()
 		HoverOnTopBarButton,
 		HoverOffTopBarButton
 	)
+
+	-- Dex button
+	UIFunctions:NewButton(
+		self.TopBarFrame:WaitForChild("Dex"),
+		{"Action"},
+		{ Click = "One", HoverOn = "One", HoverOff = "One" },
+		0.7,
+		function()
+			-- Prevent opening menus during hide animation or when interactions are suppressed
+			if SuppressInteractions then return end
+			if IsHiding then
+				return
+			end
+
+			Audio.SFX.Click:Play()
+			
+			-- Check if player has any creatures in their party
+			local playerData = ClientData:Get()
+			local hasCreatures = false
+			if playerData and playerData.Party and type(playerData.Party) == "table" then
+				hasCreatures = #playerData.Party > 0
+			end
+			
+			if not hasCreatures then
+				-- Player doesn't have any creatures, use Say instead
+				local character = LocalPlayer.Character
+				if character then
+					Say:Say("You", true, {"I can't find my dex..."}, character)
+					task.delay(0.5,function()
+						self:SetSuppressed(false)
+						self:Show()
+					end)
+				end
+				return
+			end
+			
+			if self.CurrentState == "Dex" then
+				CloseCurrent()
+			else
+				if self.CurrentState ~= nil then
+					CloseCurrent()
+					task.wait(0.15)
+				end
+				-- Start TopBar animations and disable movement when opening menu
+				PlayTopBarAnimation()
+				CharacterFunctions:CanMove(false)
+				IsMenuOpen = true
+				DexModule:Open()
+				self.CurrentState = "Dex"
+			end
+
+			StateVisualChange()
+			UpdateWhichZIndex(self.TopBarFrame:WaitForChild("Dex"))
+		end,
+		HoverOnTopBarButton,
+		HoverOffTopBarButton
+	)
 	-- Save button
 	UIFunctions:NewButton(
 		self.TopBarFrame:WaitForChild("Save"),
@@ -342,6 +407,63 @@ function TopBar:Create()
 		HoverOnTopBarButton,
 		HoverOffTopBarButton
 	)
+
+	-- CTRL button
+	UIFunctions:NewButton(
+		self.TopBarFrame:WaitForChild("CTRL"),
+		{"Action"},
+		{ Click = "One", HoverOn = "One", HoverOff = "One" },
+		0.7,
+		function()
+			-- Prevent opening menus during hide animation or when interactions are suppressed
+			if SuppressInteractions then return end
+			-- Prevent opening menus during hide animation
+			if IsHiding then
+				return
+			end
+			
+			Audio.SFX.Click:Play()
+			
+			-- Check if player has at least 1 badge
+			local playerData = ClientData:Get()
+			local badges = 0
+			if playerData and playerData.Badges then
+				badges = tonumber(playerData.Badges) or 0
+			end
+			
+			if badges < 1 then
+				-- Player doesn't have at least 1 badge, use Say instead
+				local character = LocalPlayer.Character
+				if character then
+					Say:Say("You", true, {"I shouldn't use this until I'm ready."}, character)
+					task.delay(0.5,function()
+						self:SetSuppressed(false)
+						self:Show()
+					end)
+				end
+				return
+			end
+			
+            if self.CurrentState == "CTRL" then
+				CloseCurrent()
+			else
+                if self.CurrentState ~= nil then
+					CloseCurrent()
+					task.wait(0.15)
+				end
+				-- Start TopBar animations and disable movement when opening menu
+				PlayTopBarAnimation()
+				CharacterFunctions:CanMove(false)
+				IsMenuOpen = true
+				CTRLModule:Open()
+                self.CurrentState = "CTRL"
+			end
+			StateVisualChange()
+			UpdateWhichZIndex(self.TopBarFrame:WaitForChild("CTRL"))
+		end,
+		HoverOnTopBarButton,
+		HoverOffTopBarButton
+	)
 	
 	return self
 end
@@ -357,8 +479,10 @@ function TopBar:Show()
 	task.delay(0.4,function()
 		self.TopBarFrame.Party.Active = true
 		self.TopBarFrame.Bag.Active = true
+		self.TopBarFrame.Dex.Active = true
 		self.TopBarFrame.Save.Active = true
 		self.TopBarFrame.Settings.Active = true
+		self.TopBarFrame.CTRL.Active = true
 	end)
 end
 
@@ -369,8 +493,10 @@ function TopBar:Hide()
 	-- Close any currently open pages
 	BagModule:Close()
 	PartyModule:Close()
+	DexModule:Close()
 	SaveModule:Close()
 	SettingsModule:Close()
+	CTRLModule:Close()
 	
 	-- Stop TopBar animations and re-enable movement when hiding TopBar
 	StopTopBarAnimation()
@@ -384,8 +510,10 @@ function TopBar:Hide()
 	
 	self.TopBarFrame.Party.Active = false
 	self.TopBarFrame.Bag.Active = false
+	self.TopBarFrame.Dex.Active = false
 	self.TopBarFrame.Save.Active = false
 	self.TopBarFrame.Settings.Active = false
+	self.TopBarFrame.CTRL.Active = false
 	
 	-- Update visual state to reflect no active button
 	self.StateVisualChange()
@@ -406,8 +534,10 @@ function TopBar:HideImmediate()
     self.CurrentState = nil
     self.TopBarFrame.Party.Active = false
     self.TopBarFrame.Bag.Active = false
+    self.TopBarFrame.Dex.Active = false
     self.TopBarFrame.Save.Active = false
     self.TopBarFrame.Settings.Active = false
+    self.TopBarFrame.CTRL.Active = false
     self.StateVisualChange()
     self.TopBarFrame.Visible = false
 end

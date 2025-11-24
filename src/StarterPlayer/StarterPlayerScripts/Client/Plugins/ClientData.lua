@@ -55,26 +55,38 @@ function ClientData:ServerForceUpdateData(Data)
 	Current = Data
 	DBG:print("CLIENT DATA: Force updated by server")
 	DBG:print("Data received:", Current)
-	-- Notify UI modules that rely on party data to refresh (Party UI autoloads on open)
+	-- Notify UI modules that rely on client data to refresh
 	local UI = require(script.Parent.Parent.UI)
-	if UI and UI.Party and UI.Party.UpdatePartyDisplay then
-        pcall(function()
-            -- Guard: do not refresh Party while client is mid-animation
-            if not UI.Party.IsAnimating then
-                print("[ClientData] ServerForceUpdateData -> Party.UpdatePartyDisplay() (not animating)")
-                UI.Party:UpdatePartyDisplay()
-            else
-                print("[ClientData] ServerForceUpdateData SKIPPED (Party animating)")
-            end
-        end)
-	end
-	
-	-- Notify Bag UI to refresh when items are updated
-	if UI and UI.Bag and UI.Bag.RefreshBag then
-		pcall(function()
-			print("[ClientData] ServerForceUpdateData -> Bag.RefreshBag()")
-			UI.Bag:RefreshBag()
-		end)
+
+	if UI then
+		-- Party UI (auto-loads on open)
+		if UI.Party and UI.Party.UpdatePartyDisplay then
+			pcall(function()
+				-- Guard: do not refresh Party while client is mid-animation
+				if not UI.Party.IsAnimating then
+					print("[ClientData] ServerForceUpdateData -> Party.UpdatePartyDisplay() (not animating)")
+					UI.Party:UpdatePartyDisplay()
+				else
+					print("[ClientData] ServerForceUpdateData SKIPPED (Party animating)")
+				end
+			end)
+		end
+
+		-- Bag UI: inventory changes
+		if UI.Bag and UI.Bag.RefreshBag then
+			pcall(function()
+				print("[ClientData] ServerForceUpdateData -> Bag.RefreshBag()")
+				UI.Bag:RefreshBag()
+			end)
+		end
+
+		-- Dex UI: new captures / box changes
+		if UI.Dex and UI.Dex.Refresh then
+			pcall(function()
+				print("[ClientData] ServerForceUpdateData -> Dex.Refresh()")
+				UI.Dex:Refresh()
+			end)
+		end
 	end
 end
 

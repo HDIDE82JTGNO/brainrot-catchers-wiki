@@ -88,22 +88,92 @@ function Abilities.OverrideImmunity(attacker: any, defender: any, moveTypeName: 
 end
 
 -- Multiplicative damage modifiers from abilities (attacker and defender)
-function Abilities.DamageMultiplier(attacker: any, defender: any, moveTypeName: string): number
+function Abilities.DamageMultiplier(attacker: any, defender: any, moveTypeName: string, moveName: string?): number
     local mul = 1.0
     local a = normalize(Abilities.GetName(attacker))
     local d = normalize(Abilities.GetName(defender))
+    
+    -- Get attacker HP percentage
+    local attackerHPPercent = 100
+    if attacker.MaxStats and attacker.MaxStats.HP and attacker.MaxStats.HP > 0 then
+        attackerHPPercent = ((attacker.Stats and attacker.Stats.HP) or 0) / attacker.MaxStats.HP * 100
+    elseif attacker.CurrentHP then
+        attackerHPPercent = attacker.CurrentHP
+    end
+
     -- Attacker boosts
     if a == "scrapper" and moveTypeName == "Normal" then mul *= 1.2 end
     if (a == "fairy sense" or a == "fairy aura") and moveTypeName == "Fairy" then mul *= 1.2 end
-    if a == "steel jaw" and moveTypeName == "Bite" then -- placeholder; depends on move flags
-        -- If you later tag biting moves in MovesModule, apply here
+    if a == "steel jaw" and moveTypeName == "Bite" then 
+        -- Note: Requires move flags or name checking. Assuming bite moves contain "Bite" or "Crunch" for now.
+        if moveName and (string.find(moveName, "Bite") or string.find(moveName, "Crunch")) then
+             mul *= 1.5 
+        end
     end
+    if a == "sharp fins" and moveTypeName == "Water" then
+        -- Assuming physical water moves; for now apply to all water moves if we don't have categories
+        mul *= 1.5
+    end
+    if (a == "blaze" or a == "fireup") and moveTypeName == "Fire" and attackerHPPercent <= 33 then
+        mul *= 1.5
+    end
+    if a == "permeate" and moveTypeName == "Grass" and attackerHPPercent <= 25 then
+        mul *= 1.5
+    end
+
     -- Defender reductions
     if d == "thickness" and (moveTypeName == "Fire" or moveTypeName == "Ice") then mul *= 0.5 end
     if d == "metallic glide" then
-        -- If physical category is tracked, apply small reduction (e.g., 0.9)
+        -- Assuming physical moves; applies reduction
+        mul *= 0.8
     end
+    
     return mul
+end
+
+-- Check for status immunity
+function Abilities.IsImmuneToStatus(creature: any, status: string, weather: string?): boolean
+    local ability = normalize(Abilities.GetName(creature))
+    
+    if status == "Paralysis" and ability == "lithe" then return true end
+    if status == "Sleep" and ability == "arcane veil" then return true end
+    if ability == "grass veil" and weather == "Sunlight" then return true end
+    
+    return false
+end
+
+-- Check for recoil negation
+function Abilities.NegatesRecoil(creature: any): boolean
+    local ability = normalize(Abilities.GetName(creature))
+    return ability == "hard head"
+end
+
+-- Check for entry ability
+function Abilities.OnEntry(creature: any): string?
+    local ability = normalize(Abilities.GetName(creature))
+    if ability == "intimidate" or ability == "menace" then return "Intimidate" end
+    if ability == "solar wrath" then return "Sunlight" end
+    return nil
+end
+
+-- Crit chance modifier (stage bonus)
+function Abilities.GetCritStageBonus(creature: any, opponentUsedMove: boolean?): number
+    local ability = normalize(Abilities.GetName(creature))
+    if ability == "great fortune" then return 1 end
+    if ability == "spy lens" and opponentUsedMove then return 1 end
+    return 0
+end
+
+-- Check for guaranteed escape
+function Abilities.GuaranteesEscape(creature: any): boolean
+    local ability = normalize(Abilities.GetName(creature))
+    return ability == "run away"
+end
+
+-- Check if ability prevents escape
+function Abilities.TrapsOpponent(creature: any): boolean
+    local ability = normalize(Abilities.GetName(creature))
+    return ability == "elastic trap" or ability == "shadow tag" or ability == "arena trap"
 end
 
 return Abilities

@@ -41,6 +41,7 @@ function Shared.ResetData(player: Player)
 	fresh.Gamepasses = {}
 	fresh.PickedUpItems = {}
 	fresh.DefeatedTrainers = {}
+	fresh.RedeemedCodes = {}
 	-- Remove optional runtime/session fields explicitly
 	fresh.SelectedStarter = nil
 	fresh.Starters = nil

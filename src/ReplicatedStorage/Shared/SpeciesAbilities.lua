@@ -130,6 +130,16 @@ local SpeciesAbilities: {[string]: { {Name: string, Chance: number} }} = {
         { Name = "Sharp Fins", Chance = 30 },
         { Name = "Triple Kick", Chance = 2 },
     },
+    ["Boneca Ambalabu"] = {
+        { Name = "Permeate", Chance = 68 },
+        { Name = "Grass Veil", Chance = 30 },
+        { Name = "Sap Siphon", Chance = 2 },
+    },
+    ["Ambalabu Ton-ton"] = {
+        { Name = "Permeate", Chance = 68 },
+        { Name = "Sap Siphon", Chance = 30 },
+        { Name = "Drumming Beat", Chance = 2 },
+    },
 }
 
 return SpeciesAbilities

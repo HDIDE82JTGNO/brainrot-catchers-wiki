@@ -71,12 +71,12 @@ local DebugData = {
 	Nickname = "DEBUG",
 	Sequence = nil,
 	Chunk = nil,
-	LastChunk = "Chunk3", 
+	LastChunk = "Chunk4", 
 	LeaveData = {
 		Position = { 
-			X = -1171,
-			Y = 3, 
-			Z = -827
+			X = -380,
+			Y = 379, 
+			Z = -2497
 		},
 		Rotation = {
 			X = 0,
@@ -164,10 +164,12 @@ local DebugData = {
 
 		MET_KYRO_ROUTE_3 = true, --These two are sorta gated, happen in the same chunk but different cutscenes
 		MET_MAN_ROUTE_3 = true,
-		ASSASSIN_ROUTE_3_INTRO = false,
-		ASSASSIN_ROUTE_3 = false,
+		ASSASSIN_ROUTE_3_INTRO = true,
+		ASSASSIN_ROUTE_3 = true,
 
-		MET_FREINDS_ROUTE_4 = false, --Set after we meet our friends in route 4
+		MET_FREINDS_ROUTE_4 = true, --Set after we meet our friends in route 4
+		MET_FREINDS_ASTERDEN = false, --Set after we meet our friends in Asterden
+		MET_FRIENDS_AFTER_GYM = false, --Set after we meet our friends again after beating the gym
 	},
 
 	DefeatedTrainers = {

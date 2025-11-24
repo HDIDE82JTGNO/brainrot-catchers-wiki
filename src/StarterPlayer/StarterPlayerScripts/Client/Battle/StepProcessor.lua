@@ -505,15 +505,68 @@ end
 	Internal: Process damage step
 ]]
 function StepProcessor:_processDamage(step: any, isPlayer: boolean, onComplete: StepCallback?)
-    -- Determine target side (damage always applies to the defender of the move)
-    local targetIsPlayer = not not (not isPlayer)
+    -- Determine target side: use step.IsPlayer if available (indicates which creature was damaged)
+    -- step.IsPlayer = true means player's creature was damaged, false means foe's creature was damaged
+    local targetIsPlayer = nil
+    if type(step.IsPlayer) == "boolean" then
+        targetIsPlayer = step.IsPlayer
+    else
+        -- Fallback: if step came from friendlyActions (isPlayer=true), damage is typically to foe
+        -- If step came from enemyActions (isPlayer=false), damage is typically to player
+        -- But this is unreliable, so we should always have step.IsPlayer set
+        targetIsPlayer = not isPlayer
+    end
+    
+    print("[StepProcessor] _processDamage - step.IsPlayer:", step.IsPlayer, "isPlayer param:", isPlayer, "targetIsPlayer:", targetIsPlayer)
+    print("[StepProcessor] _processDamage - step.Message:", step.Message, "step.NewHP:", step.NewHP, "step.EndOfTurn:", step.EndOfTurn)
+    print("[StepProcessor] _processDamage - Full step:", step)
+
+    -- Show message first if provided (for end-of-turn status damage like burn)
+    if step.Message then
+        self._messageQueue:Enqueue(step.Message)
+        -- Wait for message to drain before proceeding (like Crumbs)
+        if self._messageQueue and self._messageQueue.WaitForDrain then
+            self._messageQueue:WaitForDrain()
+        end
+    end
+
+    -- Optional delay (e.g., burn/poison end-of-turn damage, similar to Crumbs)
+    local delaySec = tonumber(step.DelaySeconds) or tonumber(step.Delay) or 0
+    if delaySec and delaySec > 0 then
+        task.wait(delaySec)
+    end
 
     -- If server provided per-hit NewHP, apply it to the target creature now (authoritative)
     if step and type(step.NewHP) == "number" then
         local creature = targetIsPlayer and self._battleState.PlayerCreature or self._battleState.FoeCreature
         if creature and creature.Stats then
             creature.Stats.HP = math.max(0, step.NewHP)
-            -- Do not tween HP here; HP UI is updated strictly at the Hit marker in _processMove
+            -- For end-of-turn damage (like burn), update UI immediately with tween
+            if step.EndOfTurn == true then
+                -- Update the creature data with new HP
+                local updatedCreature = table.clone(creature)
+                updatedCreature.Stats = updatedCreature.Stats or {}
+                updatedCreature.Stats.HP = math.max(0, step.NewHP)
+                if type(step.MaxHP) == "number" then
+                    updatedCreature.MaxStats = updatedCreature.MaxStats or {}
+                    updatedCreature.MaxStats.HP = step.MaxHP
+                end
+                
+                -- Update battle state with new HP
+                if targetIsPlayer then
+                    self._battleState:UpdatePlayerCreature(updatedCreature, self._battleState.PlayerCreatureIndex or 1)
+                else
+                    self._battleState:UpdateFoeCreature(updatedCreature)
+                end
+                
+                -- Update UI with tween
+                self._uiController:UpdateCreatureUI(targetIsPlayer, updatedCreature, true)
+                self._uiController:UpdateLevelUI(updatedCreature, false)
+                self._uiController:UpdateHPBar(targetIsPlayer, updatedCreature, true)
+                
+                print("[StepProcessor] End-of-turn damage applied - Target:", targetIsPlayer and "Player" or "Foe", "NewHP:", step.NewHP, "MaxHP:", step.MaxHP)
+            end
+            -- Do not tween HP here for normal damage; HP UI is updated strictly at the Hit marker in _processMove
         end
     else
         -- No NewHP provided; defer entirely to the Hit marker-driven update path
@@ -535,6 +588,7 @@ function StepProcessor:_processDamage(step: any, isPlayer: boolean, onComplete: 
     end
 
     -- Enqueue effectiveness message when applicable
+    local isNoEffect = false
     if type(step.Effectiveness) == "string" then
         local key: string?
         if step.Effectiveness == "Super" then
@@ -543,6 +597,7 @@ function StepProcessor:_processDamage(step: any, isPlayer: boolean, onComplete: 
             key = "NotVeryEffective"
         elseif step.Effectiveness == "Immune" then
             key = "NoEffect"
+            isNoEffect = true
         end
         if key then
             local msg = MessageGenerator.Effectiveness(key)
@@ -553,7 +608,18 @@ function StepProcessor:_processDamage(step: any, isPlayer: boolean, onComplete: 
     end
 
     if onComplete then
-        task.delay(0.3, onComplete)
+        if isNoEffect then
+            -- Wait for "doesn't affect" message to drain before proceeding
+            if self._messageQueue and self._messageQueue.WaitForDrain then
+                self._messageQueue:WaitForDrain()
+            end
+            onComplete()
+        elseif step.EndOfTurn == true then
+            -- End-of-turn damage (like burn) - complete immediately after UI update
+            onComplete()
+        else
+            task.delay(0.3, onComplete)
+        end
     end
 end
 
@@ -1095,12 +1161,158 @@ end
 	Internal: Process status step
 ]]
 function StepProcessor:_processStatus(step: any, isPlayer: boolean, onComplete: StepCallback?)
-	if step.Message then
-		self._messageQueue:Enqueue(step.Message)
+	-- Debug: Log the entire step to see what we're receiving
+	print("[StepProcessor] _processStatus - Full step:", step)
+	print("[StepProcessor] step.Status:", step.Status, "type:", type(step.Status))
+	print("[StepProcessor] step.IsPlayer:", step.IsPlayer, "isPlayer param:", isPlayer)
+	
+	-- Determine which creature was affected by checking step.IsPlayer (which indicates the affected creature)
+	-- step.IsPlayer = true means player's creature was affected, false means foe's creature was affected
+	local affectedIsPlayer = (type(step.IsPlayer) == "boolean") and step.IsPlayer or isPlayer
+	
+	-- Generate proper status message using BattleMessageGenerator
+	local creatureName = nil
+	local creatureData = nil
+	
+	if affectedIsPlayer then
+		creatureData = self._battleState and self._battleState.PlayerCreature
+		if creatureData then
+			creatureName = creatureData.Nickname or creatureData.Name or "Your creature"
+		end
+	else
+		creatureData = self._battleState and self._battleState.FoeCreature
+		if creatureData then
+			creatureName = creatureData.Nickname or creatureData.Name or "Foe"
+		end
 	end
 	
-	-- Play status effect
-	local model = isPlayer 
+	-- Extract status type from step - ensure it's a valid status code
+	local statusType = nil
+	if step.Status then
+		local statusValue = step.Status
+		-- Check if it's a valid status code (string like "BRN", "PSN", etc.)
+		if type(statusValue) == "string" then
+			local upperValue = statusValue:upper()
+			if upperValue == "BRN" or upperValue == "PAR" or upperValue == "PSN" or upperValue == "TOX" or upperValue == "SLP" or upperValue == "FRZ" then
+				statusType = upperValue
+			else
+				warn("[StepProcessor] Invalid status string:", statusValue)
+			end
+		elseif type(statusValue) == "number" then
+			-- If it's a number (like 100), this is wrong - try to extract from message or creature data
+			warn("[StepProcessor] Status step has numeric value:", statusValue, "- this should be a status code!")
+			
+			-- Try to extract status from the server message if available
+			if step.Message and type(step.Message) == "string" then
+				local msg = step.Message:lower()
+				if string.find(msg, "burned") then
+					statusType = "BRN"
+				elseif string.find(msg, "paralyzed") then
+					statusType = "PAR"
+				elseif string.find(msg, "badly poisoned") then
+					statusType = "TOX"
+				elseif string.find(msg, "poisoned") then
+					statusType = "PSN"
+				elseif string.find(msg, "asleep") or string.find(msg, "sleep") then
+					statusType = "SLP"
+				elseif string.find(msg, "frozen") then
+					statusType = "FRZ"
+				end
+				if statusType then
+					print("[StepProcessor] Extracted status from message:", statusType)
+				end
+			end
+			
+			-- Fallback: try to get status from creature data if available
+			if not statusType and creatureData and creatureData.Status and creatureData.Status.Type then
+				local creatureStatus = creatureData.Status.Type
+				if type(creatureStatus) == "string" then
+					local upperStatus = creatureStatus:upper()
+					if upperStatus == "BRN" or upperStatus == "PAR" or upperStatus == "PSN" or upperStatus == "TOX" or upperStatus == "SLP" or upperStatus == "FRZ" then
+						statusType = upperStatus
+						print("[StepProcessor] Using status from creature data:", statusType)
+					end
+				end
+			end
+		end
+	end
+	
+	-- Generate message
+	if statusType and creatureName then
+		local statusMessage = MessageGenerator.StatusApplied(creatureName, statusType)
+		self._messageQueue:Enqueue(statusMessage)
+		print("[StepProcessor] Status message generated:", statusMessage, "for status:", statusType)
+	elseif step.Message then
+		-- Use server message, but try to extract status from it for UI update
+		self._messageQueue:Enqueue(step.Message)
+		print("[StepProcessor] Using server message for status:", step.Message)
+		
+		-- Try one more time to extract status from message for UI update
+		if not statusType and step.Message and type(step.Message) == "string" then
+			local msg = step.Message:lower()
+			if string.find(msg, "burned") then
+				statusType = "BRN"
+			elseif string.find(msg, "paralyzed") then
+				statusType = "PAR"
+			elseif string.find(msg, "badly poisoned") then
+				statusType = "TOX"
+			elseif string.find(msg, "poisoned") then
+				statusType = "PSN"
+			elseif string.find(msg, "asleep") or string.find(msg, "sleep") then
+				statusType = "SLP"
+			elseif string.find(msg, "frozen") then
+				statusType = "FRZ"
+			end
+			if statusType then
+				print("[StepProcessor] Extracted status from server message:", statusType)
+			end
+		end
+	else
+		warn("[StepProcessor] No status message available! step.Status:", step.Status, "step.Message:", step.Message)
+	end
+	
+	-- Wait for the status message to be displayed and drained before continuing
+	if self._messageQueue and self._messageQueue.WaitForDrain then
+		self._messageQueue:WaitForDrain()
+	end
+	
+	-- Wait for the status message to be displayed before updating UI
+	if statusType and creatureData then
+		-- Validate statusType is a valid status code before using it
+		local validStatusCodes = {BRN = true, PAR = true, PSN = true, TOX = true, SLP = true, FRZ = true}
+		if not validStatusCodes[statusType] then
+			warn("[StepProcessor] Invalid status type:", statusType, "- skipping UI update")
+			if onComplete then
+				onComplete()
+			end
+			return
+		end
+		
+		-- Update the creature data with the new status (ensure it's a string)
+		if not creatureData.Status then
+			creatureData.Status = {}
+		end
+		creatureData.Status.Type = statusType
+		
+		print("[StepProcessor] Updating status UI after message - Status:", statusType, "AffectedIsPlayer:", affectedIsPlayer, "Creature:", creatureName)
+		
+		-- Update battle state with status
+		if affectedIsPlayer then
+			self._battleState:UpdatePlayerCreature(creatureData, self._battleState.PlayerCreatureIndex or 1)
+		else
+			self._battleState:UpdateFoeCreature(creatureData)
+		end
+		
+		-- Update UI display (this will show the status after message is displayed)
+		if self._uiController then
+			self._uiController:UpdateStatusDisplay(affectedIsPlayer, creatureData)
+			-- Also call UpdateCreatureUI to ensure everything is refreshed
+			self._uiController:UpdateCreatureUI(affectedIsPlayer, creatureData, false)
+		end
+	end
+	
+	-- Play status effect on the affected creature's model (after message is shown)
+	local model = affectedIsPlayer 
 		and self._sceneManager:GetPlayerCreature() 
 		or self._sceneManager:GetFoeCreature()
 	
@@ -1108,8 +1320,9 @@ function StepProcessor:_processStatus(step: any, isPlayer: boolean, onComplete: 
 		self._combatEffects:PlayStatusEffect(model, step.Status)
 	end
 	
+	-- Complete after message has drained
 	if onComplete then
-		task.delay(0.5, onComplete)
+		onComplete()
 	end
 end
 

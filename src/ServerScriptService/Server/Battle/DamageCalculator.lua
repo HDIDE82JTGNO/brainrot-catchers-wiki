@@ -171,6 +171,12 @@ function DamageCalculator.CalculateDamage(
 	local attackStat = applyStatStage(attacker.Stats.Attack, attackStage or 0)
 	local defenseStat = applyStatStage(defender.Stats.Defense, defenseStage or 0)
 	
+	-- Apply status multipliers
+	local StatusModule = require(ReplicatedStorage.Shared.Status)
+	local statusAttackMult = StatusModule.GetAttackMultiplier(attacker)
+	local statusSpeedMult = StatusModule.GetSpeedMultiplier(attacker)
+	attackStat = math.floor(attackStat * statusAttackMult)
+	
 	-- Calculate base damage using Pokémon formula
 	local level = attacker.Level or 1
 	local levelFactor = math.floor((2 * level) / 5) + 2
@@ -183,11 +189,18 @@ function DamageCalculator.CalculateDamage(
 	local stab = calculateSTAB(moveData.Type, attacker.Type or {})
 	local effectiveness = calculateTypeEffectiveness(moveData.Type, defender.Type or {})
 	
+    -- Apply ability overrides for immunity (e.g., Magic Eyes)
+    local Abilities = require(ReplicatedStorage.Shared.Abilities)
+    effectiveness = Abilities.OverrideImmunity(attacker, defender, moveData.Type, effectiveness)
+
 	-- Random factor (0.85 to 1.0)
 	local randomFactor = 0.85 + (math.random() * 0.15)
 	
+    -- Ability damage multipliers
+    local abilityMult = Abilities.DamageMultiplier(attacker, defender, moveData.Type, type(moveNameOrData)=="string" and moveNameOrData or nil)
+
 	-- Calculate final damage
-	local finalDamage = baseDamage * critMultiplier * stab * effectiveness * randomFactor
+	local finalDamage = baseDamage * critMultiplier * stab * effectiveness * randomFactor * abilityMult
 	finalDamage = math.floor(finalDamage)
 	
 	-- Ensure minimum damage if not immune
@@ -225,21 +238,28 @@ end
 function DamageCalculator.CheckAccuracy(
 	moveNameOrData: string | Move,
 	accuracyStage: number?,
-	evasionStage: number?
+	evasionStage: number?,
+    attacker: Creature? -- Added attacker param
 ): boolean
 	-- Get move data
-	local moveData: Move?
-	if type(moveNameOrData) == "string" then
-		moveData = MovesModule[moveNameOrData]
-	else
-		moveData = moveNameOrData
-	end
-	
-	if not moveData then
-		return false
-	end
-	
-	-- Moves with no accuracy always hit
+    local moveData: Move?
+    if type(moveNameOrData) == "string" then
+        moveData = MovesModule[moveNameOrData]
+    else
+        moveData = moveNameOrData
+    end
+
+    if not moveData then
+        return false
+    end
+
+    local Abilities = require(ReplicatedStorage.Shared.Abilities)
+    local abilityName = Abilities.GetName(attacker) -- attacker needs to be passed to CheckAccuracy if we want to use it
+    if abilityName and (string.lower(abilityName) == "recon flight") then
+        return true
+    end
+
+    -- Moves with no accuracy always hit
 	if not moveData.Accuracy or moveData.Accuracy == 0 then
 		return true
 	end

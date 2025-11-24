@@ -241,6 +241,9 @@ function UIController:UpdateCreatureUI(
 	-- Update type display
 	self:_updateTypeDisplay(ui, creatureData)
 	
+	-- Update status condition display
+	self:UpdateStatusDisplay(isPlayer, creatureData)
+	
 	-- Update HP
 	self:UpdateHPBar(isPlayer, creatureData, shouldTween)
 end
@@ -668,6 +671,84 @@ function UIController:SlideFoeUIIn(callback: (() -> ())?)
     slideTween:Play()
     
     print("[UIController] Sliding Foe UI in from off-screen")
+end
+
+--[[
+	Updates status condition display
+	@param isPlayer Whether this is the player's creature
+	@param creatureData The creature data
+]]
+function UIController:UpdateStatusDisplay(isPlayer: boolean, creatureData: any)
+	local ui = isPlayer and self._youUI or self._foeUI
+	if not ui then
+		return
+	end
+	
+	local statusFrame = ui:FindFirstChild("Status")
+	if not statusFrame or not statusFrame:IsA("Frame") then
+		-- Status frame doesn't exist, skip
+		return
+	end
+	
+	local statusText = statusFrame:FindFirstChild("StatusText")
+	if not statusText or not statusText:IsA("TextLabel") then
+		return
+	end
+	
+	local StatusModule = require(ReplicatedStorage.Shared.Status)
+	
+	-- Check if creature has a status condition
+	if creatureData.Status and creatureData.Status.Type then
+		local statusType = tostring(creatureData.Status.Type):upper()
+		local statusDef = StatusModule.GetDefinition(statusType)
+		
+		print("[UIController] UpdateStatusDisplay - StatusType:", statusType, "StatusDef:", statusDef and "found" or "nil", "IsPlayer:", isPlayer)
+		
+		if statusDef then
+			-- Map status codes to display names
+			local displayNames = {
+				BRN = "Burned",
+				PAR = "Paralyzed",
+				PSN = "Poisoned",
+				TOX = "Badly Poisoned",
+				SLP = "Asleep",
+				FRZ = "Frozen",
+			}
+			
+			local displayName = displayNames[statusType] or statusDef.Name
+			
+			statusFrame.Visible = true
+			statusText.Text = displayName
+			-- Keep text color white (don't change to status color)
+			statusText.TextColor3 = Color3.fromRGB(255, 255, 255)
+			
+			-- Update frame background color
+			if statusFrame:IsA("Frame") then
+				statusFrame.BackgroundColor3 = statusDef.Color
+			end
+			
+			-- Update stroke color
+			local stroke = statusText:FindFirstChild("UIStroke")
+			if stroke and stroke:IsA("UIStroke") then
+				stroke.Color = statusDef.StrokeColor
+			end
+			
+			-- Update frame stroke if it exists
+			local frameStroke = statusFrame:FindFirstChild("UIStroke")
+			if frameStroke and frameStroke:IsA("UIStroke") then
+				frameStroke.Color = statusDef.StrokeColor
+			end
+			
+			print("[UIController] Status UI updated - Visible:", statusFrame.Visible, "Text:", displayName, "Color:", statusDef.Color)
+		else
+			warn("[UIController] Status definition not found for:", statusType)
+			statusFrame.Visible = false
+		end
+	else
+		-- No status condition
+		print("[UIController] No status condition found")
+		statusFrame.Visible = false
+	end
 end
 
 --[[

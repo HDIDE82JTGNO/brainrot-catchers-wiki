@@ -538,8 +538,106 @@ return {
 			end)
 		end
 
-		SetupHealer("Camille", "Hey! Let me heal those creatures for you.", "Andddd... All done!")
 		SetupHealer("Miranda", "Oh hi! You need your creatures healed? Allow me!", "Done! Take care of them!")
+
+		-- Camille: Code Redemption NPC
+		local CodeInput = require(script.Parent.Parent.UI.CodeInput)
+		local camille = NPCFolder:FindFirstChild("Camille")
+		if camille then
+			NPC:Setup(camille, function()
+				UI.TopBar:Hide()
+				Say:Say("Camille", false, {
+					{ Text = "Hey! Got any codes to redeem?", Emotion = "Happy" },
+				}, camille)
+
+				local pg = Players.LocalPlayer and Players.LocalPlayer:FindFirstChildOfClass("PlayerGui")
+				local sayFrame = pg and pg:FindFirstChild("GameUI")
+				sayFrame = sayFrame and sayFrame:FindFirstChild("Say")
+				local choiceFrame = sayFrame and sayFrame:FindFirstChild("Choice")
+				local yesBtn = choiceFrame and choiceFrame:FindFirstChild("Yes")
+				local noBtn = choiceFrame and choiceFrame:FindFirstChild("No")
+				local yesLabel = yesBtn and yesBtn:FindFirstChild("Label")
+				local noLabel = noBtn and noBtn:FindFirstChild("Label")
+				local originalYes = yesLabel and yesLabel:IsA("TextLabel") and yesLabel.Text or nil
+				local originalNo = noLabel and noLabel:IsA("TextLabel") and noLabel.Text or nil
+				if yesLabel and yesLabel:IsA("TextLabel") then
+					yesLabel.Text = "Yes"
+				elseif yesBtn and yesBtn:IsA("TextButton") then
+					yesBtn.Text = "Yes"
+				end
+				if noLabel and noLabel:IsA("TextLabel") then
+					noLabel.Text = "No"
+				elseif noBtn and noBtn:IsA("TextButton") then
+					noBtn.Text = "No"
+				end
+
+				local wantsToRedeem = Say:YieldChoice()
+
+				if originalYes and yesLabel and yesLabel:IsA("TextLabel") then
+					yesLabel.Text = originalYes
+				elseif originalYes and yesBtn and yesBtn:IsA("TextButton") then
+					yesBtn.Text = originalYes
+				end
+				if originalNo and noLabel and noLabel:IsA("TextLabel") then
+					noLabel.Text = originalNo
+				elseif originalNo and noBtn and noBtn:IsA("TextButton") then
+					noBtn.Text = originalNo
+				end
+
+				Say:Exit()
+
+				local function restoreState()
+					UI.TopBar:SetSuppressed(false)
+					UI.TopBar:Show()
+					CharacterFunctions:SetSuppressed(false)
+					CharacterFunctions:CanMove(true)
+				end
+
+				if wantsToRedeem ~= true then
+					Say:Say("Camille", true, {
+						{ Text = "No problem! Come back if you get any codes.", Emotion = "Happy" },
+					}, camille)
+					restoreState()
+					return
+				end
+
+				-- Prompt for code input
+				UI.TopBar:SetSuppressed(true)
+				CharacterFunctions:SetSuppressed(true)
+				CharacterFunctions:CanMove(false)
+
+				local code = CodeInput:Input(true)
+				
+				if not code or code == "" then
+					restoreState()
+					return
+				end
+
+				-- Attempt to redeem code
+				local result = nil
+				local ok = pcall(function()
+					result = Events.Request:InvokeServer({"RedeemCode", code})
+				end)
+
+				if ok and result and type(result) == "table" then
+					if result.Success == true then
+						Say:Say("Camille", true, {
+							{ Text = result.Message or "Great! Code redeemed successfully!", Emotion = "Happy" },
+						}, camille)
+					else
+						Say:Say("Camille", true, {
+							{ Text = result.Message or "Code redemption failed.", Emotion = "Confused" },
+						}, camille)
+					end
+				else
+					Say:Say("Camille", true, {
+						{ Text = "Hmm, something went wrong. Try again later.", Emotion = "Confused" },
+					}, camille)
+				end
+
+				restoreState()
+			end)
+		end
 
 		local shopController = UI and UI.CatchCareShop
 
@@ -2076,6 +2174,112 @@ return {
 		end
 	end,
 
+	["Load_Chunk5"] = function(CurrentChunk)
+		local CD = ClientData:Get()
+		local events = (CD and CD.Events) or {}
+		if events.MET_FREINDS_ASTERDEN ~= true then
+			local CutsceneFolder = CurrentChunk.Model.Essentials.Cutscene_BeforeGym
+			local nickname = (CD and CD.Nickname) or "Trainer"
+			UI.TopBar:Hide()
+			UI.TopBar:SetSuppressed(true)
+			CharacterFunctions:CanMove(false)
+			CharacterFunctions:SetSuppressed(true)
+
+			task.wait(0.5)
+
+			Say:Say("Ayla", true, {
+				{ Text = "Wow… Asterden is huge! I’m sure you’ll love it here.", Emotion = "Happy" },
+				{ Text = "I’m gonna try to take on the Gym Leader right away!", Emotion = "Happy" },
+				{ Text = "You should go for it too, " .. nickname .. ". I’ll probably finish around the same time as you.", Emotion = "Happy" },
+				{ Text = "And hey, good luck! I’m also gonna look around for Kyro and see if he managed to beat the gym already.", Emotion = "Happy" },
+				{ Text = "See you later!", Emotion = "Happy" },
+			},CutsceneFolder.Ayla)
+			UIFunctions:Transition(true)
+			task.wait(1.5)
+			CutsceneFolder.Ayla:Destroy()
+			UIFunctions:Transition(false)
+
+			UI.TopBar:SetSuppressed(false)
+			CharacterFunctions:SetSuppressed(false)
+			UI.TopBar:Show()
+			CharacterFunctions:CanMove(true)
+
+			setClientEventFlag("MET_FREINDS_ASTERDEN", true)
+
+		else
+			local CutsceneFolder = CurrentChunk.Model.Essentials.Cutscene_BeforeGym
+			CutsceneFolder:Destroy()
+		end
+
+
+		CD = ClientData:Get()
+		events = (CD and CD.Events) or {}
+
+		if events.MET_FREINDS_ASTERDEN == true and events.MET_FRIENDS_AFTER_GYM ~= true and (CD and CD.Badges) == 1 then
+			local CutsceneFolder = CurrentChunk.Model.Essentials.Cutscene_AfterGym
+			local nickname = (CD and CD.Nickname) or "Trainer"
+			UI.TopBar:Hide()
+			UI.TopBar:SetSuppressed(true)
+			CharacterFunctions:CanMove(false)
+			CharacterFunctions:SetSuppressed(true)
+			task.wait(0.5)
+
+			Say:Say("Ayla", true, {
+				{ Text = "Oh hey! That gym was no joke.", Emotion = "Talking" },
+				{ Text = "But I pulled through—got the badge! And I see you did too! That's awesome!", Emotion = "Excited" },
+				{ Text = "Oh! Plus, I found Kyro!", Emotion = "Excited" },
+			},CutsceneFolder.Ayla)
+
+			Say:Say("Kyro", true, {
+				{ Text = "Yo, " .. nickname .. "! I just beat the gym too!", Emotion = "Excited" },
+				{ Text = "I've been waiting here with Ayla for you.", Emotion = "Neutral" },
+			},CutsceneFolder.Kyro)
+
+			Say:Say("Ayla", true, {
+				{ Text = "Mhm! And guess what! I picked up some info about Route 4.", Emotion = "Excited" },
+				{ Text = "It's really cool. You're gonna be amazed when you see it.", Emotion = "Happy" },
+				{ Text = "No spoilers though!", Emotion = "Smug" },
+			},CutsceneFolder.Ayla, CutsceneFolder.Kyro)
+
+			Say:Say("Kyro", true, {
+				{ Text = "Yeah, for real. Route 4 is sick. I'm definitely gonna try to catch something awesome over there.", Emotion = "Excited" },
+			},CutsceneFolder.Kyro, CutsceneFolder.Ayla)
+
+			Say:Say("Ayla", true, {
+				{ Text = "Same here! I need to add some new Brainrots to my team.", Emotion = "Happy" },
+				{ Text = "I've only caught two more since our last battle, " .. nickname .. ", so I need to step it up.", Emotion = "Neutral" },
+			},CutsceneFolder.Ayla)
+
+			Say:Say("Kyro", true, {
+				{ Text = "Let's make a plan. Once we all explore Route 4 and get what we need, we meet up again in the next city. Sound good?", Emotion = "Talking" },
+			},CutsceneFolder.Kyro, CutsceneFolder.Ayla)
+
+			Say:Say("Ayla", true, {
+				{ Text = "Yeah! Let's do it!", Emotion = "Excited" },
+			},CutsceneFolder.Ayla, CutsceneFolder.Kyro)
+
+			Say:Say("Kyro", true, {
+				{ Text = "Awesome. Don't get lost out there guys!", Emotion = "Happy" },
+			},CutsceneFolder.Kyro)
+
+			UIFunctions:Transition(true)
+			task.wait(1.5)
+			CutsceneFolder:Destroy()
+			UIFunctions:Transition(false)
+
+			UI.TopBar:SetSuppressed(false)
+			CharacterFunctions:SetSuppressed(false)
+			UI.TopBar:Show()
+			CharacterFunctions:CanMove(true)
+
+			setClientEventFlag("MET_FRIENDS_AFTER_GYM", true)
+
+		else
+			local CutsceneFolder = CurrentChunk.Model.Essentials.Cutscene_AfterGym
+			CutsceneFolder:Destroy()
+		end
+	end,
+
 	["Load_Professor's Lab"] = function(CurrentChunk)
         -- If player hasn't chosen a starter yet, re-run the professor intro cutscene on (re)entry
         local pd = ClientData:Get()
@@ -2338,7 +2542,7 @@ return {
 						return
 					end
 
-					Say("Gym Leader Vincent", true, {
+					Say:Say("Gym Leader Vincent", true, {
 						{ Text = "So, you actually made it through my gym’s trials.", Emotion = "Happy" },
 						{ Text = "Most challengers talk big… until they hit the real test.", Emotion = "Happy" },
 					
@@ -2372,13 +2576,20 @@ return {
 						rc = RelocationSignals.OnPostBattleRelocated(function()
 							if rc then rc:Disconnect() rc = nil end
 							UI.TopBar:Hide()
-							Say("Gym Leader Vincent", true, {
-								{ Text = "Impressive! You’ve truly earned your first badge.", Emotion = "Happy" },
+							Say:Say("Gym Leader Vincent", true, {
+								{ Text = "Impressive! That was an excellent battle.", Emotion = "Happy" },
 								{ Text = "Most challengers fall apart long before this point… but you held your ground.", Emotion = "Talking" },
 								{ Text = "Take this badge and wear it like proof of your discipline and your bond with your Brainrots.", Emotion = "Talking" },
+								{ Text = "I present to you... The Grass Badge!", Emotion = "Talking" },
+							}, vincent)		
+							
+							--Badge animation
+							UI.BadgeAnimation:Play("Grass", 5)
+							
+							Say:Say("Gym Leader Vincent", true, {
 								{ Text = "Your next step is Route 4. New challengers, new threats. Keep pushing forward!", Emotion = "Excited" },
-								{ Text = "If you can handle what’s ahead, we’ll be hearing your name across the region soon enough! Good luck out there.", Emotion = "Smug" }
-							}, vincent)							
+								{ Text = "If you can handle what's ahead, we'll be hearing your name across the region soon enough! Good luck out there.", Emotion = "Smug" }
+							}, vincent)		
 							UI.TopBar:Show()
 						end)
 					end)

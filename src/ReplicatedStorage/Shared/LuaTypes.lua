@@ -14,6 +14,10 @@ export type Move = {
 	Type: {any}, --Type.Any
     Description: string?,
     HealsPercent: number?, -- Optional: percent of max HP to heal (self-heal moves)
+    StatusEffect: string?, -- Optional: status condition to inflict ("BRN", "PAR", "PSN", "TOX", "SLP", "FRZ")
+    StatusChance: number?, -- Optional: chance to inflict status (0-100)
+    CausesFlinch: boolean?, -- Optional: causes flinch on hit
+    CausesConfusion: boolean?, -- Optional: causes confusion
 }
 
 export type StatBoostInfo = {

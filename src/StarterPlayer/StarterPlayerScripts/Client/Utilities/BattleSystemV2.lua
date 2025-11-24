@@ -931,9 +931,9 @@ function BattleSystemV2:_checkTurnEndConditions(data: any)
             -- No enemy send-out provided; treat as potential battle end (wild or trainer with no party)
             print("[BattleSystemV2] Foe fainted - waiting for battle end sequence")
         end
-	elseif playerSwitched then
-		-- Player switched - start next turn after all steps complete
-		print("[BattleSystemV2] Player switched - starting next turn after all steps complete")
+	elseif playerSwitched and self._battleState and self._battleState.SwitchMode == "Forced" then
+		-- Forced switch (after faint) - start next turn after all steps complete
+		print("[BattleSystemV2] Forced switch - starting next turn after all steps complete")
 		-- Wait for message queue to drain before unlocking and starting next turn
 		self:_safeWaitForDrain(3)
 		if self._actionHandler then self._actionHandler:Unlock() end

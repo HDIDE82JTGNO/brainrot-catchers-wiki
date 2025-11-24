@@ -178,10 +178,14 @@ end
 	@param actorName The name of the creature whose move missed (optional, message may be pre-formatted)
 	@return Formatted message string
 ]]
-function BattleMessageGenerator.Miss(actorName: string?): string
+function BattleMessageGenerator.Miss(actorName: string?, moveName: string?): string
 	-- If message is already formatted (from server), use it directly
 	if actorName and not string.find(actorName, "'s attack missed", 1, true) and not string.find(actorName, "avoided", 1, true) then
-		return string.format("%s's attack missed!", actorName)
+		if moveName then
+			return string.format("%s used %s, but it missed!", actorName, moveName)
+		else
+			return string.format("%s's attack missed!", actorName)
+		end
 	end
 	-- Default message for when server provides pre-formatted message
 	return actorName or "The attack missed!"
@@ -210,15 +214,37 @@ end
 	@return Formatted message string
 ]]
 function BattleMessageGenerator.StatusApplied(creatureName: string, status: string): string
-	local statusMessages = {
-		Burn = string.format("%s was burned!", creatureName),
-		Paralysis = string.format("%s was paralyzed!", creatureName),
-		Poison = string.format("%s was poisoned!", creatureName),
-		Sleep = string.format("%s fell asleep!", creatureName),
-		Freeze = string.format("%s was frozen solid!", creatureName),
+	-- Ensure status is a string and uppercase for matching
+	local statusStr = tostring(status):upper()
+	
+	-- Map status codes to display names and messages
+	local statusMap = {
+		-- Status codes (from server)
+		BRN = string.format("%s was burned!", creatureName),
+		PAR = string.format("%s is paralyzed! It may be unable to move!", creatureName),
+		PSN = string.format("%s was poisoned!", creatureName),
+		TOX = string.format("%s was badly poisoned!", creatureName),
+		SLP = string.format("%s fell asleep!", creatureName),
+		FRZ = string.format("%s was frozen solid!", creatureName),
+		-- Volatile statuses
+		CONFUSION = string.format("%s became confused!", creatureName),
+		INFATUATION = string.format("%s fell in love!", creatureName),
+		-- Display names (for backwards compatibility)
+		BURN = string.format("%s was burned!", creatureName),
+		PARALYSIS = string.format("%s is paralyzed! It may be unable to move!", creatureName),
+		POISON = string.format("%s was poisoned!", creatureName),
+		SLEEP = string.format("%s fell asleep!", creatureName),
+		FREEZE = string.format("%s was frozen solid!", creatureName),
 	}
 	
-	return statusMessages[status] or string.format("%s was affected by %s!", creatureName, status)
+	local message = statusMap[statusStr]
+	if message then
+		return message
+	end
+	
+	-- Fallback: try to generate a reasonable message
+	warn("[BattleMessageGenerator] Unknown status type:", status, "for creature:", creatureName)
+	return string.format("%s was affected!", creatureName)
 end
 
 --[[
@@ -421,7 +447,7 @@ function BattleMessageGenerator.FromEvent(eventData: any): string?
 		return BattleMessageGenerator.CriticalHit()
 		
 	elseif eventType == "Miss" and eventData.Actor then
-		return BattleMessageGenerator.Miss(eventData.Actor)
+		return BattleMessageGenerator.Miss(eventData.Actor, eventData.Move)
 		
 	elseif eventType == "Effectiveness" and eventData.Effectiveness then
 		return BattleMessageGenerator.Effectiveness(eventData.Effectiveness)

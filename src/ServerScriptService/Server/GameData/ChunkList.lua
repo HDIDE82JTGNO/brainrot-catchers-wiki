@@ -123,7 +123,7 @@ local ChunkList = {
 			{"Trippi Troppi",10,12,30},
 			{"Tadbalabu",10,12,30},
 		},
-		ValidPrevious = {"Chunk3"}
+		ValidPrevious = {"Chunk3", "Chunk5"} -- Can come from Cresamore Town or Asterden
 	},
 
 	--Chunk 5 and sub rooms
@@ -131,7 +131,7 @@ local ChunkList = {
 		ProperName = "Asterden", -- Fredd's city (grass gym)
 		IsSubRoom = false,
 		Encounters = {},
-		ValidPrevious = {"Chunk4"},
+		ValidPrevious = {"Chunk4", "Chunk6"}, -- Can come from Route 3 or Route 4
 		HasCatchCareDoor = true,
 		SubChunks = {
 			["Gym1"] = {
@@ -160,7 +160,25 @@ local ChunkList = {
 			{"Bombombini Gusini",15,17,20},
 			{"Il Cacto Hipopotamo",15,16,30},
 		},
-		ValidPrevious = {"Chunk5"}
+		ValidPrevious = {"Chunk5", "Chunk7"} -- Can come from Asterden or Dustnook Town
+	},
+
+	["Chunk7"] = {
+		ProperName = "Dustnook Town", -- desert chunk leading to the wild west town (ground gym)
+		IsSubRoom = false,
+		Encounters = {},
+		ValidPrevious = {"Chunk6", "Chunk8"} -- Can come from Route 4 or Route 5
+	},
+
+	["Chunk8"] = {
+		ProperName = "Route 5", 
+		IsSubRoom = false,
+		Encounters = {
+			{"Duckaroo",16,18,20},
+			{"Bombombini Gusini",15,17,20},
+			{"Il Cacto Hipopotamo",15,16,30},
+		},
+		ValidPrevious = {"Chunk7"} 
 	},
 	
 }

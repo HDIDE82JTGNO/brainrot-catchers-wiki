@@ -36,6 +36,13 @@ local XPManager = Battle.XPManager
 local HeldItemEffects = require(script.Parent:WaitForChild("Battle"):WaitForChild("HeldItemEffects"))
 local XPAwarder = require(script.Parent:WaitForChild("Battle"):WaitForChild("XPAwarder"))
 
+--// Refactored System Modules
+local BattleSystem = require(script.Parent.BattleSystem)
+local ItemSystem = require(script.Parent.ItemSystem)
+local CreatureSystem = require(script.Parent.CreatureSystem)
+local WorldSystem = require(script.Parent.WorldSystem)
+local CodeRedemption = require(script.Parent.CodeRedemption)
+
 -- Unstuck cooldowns
 local _unstuckCooldown: {[Player]: number} = {}
 
@@ -45,6 +52,41 @@ local Events = ReplicatedStorage:WaitForChild("Events")
 -- Store active battles for escape calculations and battle state management
 -- Note: ActiveBattles is now managed by BattleStateManager, but kept for backward compatibility
 local ActiveBattles = {}
+
+-- Initialize refactored system modules with dependencies
+do
+	local dependencies = {
+		ActiveBattles = ActiveBattles,
+		ClientData = ClientData,
+		Events = Events,
+		DBG = DBG,
+		MovesModule = MovesModule,
+		AbilitiesModule = AbilitiesModule,
+		CreaturesModule = CreaturesModule,
+		StatCalc = StatCalc,
+		Natures = Natures,
+		CreatureFactory = CreatureFactory,
+		TypesModule = TypesModule,
+		DamageCalculator = DamageCalculator,
+		HeldItemEffects = HeldItemEffects,
+		XPManager = XPManager,
+		XPAwarder = XPAwarder,
+		GameData = GameData,
+		GameConfig = GameConfig,
+		ChunkService = ChunkService,
+		CatchCareShopConfig = CatchCareShopConfig,
+		ReplicatedStorage = ReplicatedStorage,
+	}
+	
+	BattleSystem.Initialize(dependencies)
+	ItemSystem.Initialize(dependencies)
+	CreatureSystem.Initialize(dependencies)
+	WorldSystem.Initialize(dependencies)
+	
+	-- Initialize CodeRedemption with ServerFunctions reference
+	dependencies.ServerFunctions = ServerFunctions
+	CodeRedemption.Initialize(dependencies)
+end
 
 -- Event-based save helper
 local function _saveNow(player: Player)
@@ -59,145 +101,11 @@ end
 
 -- Give an item to a creature in the overworld (sets HeldItem)
 function ServerFunctions:GiveItem(Player, payload)
-    local itemName = payload.Name
-    local slotIndex = tonumber(payload.SlotIndex or 0)
-    DBG:print("[Server] GiveItem called by", Player and Player.Name, "item=", itemName, "slot=", slotIndex)
-    if type(itemName) ~= "string" or slotIndex < 1 then return false end
-    local PlayerData = ClientData:Get(Player)
-    if not PlayerData then return false end
-    local Items = GameData.Items
-    local itemDef = Items[itemName]
-    if not itemDef then return false end
-
-    -- Disallow MoveLearners as held items
-    if itemDef.Category == "MoveLearners" then
-        DBG:print("[Server] GiveItem blocked - item is MoveLearners")
-        return "Cannot give this item."
-    end
-
-    -- Validate inventory
-    PlayerData.Items = PlayerData.Items or {}
-    local count = PlayerData.Items[itemName] or 0
-    if count <= 0 then
-        DBG:print("[Server] GiveItem blocked - no inventory for", itemName)
-        return false
-    end
-
-    -- Validate party and target
-    local party = PlayerData.Party
-    if not party or #party == 0 then
-        DBG:print("[Server] GiveItem blocked - no party")
-        return "No creatures in party."
-    end
-    local creature = party[slotIndex]
-    if not creature then
-        DBG:print("[Server] GiveItem blocked - invalid slot")
-        return false
-    end
-
-    -- Prevent giving to fainted? (allow per design) → we'll allow
-    -- Prevent giving if already holding something
-    if type(creature.HeldItem) == "string" and creature.HeldItem ~= "" then
-        DBG:print("[Server] GiveItem blocked - creature already holds", creature.HeldItem)
-        return "This creature is already holding an item."
-    end
-
-    -- Assign and deduct
-    creature.HeldItem = itemName
-    PlayerData.Items[itemName] = math.max(0, count - 1)
-
-    -- Persist to client
-    if ClientData.UpdateClientData then ClientData:UpdateClientData(Player, PlayerData) end
-    DBG:print("[Server] GiveItem success -", itemName, "-> slot", slotIndex)
-    return true
+	return ItemSystem.GiveItem(Player, payload)
 end
 
 function ServerFunctions:PurchaseCatchCareItem(Player: Player, payload: any)
-	if typeof(payload) ~= "table" then
-		return { Success = false, Message = "Invalid request." }
-	end
-
-	local itemName = payload.ItemName
-	if type(itemName) ~= "string" or itemName == "" then
-		return { Success = false, Message = "Invalid item." }
-	end
-
-	local quantity = tonumber(payload.Quantity) or 1
-	if quantity < 1 then
-		quantity = 1
-	end
-
-	local PlayerData = ClientData:Get(Player)
-	if not PlayerData then
-		return { Success = false, Message = "No player data." }
-	end
-
-	if tostring(PlayerData.Chunk) ~= "CatchCare" then
-		return { Success = false, Message = "You're not at a CatchCare counter." }
-	end
-
-	local lastChunk = tostring(PlayerData.LastChunk or "")
-	if lastChunk == "CatchCare" then
-		lastChunk = ""
-	end
-	local locationConfig = (lastChunk ~= "" and CatchCareShopConfig.Locations[lastChunk]) or nil
-	local effectiveTier = (locationConfig and locationConfig.Tier) or CatchCareShopConfig.DefaultTier
-	local tierDefinition = CatchCareShopConfig.Tiers[effectiveTier]
-	if not tierDefinition then
-		return { Success = false, Message = "Shop data unavailable." }
-	end
-
-	local targetEntry: ShopItem?
-	for _, entry in ipairs(tierDefinition.Items or {}) do
-		if entry.ItemName == itemName then
-			targetEntry = entry
-			break
-		end
-	end
-
-	if not targetEntry then
-		return { Success = false, Message = "That item isn't sold here." }
-	end
-
-	local unitPrice = tonumber(targetEntry.Price)
-	if not unitPrice or unitPrice <= 0 then
-		return { Success = false, Message = "Invalid price data." }
-	end
-	local totalPrice = unitPrice * quantity
-
-	local itemsCatalog = GameData.Items
-	if not itemsCatalog[itemName] then
-		return { Success = false, Message = "Unknown item." }
-	end
-
-	if type(PlayerData.Studs) ~= "number" then
-		PlayerData.Studs = 0
-		ClientData:UpdateClientData(Player, PlayerData)
-	end
-
-	if PlayerData.Studs < totalPrice then
-		return { Success = false, Message = "You don't have enough Studs." }
-	end
-
-	PlayerData.Studs -= totalPrice
-	PlayerData.Items = PlayerData.Items or {}
-	PlayerData.Items[itemName] = (PlayerData.Items[itemName] or 0) + quantity
-	ClientData:UpdateClientData(Player, PlayerData)
-
-	DBG:print(string.format("[CatchCareShop] %s purchased %dx %s for %d studs", Player.Name, quantity, itemName, totalPrice))
-
-	local message: string
-	if quantity == 1 then
-		message = string.format("%s purchased!", itemName)
-	else
-		message = string.format("%dx %s purchased!", quantity, itemName)
-	end
-
-	return {
-		Success = true,
-		Message = message,
-		Studs = PlayerData.Studs,
-	}
+	return ItemSystem.PurchaseCatchCareItem(Player, payload)
 end
 
 -- Manual save rate limiting (per-player)
@@ -247,6 +155,7 @@ local _ALLOWED_VERBS: {[string]: boolean} = {
     GiveItem = true,
     GetUnstuck = true,
     PurchaseCatchCareItem = true,
+    RedeemCode = true,
 }
 
 local function _rateLimitOk(player: Player): boolean
@@ -406,161 +315,7 @@ end
 
 
 function ServerFunctions:LoadChunkPlayer(Player, ChunkName)
-	local PlayerData = ClientData:Get(Player)
-	local Authorized = false
-
-	DBG:warn("Player:", Player.Name, "| Requested Chunk:", ChunkName)
-
-	if not PlayerData.Chunk then
-		PlayerData.Chunk = "nil"
-		DBG:warn("No previous Chunk found in session, defaulted to 'nil'")
-	end
-
-	-- Failsafe: prevent re-entering CatchCare from its own exit (or any loop into itself)
-	do
-		local current = tostring(PlayerData.Chunk or "")
-		local requested = tostring(ChunkName or "")
-		if current == "CatchCare" and requested == "CatchCare" then
-			DBG:warn("[CatchCare Failsafe] Preventing re-entry into CatchCare from CatchCare; selecting fallback")
-			-- Preferred fallback: player's last known valid chunk (not CatchCare)
-			local ChunkList = GameData.ChunkList
-			local fallback = nil
-			local last = tostring(PlayerData.LastChunk or "")
-			if last ~= "" and last ~= "CatchCare" and ChunkList[last] then
-				fallback = last
-			end
-			-- Secondary: LeaveData.Chunk if valid gameplay chunk and not CatchCare
-			if not fallback then
-				local ld = PlayerData.LeaveData
-				local ldChunk = type(ld) == "table" and tostring(ld.Chunk or "") or ""
-				if ldChunk ~= "" and ldChunk ~= "CatchCare" and ChunkList[ldChunk] then
-					fallback = ldChunk
-				end
-			end
-			-- Final fallback: Chunk1 if defined
-			if not fallback and ChunkList["Chunk1"] then
-				fallback = "Chunk1"
-			end
-			if fallback then
-				DBG:warn("[CatchCare Failsafe] Redirecting requested chunk from CatchCare to:", fallback)
-				ChunkName = fallback
-			end
-		end
-	end
-
-	local ChunkData, ParentChunk = ChunkService:GetChunkRecord(ChunkName)
-
-	if not ChunkData then
-		DBG:warn("Chunk not found in GameData:", tostring(ChunkName))
-		Player:Kick("Unable to find requested chunk! RQ: " .. tostring(ChunkName))
-		return
-	end
-
-	if PlayerData.Chunk == ChunkName then
-		Authorized = true
-		DBG:warn("Player came from same chunk: Authorized")
-	end
-
-	local ok, errMsg = ChunkService:IsChunkTransitionAuthorized(Player, PlayerData, ChunkName)
-	if ok then
-		Authorized = true
-	else
-		DBG:warn(errMsg or ("Unauthorized chunk transition to " .. tostring(ChunkName)))
-	end
-
-	-- Starter gate: prevent leaving Professor's Lab without a starter
-	if Authorized then
-		local leavingProfsLab = (PlayerData.Chunk == "Professor's Lab") and (ChunkName ~= "Professor's Lab")
-		if leavingProfsLab then
-			local hasStarter = (PlayerData.SelectedStarter ~= nil) or (PlayerData.Party and #PlayerData.Party > 0)
-			if not hasStarter then
-				DBG:warn("Blocking exit: Player has not chosen a starter yet")
-				return false
-			end
-			-- If moving to PlayersHouse after lab, mark MET_PROFESSOR
-			if tostring(ChunkName) == "PlayersHouse" then
-				pcall(function()
-					PlayerData.Events = PlayerData.Events or {}
-					if PlayerData.Events.MET_PROFESSOR ~= true then
-						PlayerData.Events.MET_PROFESSOR = true
-						DBG:print("[LoadChunkPlayer] Marked MET_PROFESSOR for player:", Player.Name)
-					end
-					ClientData:UpdateClientData(Player, PlayerData)
-				end)
-			end
-		end
-	end
-
-	if not Authorized then
-		local current = tostring(PlayerData and PlayerData.Chunk or "nil")
-		local last = tostring(PlayerData and PlayerData.LastChunk or "nil")
-		local msg = string.format("Tried to load an unauthorized chunk! :: RQ:%s | Curr:%s | Last:%s", tostring(ChunkName), current, last)
-		Player:Kick(msg)
-		return
-	end
-	
-	-- If entering CatchCare, authoritatively remember where the player came from
-	do
-		local previousChunk = tostring(PlayerData.Chunk or "")
-		if ChunkName == "CatchCare" then
-			local ChunkList = GameData.ChunkList
-			if previousChunk ~= "" and previousChunk ~= "CatchCare" and ChunkList[previousChunk] then
-				PlayerData.LastChunk = previousChunk
-				DBG:warn("[CatchCare Entry] Set LastChunk to previous:", previousChunk)
-				-- Push to client so client-side door logic can use Previous immediately
-				pcall(function() ClientData:UpdateClientData(Player, PlayerData) end)
-			end
-		end
-	end
-	
-	PlayerData.Chunk = ChunkName
-
-	-- Get the source folder - check both Chunks and Interiors based on ChunkList
-	local SourceFolder = ChunkService:GetSourceFolder(ChunkName)
-
-	if not SourceFolder then
-		DBG:warn("Could not locate chunk in storage:", ChunkName, "IsSubRoom:", ChunkData.IsSubRoom)
-		Player:Kick("Requested chunk not found in storage! :: RQ: " .. ChunkName)
-		return
-	end
-
-	local ClonedChunk = SourceFolder:Clone()
-	ClonedChunk.Name = ChunkName
-	ClonedChunk.Parent = Player.PlayerGui
-	-- Mark interior + scripted camera status on the cloned chunk for client logic
-	pcall(function()
-		ClonedChunk:SetAttribute("IsInterior", ChunkData.IsSubRoom == true)
-		ClonedChunk:SetAttribute("ScriptedCam", ChunkData.ScriptedCam == true)
-	end)
-	
-	-- Validate LeaveData vs chunk fallback spawn: if too far (>=600 studs on any axis), clear LeaveData so client uses start door
-	do
-		local ld = PlayerData.LeaveData
-		local essentials = ClonedChunk:FindFirstChild("Essentials")
-		local fallbackPart = essentials and essentials:FindFirstChild("ChunkSpawnFallBack")
-		if type(ld) == "table" and type(ld.Position) == "table" and fallbackPart and fallbackPart:IsA("BasePart") then
-			-- Only consider if LeaveData corresponds to this chunk or is unset
-			local ldChunk = tostring(ld.Chunk or ChunkName)
-			if ldChunk == ChunkName then
-				local p = ld.Position
-				local dx = math.abs((p.X or 0) - fallbackPart.Position.X)
-				local dy = math.abs((p.Y or 0) - fallbackPart.Position.Y)
-				local dz = math.abs((p.Z or 0) - fallbackPart.Position.Z)
-				if dx >= 600 or dy >= 600 or dz >= 600 then
-					DBG:warn(string.format("[LeaveData] Clearing LeaveData for %s due to large offset from fallback (dx=%.1f, dy=%.1f, dz=%.1f)", Player.Name, dx, dy, dz))
-					PlayerData.LeaveData = nil
-					pcall(function() ClientData:UpdateClientData(Player, PlayerData) end)
-				end
-			end
-		end
-	end
-	
-	DBG:warn("Successfully cloned and parented chunk as:", ClonedChunk.Name)
-
-
-	DBG:warn("Successfully cloned and parented chunk:", ChunkName)
-
-	return {ChunkName, ChunkData and ChunkData.ProperName}
+	return WorldSystem.LoadChunkPlayer(Player, ChunkName)
 end
 
 function ServerFunctions:FilterName(Player, Name)
@@ -748,78 +503,19 @@ function ServerFunctions:PickStarter(Player, StarterName)
 end
 
 function ServerFunctions:GetEncounterData(Player, ChunkName)
-	local ChunkData = GameData.ChunkList[ChunkName]
-	
-	if not ChunkData then
-		DBG:warn("Chunk not found for encounter data:", ChunkName)
-		return {}
-	end
-	
-	-- Return encounter data for the chunk
-	return ChunkData.Encounters or {}
+	return WorldSystem.GetEncounterData(Player, ChunkName)
 end
 
 -- Server-authoritative encounter step: roll and start wild battle if triggered
 function ServerFunctions:TryEncounterStep(Player)
-    DBG:print("=== TryEncounterStep called for", Player.Name, "===")
-    
-    -- SECURITY: Prevent multiple battles for the same player
-    if ActiveBattles[Player] then
-        DBG:print("Player", Player.Name, "already in battle, refusing encounter request")
-        return false
-    end
-    
-    local PlayerData = ClientData:Get(Player)
-    if not PlayerData then
-        DBG:warn("No player data found for", Player.Name)
-        return false
-    end
-    local ChunkName = PlayerData.Chunk
-    DBG:print("Player", Player.Name, "is in chunk:", ChunkName)
-    
-    local ChunkData = GameData.ChunkList[ChunkName]
-    if not ChunkData then
-        DBG:warn("No chunk data found for:", ChunkName)
-        return false
-    end
-    local encounterList = ChunkData.Encounters or {}
-    DBG:print("Encounter list length:", #encounterList)
-    DBG:print("Raw encounter list:", encounterList)
-    if #encounterList == 0 then
-        DBG:print("No encounters available in chunk:", ChunkName)
-        return false
-    end
-
-    -- Global roll to throttle encounter frequency
-    local baseRoll = math.random(1, 100)
-    if math.random(1, 100) > (GameConfig.ENCOUNTER_BASE_CHANCE or 15) then
-        DBG:print("No encounter triggered (global roll)")
-        return false
-    end
-
-    -- Roll per-entry server-side
-    for i, entry in ipairs(encounterList) do
-        local creatureName = entry[1]
-        local minLevel = entry[2]
-        local maxLevel = entry[3]
-        local chance = entry[4]
-        local roll = math.random(1, 100)
-        DBG:print("Encounter", i, "- Creature:", creatureName, "Level:", minLevel, "-", maxLevel, "Chance:", chance, "Roll:", roll)
-        if roll <= chance then
-            DBG:print("Encounter triggered! Starting battle with", creatureName)
-            -- Build server-side battle data and start battle
-            local level = math.random(minLevel, maxLevel)
-            local ok, _ = ServerFunctions:StartBattle(Player, "Wild", {
-                CreatureName = creatureName,
-                Level = level,
-            })
-            DBG:print("StartBattle result:", ok)
-            return ok == true
-        end
-    end
-
-    DBG:print("No encounter triggered for", Player.Name)
-    return false
+	local ok, encounterData = WorldSystem.TryEncounterStep(Player)
+	if ok and encounterData then
+		-- Start battle with encounter data
+		local battleOk, _ = ServerFunctions:StartBattle(Player, "Wild", encounterData)
+		DBG:print("StartBattle result:", battleOk)
+		return battleOk == true
+	end
+	return ok
 end
 
 function ServerFunctions:UpdateSettings(Player, SettingName, SettingValue)
@@ -909,9 +605,40 @@ function ServerFunctions:AttemptEscape(Player)
         local battle = ActiveBattles[Player]
         if battle and battle.Type == "Wild" then
             local pc = battle.PlayerCreature
-            if pc and type(pc.Ability) == "string" and string.lower(pc.Ability) == "run away" then
+            local Abilities = require(game:GetService("ReplicatedStorage").Shared.Abilities)
+            if pc and Abilities.GuaranteesEscape(pc) then
                 canEscape = true
                 DBG:print("[Abilities] Run Away triggered: forced escape success")
+            end
+            
+            -- Check for trapping abilities on foe (Elastic Trap)
+            local foe = battle.FoeCreature
+            if foe and Abilities.TrapsOpponent(foe) then
+                -- Exception: Ghost types or Run Away users are immune to trapping (standard logic)
+                -- Since Run Away is checked above, we can prioritize that.
+                -- If Run Away is present, canEscape is true.
+                -- If not, and foe has Elastic Trap, block escape.
+                if not canEscape then -- i.e. Run Away didn't force it
+                     -- Check if player is Ghost type (immune to trapping)
+                     -- If not, block escape
+                     -- canEscape = false
+                     -- For now, just block if not already escaping
+                     -- But wait, CalculateEscapeChance might have returned true.
+                     -- If trapped, force false unless Run Away (which overrides trap in some Gens, or not? Run Away usually guarantees escape except from Block/Mean Look? No, Run Away guarantees escape from wild battle ALWAYS).
+                     -- So if Run Away triggered, we are good.
+                     -- If not, check trap.
+                     if Abilities.TrapsOpponent(foe) then
+                         -- Check for ghost type immunity
+                         local isGhost = false
+                         if pc.Type then
+                             for _, t in ipairs(pc.Type) do if t == "Ghost" then isGhost = true break end end
+                         end
+                         if not isGhost then
+                             canEscape = false
+                             DBG:print("[Abilities] Foe's trapping ability prevented escape")
+                         end
+                     end
+                end
             end
         end
     end
@@ -989,148 +716,17 @@ end
 
 -- Check all party creatures for evolution after battle
 function ServerFunctions:CheckPartyEvolutions(Player)
-	local PlayerData = ClientData:Get(Player)
-	if not PlayerData or not PlayerData.Party then
-		return
-	end
-	
-	DBG:print("=== CHECKING PARTY EVOLUTIONS ===")
-	DBG:print("Player:", Player.Name)
-	DBG:print("Party size:", PlayerData.Party and #PlayerData.Party or "nil")
-	
-	local evolvedCreatures = {}
-	
-	-- Check each creature in the party
-	for i, creature in ipairs(PlayerData.Party) do
-		if creature and creature.Stats and creature.Stats.HP > 0 then
-			DBG:print("[Evolution] Checking creature", i, ":", creature.Name, "Level:", creature.Level, "HP:", creature.Stats.HP)
-			-- Check if this creature can evolve using XPManager
-			local shouldEvolve, evolvedName = XPManager.CheckEvolution(creature)
-			DBG:print("[Evolution] Creature", i, "evolution check result - shouldEvolve:", shouldEvolve, "evolvedName:", evolvedName)
-			if shouldEvolve then
-				DBG:print("Creature", i, "can evolve:", creature.Name, "Level:", creature.Level)
-				
-				-- Store old name for evolution message
-				local oldName = creature.Nickname or creature.Name
-				local oldSpecies = creature.Name
-				
-				-- Get the new species name before evolving
-				local creatureData = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Creatures"))[creature.Name]
-				local newSpecies = creatureData and creatureData.EvolvesInto
-				
-				-- Evolve the creature using XPManager
-				local success, newName = XPManager.EvolveCreature(creature)
-				if success and newSpecies then
-					table.insert(evolvedCreatures, {
-						oldName = oldName,
-						oldSpecies = oldSpecies,
-						newSpecies = newSpecies,
-						nickname = creature.Nickname
-					})
-					DBG:print("Successfully evolved creature", i, "from", oldSpecies, "to", newSpecies)
-				else
-					DBG:warn("Failed to evolve creature", i, ":", creature.Name)
-				end
-			end
-		end
-	end
-	
-	-- If any creatures evolved, update the player's data and notify client
-	if #evolvedCreatures > 0 then
-		DBG:print("=== EVOLUTION SUMMARY ===")
-		DBG:print("Total evolutions:", #evolvedCreatures)
-		for i, evolution in ipairs(evolvedCreatures) do
-			DBG:print("Evolution", i, ":", evolution.oldSpecies, "->", evolution.newSpecies)
-		end
-		
-	-- Send evolution events to client to trigger evolution UI
-	-- The client will request a data update after the evolution UI completes
-	if Events and Events.Communicate then
-		for _, evolution in ipairs(evolvedCreatures) do
-			Events.Communicate:FireClient(Player, "Evolution", {
-				OldName = evolution.oldName,
-				OldSpecies = evolution.oldSpecies,
-				NewSpecies = evolution.newSpecies,
-				Nickname = evolution.nickname
-			})
-			DBG:print("[Evolution] Sent evolution event to client:", evolution.oldSpecies, "->", evolution.newSpecies)
-		end
-	end
-	
-	-- Note: Client data is NOT updated here - the client will request an update
-	-- after the evolution UI completes via EvolutionComplete event
-	else
-		DBG:print("No evolutions occurred")
-	end
+	return CreatureSystem.CheckPartyEvolutions(Player)
 end
 
 -- Clear battle data when battle ends
 function ServerFunctions:ClearBattleData(Player)
-    if ActiveBattles[Player] then
-        ActiveBattles[Player] = nil
-        DBG:print("Cleared battle data for player:", Player.Name)
-    end
-    -- Also clear InBattle flag to allow new encounters
-    local pd = ClientData:Get(Player)
-    if pd and pd.InBattle == true then
-        pd.InBattle = false
-        ClientData:UpdateClientData(Player, pd)
-    end
+	return BattleSystem.ClearBattleData(Player)
 end
 
 -- Calculate escape chance using Pokemon formula (server-side)
 function ServerFunctions:CalculateEscapeChance(Player, PlayerData)
-	-- Get player's creature stats
-	local PlayerCreature = PlayerData.Party[1] -- Assuming first creature
-	if not PlayerCreature or not PlayerCreature.Stats then
-		DBG:warn("No player creature stats found")
-		return false
-	end
-	
-	-- Get enemy creature stats from active battle data
-	local EnemySpeed = 50 -- Default fallback
-	local EnemyLevel = 5 -- Default fallback
-	
-	-- Try to get enemy stats from active battle
-	if ActiveBattles[Player] and ActiveBattles[Player].FoeCreature then
-		local FoeCreature = ActiveBattles[Player].FoeCreature
-		EnemySpeed = FoeCreature.Stats and FoeCreature.Stats.Speed or 50
-		EnemyLevel = FoeCreature.Level or 5
-		DBG:print("Using enemy stats from battle - Speed:", EnemySpeed, "Level:", EnemyLevel)
-	else
-		DBG:print("No active battle found, using default enemy stats")
-	end
-	
-	local PlayerSpeed = PlayerCreature.Stats.Speed or 50
-	local PlayerLevel = PlayerCreature.Level or 5
-	
-	-- Pokemon escape formula: chance = (player_speed * 32) / (enemy_speed / 4 % 256) + 30 * attempts
-    -- Prefer active battle attempts if present, fallback to PlayerData
-    local attempts = 0
-    if ActiveBattles[Player] and ActiveBattles[Player].EscapeAttempts then
-        attempts = ActiveBattles[Player].EscapeAttempts
-    else
-        attempts = PlayerData.EscapeAttempts or 0
-    end
-    local chance = (PlayerSpeed * 32) / (EnemySpeed / 4 % 256) + 30 * attempts
-	
-	-- Level-based escape modifier: easier to escape from lower level foes
-	local LevelDifference = PlayerLevel - EnemyLevel
-	local LevelModifier = 1 + (LevelDifference * 0.1) -- 10% easier per level difference
-	chance = chance * LevelModifier
-	
-	-- Make running 1.6x more successful (60% increase)
-	chance = chance * 1.6
-	
-	-- If chance > 255, escape is guaranteed
-	if chance > 255 then
-		return true
-	end
-	
-	-- Otherwise, roll against chance
-	local roll = math.random(0, 255)
-    DBG:print("Escape calculation - PlayerSpeed:", PlayerSpeed, "EnemySpeed:", EnemySpeed, "LevelDiff:", LevelDifference, "Attempts:", attempts, "Chance:", chance, "Roll:", roll)
-	return roll < chance
+	return BattleSystem.CalculateEscapeChance(Player, PlayerData)
 end
 
 function ServerFunctions:SaveItemPickup(Player, ChunkName, ItemName)
@@ -1193,133 +789,24 @@ function ServerFunctions:GrantItem(Player: Player, ItemName: string, Amount: num
 	return true
 end
 
--- Function to find the first alive creature in a party
+-- Function to find the first alive creature in a party (delegates to CreatureSystem)
 local function FindFirstAliveCreature(Party)
-	if not Party or #Party == 0 then
-		return nil
-	end
-	
-	for i = 1, #Party do
-		local creature = Party[i]
-		local hp = (creature.CurrentHP ~= nil) and creature.CurrentHP or (creature.Stats and creature.Stats.HP)
-		if creature and hp and hp > 0 then
-			return creature, i
-		end
-	end
-	
-	return nil, nil
+	return CreatureSystem.FindFirstAliveCreature(Party)
 end
 
--- Helper: determine learned moves from LearnableMoves based on level thresholds
--- Returns array of move names (strings) for network transmission
+-- Helper: determine learned moves from LearnableMoves based on level thresholds (delegates to CreatureSystem)
 local function GetMovesForLevel(LearnableMoves, level)
-	local moves = {}
-	if not LearnableMoves then return moves end
-	
-	-- Convert move table references to move names
-	local function getMoveNameFromTable(moveTable)
-		if not moveTable then return nil end
-		-- Search Moves module for matching table reference
-		for moveName, moveData in pairs(MovesModule) do
-			if moveData == moveTable then
-				return moveName
-			end
-		end
-		return nil
-	end
-	
-	if LearnableMoves[1] then 
-		local moveName = getMoveNameFromTable(LearnableMoves[1])
-		if moveName then moves[1] = moveName end
-	end
-	if level >= 10 and LearnableMoves[2] then 
-		local moveName = getMoveNameFromTable(LearnableMoves[2])
-		if moveName then moves[2] = moveName end
-	end
-	if level >= 25 and LearnableMoves[3] then 
-		local moveName = getMoveNameFromTable(LearnableMoves[3])
-		if moveName then moves[3] = moveName end
-	end
-	if level >= 45 and LearnableMoves[4] then 
-		local moveName = getMoveNameFromTable(LearnableMoves[4])
-		if moveName then moves[4] = moveName end
-	end
-	return moves
+	return CreatureSystem.GetMovesForLevel(LearnableMoves, level)
 end
 
--- Ensure all party creatures have an Ability assigned (backfill for older data/debug)
+-- Ensure all party creatures have an Ability assigned (delegates to CreatureSystem)
 local function EnsurePartyAbilities(party)
-	if not party then
-		return
-	end
-
-	for _, creature in ipairs(party) do
-		if creature and (creature.Ability == nil or creature.Ability == "") and type(creature.Name) == "string" then
-			-- Use shared species ability table; treat party creatures as non-wild
-			local ability = AbilitiesModule.SelectAbility(creature.Name, false)
-			if ability ~= nil then
-				creature.Ability = ability
-			end
-		end
-	end
+	return CreatureSystem.EnsurePartyAbilities(party)
 end
 
--- Ensure all party creatures have CurrentMoves derived from species Learnset
+-- Ensure all party creatures have CurrentMoves derived from species Learnset (delegates to CreatureSystem)
 local function EnsurePartyMoves(party)
-	if not party then
-		return
-	end
-
-	local Creatures = require(game:GetService("ReplicatedStorage").Shared.Creatures)
-	for _, creature in ipairs(party) do
-		if creature and (creature.CurrentMoves == nil or #creature.CurrentMoves == 0) then
-			local def = creature.Name and Creatures[creature.Name]
-			if def and def.Learnset then
-				local level = creature.Level or 1
-				-- Build starting moves from learnset without external refs
-				local all = {}
-				for lvl, moveList in pairs(def.Learnset) do
-					for _, mv in ipairs(moveList) do
-						table.insert(all, { lvl = lvl, move = mv })
-					end
-				end
-				table.sort(all, function(a, b)
-					if a.lvl == b.lvl then
-						return a.move < b.move
-					end
-					return a.lvl < b.lvl
-				end)
-				local current, learned = {}, {}
-				local recent = {}
-				for i = #all, 1, -1 do
-					local entry = all[i]
-					if entry.lvl <= level and not table.find(recent, entry.move) then
-						table.insert(recent, entry.move)
-						if #recent == 4 then
-							break
-						end
-					end
-				end
-				for i = #recent, 1, -1 do
-					table.insert(current, recent[i])
-					learned[recent[i]] = true
-				end
-				if #current < 4 then
-					for _, entry in ipairs(all) do
-						if entry.lvl <= level and not learned[entry.move] then
-							table.insert(current, entry.move)
-							learned[entry.move] = true
-							if #current == 4 then
-								break
-							end
-						end
-					end
-				end
-				creature.CurrentMoves = current
-				creature.LearnedMoves = learned
-			end
-		end
-	end
+	return CreatureSystem.EnsurePartyMoves(party)
 end
 
 -- Returns list of move names to learn at this level from a Learnset {[level]={moves}}
@@ -1334,49 +821,9 @@ local function GetLearnsetMovesAtLevel(Learnset, level)
     return toLearn
 end
 
--- Build starting moves (Pokémon-style) for a creature at a given level.
--- Rules: pick the four most recent moves learnable at or before the level; if fewer than 4, fill from earliest moves until reaching 4. Deterministic.
+-- Build starting moves (Pokémon-style) for a creature at a given level (delegates to CreatureSystem)
 local function BuildStartingMovesFromLearnset(Learnset, level)
-    local currentMoves = {}
-    local learned = {}
-    if not Learnset or not level then return currentMoves, learned end
-
-    local all = {}
-    for lvl, moveList in pairs(Learnset) do
-        for _, mv in ipairs(moveList) do
-            table.insert(all, { lvl = lvl, move = mv })
-        end
-    end
-    table.sort(all, function(a, b)
-        if a.lvl == b.lvl then return a.move < b.move end
-        return a.lvl < b.lvl
-    end)
-
-    local recent = {}
-    for i = #all, 1, -1 do
-        local entry = all[i]
-        if entry.lvl <= level and not table.find(recent, entry.move) then
-            table.insert(recent, entry.move)
-            if #recent == 4 then break end
-        end
-    end
-    -- assign oldest->newest for consistency
-    for i = #recent, 1, -1 do
-        table.insert(currentMoves, recent[i])
-        learned[recent[i]] = true
-    end
-
-    if #currentMoves < 4 then
-        for _, entry in ipairs(all) do
-            if entry.lvl <= level and not learned[entry.move] then
-                table.insert(currentMoves, entry.move)
-                learned[entry.move] = true
-                if #currentMoves == 4 then break end
-            end
-        end
-    end
-
-    return currentMoves, learned
+	return CreatureSystem.BuildStartingMovesFromLearnset(Learnset, level)
 end
 
 -- Helper: get list of type names from a Type reference (string or array or type tables)
@@ -1663,6 +1110,15 @@ function ServerFunctions:StartBattle(Player, BattleType, BattleData)
 		BattleInfo.FoeCreature = WildCreature
 		BattleInfo.Message = "A wild " .. BattleData.CreatureName .. " has appeared!"
 		
+		-- Mark creature as seen
+		PlayerData.SeenCreatures = PlayerData.SeenCreatures or {}
+		PlayerData.SeenCreatures[BattleData.CreatureName] = true
+		DBG:print("[Seen] Marked", BattleData.CreatureName, "as seen (wild encounter)")
+		-- Update client data immediately so Dex can show the creature
+		if ClientData.UpdateClientData then
+			ClientData:UpdateClientData(Player, PlayerData)
+		end
+		
 		-- Check for static/boss encounters
 		if BattleData.IsStatic then
 			BattleInfo.IsStatic = true
@@ -1716,6 +1172,17 @@ function ServerFunctions:StartBattle(Player, BattleType, BattleData)
 		BattleInfo.TrainerDialogue = BattleData.TrainerDialogue -- Pass dialogue data for post-battle messages
 		BattleInfo.Message = BattleData.TrainerName .. " would like to battle!"
 		
+		-- Mark trainer's first creature as seen
+		if TrainerCreature and TrainerCreature.Name then
+			PlayerData.SeenCreatures = PlayerData.SeenCreatures or {}
+			PlayerData.SeenCreatures[TrainerCreature.Name] = true
+			DBG:print("[Seen] Marked", TrainerCreature.Name, "as seen (trainer battle)")
+			-- Update client data immediately so Dex can show the creature
+			if ClientData.UpdateClientData then
+				ClientData:UpdateClientData(Player, PlayerData)
+			end
+		end
+		
 	else
 		DBG:warn("Unknown battle type:", BattleType, "for player:", Player.Name)
 		return false, "Unknown battle type"
@@ -1756,6 +1223,39 @@ function ServerFunctions:StartBattle(Player, BattleType, BattleData)
 
 	-- Immediately notify client to start battle (avoid extra client->server hop)
 	Events.Communicate:FireClient(Player, "StartBattle", BattleInfo)
+
+    -- Trigger OnEntry abilities for initial active creatures
+    -- We do this silently on server state; client animations are handled via specific steps if generated during turns,
+    -- but for start-of-battle we might need to queue immediate messages or just apply stats.
+    -- For now, we'll just apply stat mods immediately if needed (e.g. Intimidate).
+    -- Note: In a real turn structure, this would generate a "Message" step or "StatStage" step.
+    -- Since StartBattle doesn't return steps, we might need to rely on client-side OnEntry or handle it in the first turn?
+    -- Better: Apply stat changes to the BattleState creatures directly so damage calcs are correct from turn 1.
+    -- Visuals might be missed unless we send a "BattleStartEvents" packet.
+    do
+        local Abilities = require(game:GetService("ReplicatedStorage").Shared.Abilities)
+        local pAbility = Abilities.OnEntry(PlayerCreature)
+        local fAbility = Abilities.OnEntry(BattleInfo.FoeCreature)
+
+        if pAbility == "Intimidate" then
+            -- Lower foe attack
+            BattleInfo.FoeCreature.StatStages = BattleInfo.FoeCreature.StatStages or {}
+            BattleInfo.FoeCreature.StatStages.Attack = (BattleInfo.FoeCreature.StatStages.Attack or 0) - 1
+            DBG:print("[Abilities] Player's Intimidate lowered foe Attack")
+        elseif pAbility == "Sunlight" then
+            -- Set weather (needs BattleState weather support)
+            -- BattleInfo.Weather = "Sunlight" -- TODO: Add weather to battle state
+        end
+
+        if fAbility == "Intimidate" then
+            -- Lower player attack
+            PlayerCreature.StatStages = PlayerCreature.StatStages or {}
+            PlayerCreature.StatStages.Attack = (PlayerCreature.StatStages.Attack or 0) - 1
+            DBG:print("[Abilities] Foe's Intimidate lowered player Attack")
+        elseif fAbility == "Sunlight" then
+            -- BattleInfo.Weather = "Sunlight"
+        end
+    end
 
 	DBG:print("Starting", BattleType, "battle for player:", Player.Name)
 	return true, BattleInfo
@@ -1955,6 +1455,7 @@ end
             fresh.Gamepasses = {}
             fresh.PickedUpItems = {}
             fresh.DefeatedTrainers = {}
+            fresh.RedeemedCodes = {}
             fresh.SelectedStarter = nil
             fresh.Starters = nil
             fresh.PendingCapture = nil
@@ -2474,10 +1975,18 @@ end
 	if Request[1] == "GrantStuds" then
 		return ServerFunctions:GrantStuds(Player, Request[2])
 	end
-    if Request[1] == "GrantItem" then
+	if Request[1] == "GrantItem" then
         DBG:warn("Rejected client GrantItem request from", Player.Name)
         return false
     end
+	if Request[1] == "RedeemCode" then
+		local code = Request[2]
+		if type(code) ~= "string" then
+			return { Success = false, Message = "Invalid code format." }
+		end
+		local success, message = CodeRedemption.RedeemCode(Player, code)
+		return { Success = success, Message = message }
+	end
 	if Request[1] == "StartBattle" then
 		DBG:print("Received StartBattle request from:", Player.Name)
 		DBG:print("Request[2] (BattleType):", Request[2])
@@ -2521,138 +2030,17 @@ end)
 
 -- Execute player move and process enemy turn
 function ServerFunctions:ExecuteMove(Player, MoveData)
-	DBG:print("Player", Player.Name, "executed move:", MoveData)
-	
-	-- Get player data
-	local PlayerData = ClientData:Get(Player)
-	if not PlayerData then
-		DBG:warn("No player data found for", Player.Name)
+	-- Validate and store move action via BattleSystem
+	local success = BattleSystem.ExecuteMove(Player, MoveData)
+	if not success then
 		return false
 	end
 	
-    -- SECURITY: Validate move request
-    if not MoveData or not MoveData.MoveIndex or not MoveData.MoveName then
-		DBG:warn("Invalid move data from player:", Player.Name, MoveData)
-		return false
-	end
-
-    -- SECURITY: Validate TurnId to prevent replays/stale actions
-    local battle = ActiveBattles[Player]
-    local clientTurn = (type(MoveData.TurnId) == "number") and MoveData.TurnId or 0
-    if not battle or clientTurn ~= (battle.TurnId or 0) then
-        DBG:warn("TurnId mismatch or no battle for", Player.Name, MoveData.TurnId, (battle and battle.TurnId))
-        return false
-    end
-	
-	-- SECURITY: Check if player is in an active battle
-	if not ActiveBattles[Player] then
-		DBG:warn("Player", Player.Name, "attempted to use move without active battle")
-		return false
-	end
-	
-	-- Check if player creature is fainted before processing move
-	local battle = ActiveBattles[Player]
-	if battle.PlayerFainted or (battle.PlayerCreature.Stats.HP <= 0) then
-		DBG:print("=== PLAYER FAINT DETECTED IN EXECUTE MOVE ===")
-		DBG:print("Player creature:", battle.PlayerCreature.Name, "HP:", battle.PlayerCreature.Stats.HP)
-		DBG:print("Faint reason - Flag:", battle.PlayerFainted, "HP <= 0:", battle.PlayerCreature.Stats.HP <= 0)
-		
-		-- Create faint step for the player creature
-		local faintStep = {
-			Type = "Faint",
-			Creature = battle.PlayerCreature.Name or "Your creature",
-			IsPlayer = true
-		}
-		
-		-- Send turn result with faint step
-		-- Advance TurnId and prepare turn result
-		battle.TurnId = (battle.TurnId or 0) + 1
-		local turnResult = {
-			Friendly = {faintStep},
-			Enemy = {},
-			HP = {
-				Player = battle.PlayerCreature.Stats.HP,
-				PlayerMax = battle.PlayerCreature.MaxStats.HP,
-				Enemy = battle.FoeCreature.Stats.HP,
-				EnemyMax = battle.FoeCreature.MaxStats.HP,
-			},
-			PlayerCreature = battle.PlayerCreature,
-			FoeCreature = battle.FoeCreature,
-			TurnId = battle.TurnId,
-		}
-		
-		DBG:print("=== SENDING FAINT TURN RESULT FROM EXECUTE MOVE ===")
-		DBG:print("Friendly actions count:", #turnResult.Friendly)
-		for i, action in ipairs(turnResult.Friendly) do
-			DBG:print("Friendly", i, "Type:", action.Type, "IsPlayer:", action.IsPlayer, "Creature:", action.Creature)
-		end
-		DBG:print("=== END FAINT TURN RESULT FROM EXECUTE MOVE ===")
-		
-		local Events = game.ReplicatedStorage.Events
-		if Events and Events.Communicate then
-			Events.Communicate:FireClient(Player, "TurnResult", turnResult)
-		end
-		
-		-- Clear the faint flag
-		battle.PlayerFainted = false
-		
-		return true
-	end
-	
-	-- SECURITY: Validate move index (1-4)
-	local moveIndex = MoveData.MoveIndex
-	if type(moveIndex) ~= "number" or moveIndex < 1 or moveIndex > 4 then
-		DBG:warn("Invalid move index from player:", Player.Name, moveIndex)
-		return false
-	end
-	
-	-- SECURITY: Get player's active creature and validate move
-	local playerCreature = ActiveBattles[Player].PlayerCreature
-	if not playerCreature or not playerCreature.CurrentMoves then
-		DBG:warn("No active creature or moves for player:", Player.Name)
-		return false
-	end
-	
-	-- SECURITY: Check if the move exists in the creature's move set
-	local creatureMoves = playerCreature.CurrentMoves
-	if not creatureMoves[moveIndex] then
-		DBG:warn("Player", Player.Name, "attempted to use non-existent move at index:", moveIndex)
-		return false
-	end
-	
-	-- SECURITY: Validate that the move name matches what the creature actually has
-	local actualMoveName = creatureMoves[moveIndex]
-	if type(actualMoveName) == "string" and actualMoveName ~= MoveData.MoveName then
-		DBG:warn("Player", Player.Name, "attempted to use move", MoveData.MoveName, "but creature has", actualMoveName)
-		return false
-	end
-	
-	-- Get current battle info and store player's move choice
-	DBG:print("Processing move:", MoveData.MoveName or MoveData.Name or "Unknown Move")
-	
-    -- Resolve move name (check both MoveName and Name for compatibility)
-    local moveName = MoveData and (MoveData.MoveName or MoveData.Name or MoveData.Move) or "Unknown Move"
-    
-    -- Store player's move choice for turn order resolution
-    battle = ActiveBattles[Player]
-    if not battle then
-        DBG:warn("No active battle found for player:", Player.Name)
-        return false
-    end
-    
-    -- Store player action
-    battle.PlayerAction = {
-        Type = "Move",
-        Move = moveName,
-        MoveIndex = moveIndex,
-        MoveData = MoveData
-    }
-    
-    -- Process turn with proper speed-based order
-    return ServerFunctions:ProcessTurn(Player)
+	-- Process turn (handles battle end logic)
+	return ServerFunctions:ProcessTurn(Player)
 end
 
--- Process turn with proper speed-based order (Pokemon-style)
+-- Process turn with proper speed-based order (Pokemon-style) - delegates to BattleSystem
 function ServerFunctions:ProcessTurn(Player)
     local battle = ActiveBattles[Player]
     if not battle then
@@ -2680,6 +2068,17 @@ function ServerFunctions:ProcessTurn(Player)
             battle.NextFoeCreature = nil
             battle.NextFoeCreatureIndex = nil
             local foeName = battle.FoeCreature.Nickname or battle.FoeCreature.Name or "Foe"
+            
+            -- Mark new trainer creature as seen
+            if battle.FoeCreature and battle.FoeCreature.Name then
+                local PlayerData = ClientData:Get(Player)
+                if PlayerData then
+                    PlayerData.SeenCreatures = PlayerData.SeenCreatures or {}
+                    PlayerData.SeenCreatures[battle.FoeCreature.Name] = true
+                    DBG:print("[Seen] Marked", battle.FoeCreature.Name, "as seen (trainer send out)")
+                    ClientData:UpdateClientData(Player, PlayerData)
+                end
+            end
             local friendlyActions = {}
             local enemyActions = {
                 { Type = "Switch", Action = "SendOut", Creature = foeName, IsPlayer = false }
@@ -2778,14 +2177,14 @@ function ServerFunctions:ProcessTurn(Player)
             DBG:print("Skipping enemy action due to SkipEnemyActionOnce flag (preview switch)")
             battle.SkipEnemyActionOnce = nil
         elseif not (pa and pa.Type == "Capture" and battle.CaptureSuccess == true) then
-            enemyAction = ServerFunctions:BuildEnemyAction(Player)
+            enemyAction = BattleSystem.BuildEnemyAction(Player)
         else
             DBG:print("Skipping enemy action due to successful capture")
         end
     end
     
     -- Determine turn order based on speed and priority
-    local turnOrder = ServerFunctions:DetermineTurnOrder(battle, playerAction, enemyAction)
+    local turnOrder = BattleSystem.DetermineTurnOrder(battle, playerAction, enemyAction)
     
     -- Safe debug log for turn order when enemyAction may be skipped
     local firstActor = turnOrder[1] and turnOrder[1].Actor or "?"
@@ -2815,7 +2214,7 @@ function ServerFunctions:ProcessTurn(Player)
             break
         end
         
-        local result = ServerFunctions:ExecuteAction(Player, action, battle)
+        local result = BattleSystem.ExecuteAction(Player, action, battle)
         
         -- Handle multiple results (e.g., move + faint)
         if type(result) == "table" and result[1] then
@@ -3071,18 +2470,142 @@ function ServerFunctions:ProcessTurn(Player)
 		end
 	end
 
-	-- Held item end-of-turn effects (skip if battle ends now due to final foe faint or capture completed)
-	-- To ensure correct ordering (player move -> enemy move -> end-turn effects),
-	-- collect end-turn steps into a separate list and append them after enemy actions.
-	if not isFinalFoeFaint and not (battle and battle.CaptureCompleted == true) then
-		local endTurnSteps = {}
-		HeldItemEffects.ProcessEndOfTurn(battle, Player, endTurnSteps, endTurnSteps)
-		if #endTurnSteps > 0 then
-			for _, s in ipairs(endTurnSteps) do
-				table.insert(enemyActions, s)
-			end
-		end
-	end
+    -- End-of-turn effects (skip if battle ends now due to final foe faint or capture completed)
+    -- IMPORTANT: These effects are part of the CURRENT turn, not a new turn.
+    -- They are added to friendlyActions/enemyActions BEFORE TurnId increments.
+    -- Order: All moves execute first, THEN end-of-turn effects (status damage, then healing)
+    -- This ensures proper Pokemon-like turn order: Move -> Status from move -> End-of-turn effects
+    if not isFinalFoeFaint and not (battle and battle.CaptureCompleted == true) then
+        -- Process Status end-of-turn damage FIRST (before healing, as damage happens before healing in Pokemon)
+        -- These steps are added to the action lists and will be processed as part of this turn's TurnResult
+        local StatusModule = require(game:GetService("ReplicatedStorage").Shared.Status)
+        
+        local function applyStatusDamage(creature, isPlayerSide)
+            if not creature or not creature.Stats or creature.Stats.HP <= 0 then return end
+            if not creature.Status then return end
+            
+            local statusDamage = StatusModule.ProcessEndOfTurn(creature)
+            if not statusDamage or statusDamage <= 0 then return end
+            
+            local maxHP = creature.MaxStats and creature.MaxStats.HP or 1
+            local beforeHP = creature.Stats.HP or 0
+            creature.Stats.HP = math.max(0, beforeHP - statusDamage)
+            
+            local statusType = creature.Status and creature.Status.Type
+            local creatureName = creature.Nickname or creature.Name or (isPlayerSide and "Your creature" or "Foe")
+            local statusMessage = statusType == "BRN" and (creatureName .. " is hurt by its burn!") or
+                statusType == "PSN" and (creatureName .. " is hurt by poison!") or
+                statusType == "TOX" and (creatureName .. " is hurt by toxic poison!") or 
+                (creatureName .. " is hurt by its status!")
+            
+            local step = {
+                Type = "Damage",
+                Effectiveness = "Normal",
+                IsPlayer = isPlayerSide,
+                Message = statusMessage,
+                DelaySeconds = 0.6, -- allow UI time to display message before HP tween
+                EndOfTurn = true, -- signal client to avoid pre-damage visual adjustments
+                NewHP = creature.Stats.HP, -- explicit target HP after the damage
+                MaxHP = maxHP,
+            }
+            
+            DBG:print("[ServerFunctions][Status] applying:", creatureName, "before:", beforeHP, "-", statusDamage, "->", creature.Stats.HP, "Status:", statusType)
+            
+            if isPlayerSide then
+                table.insert(friendlyActions, step)
+                -- Update player party data
+                local pd = ClientData:Get(Player)
+                if pd and pd.Party and battle.PlayerCreatureIndex then
+                    local slot = pd.Party[battle.PlayerCreatureIndex]
+                    if slot then
+                        slot.Stats = slot.Stats or {}
+                        slot.Stats.HP = creature.Stats.HP
+                        local m = creature.MaxStats and creature.MaxStats.HP or slot.MaxStats and slot.MaxStats.HP
+                        if m and m > 0 then
+                            slot.CurrentHP = math.clamp(math.floor((creature.Stats.HP / m) * 100 + 0.5), 0, 100)
+                        end
+                        if ClientData.UpdateClientData then ClientData:UpdateClientData(Player, pd) end
+                    end
+                end
+            else
+                table.insert(enemyActions, step)
+            end
+        end
+        
+        -- Apply status damage to both creatures
+        -- Note: Status damage affects the creature, so player damage goes to friendlyActions, foe damage goes to enemyActions
+        applyStatusDamage(battle.PlayerCreature, true)
+        applyStatusDamage(battle.FoeCreature, false)
+        
+        -- THEN process held item effects (like Crumbs healing) - healing happens after damage
+        -- IMPORTANT: To get correct turn order (Player move -> Status -> Enemy move -> Crumbs -> Burn damage),
+        -- we need to add player Crumbs to enemyActions so it appears after enemy moves.
+        -- The client processes friendlyActions first, then enemyActions, so:
+        -- - friendlyActions: [Player move]
+        -- - enemyActions: [Status, Enemy move, Player Crumbs, Enemy Crumbs, Burn damage]
+        -- This gives the correct order!
+        local function processCrumbsForOrder(holder, isPlayerSide)
+            local heldName = holder and holder.HeldItem and tostring(holder.HeldItem) or ""
+            heldName = heldName:lower():gsub("^%s+"," "):gsub("%s+$"," ")
+            if holder and heldName == "crumbs" then
+                if holder.Stats and holder.MaxStats and holder.Stats.HP > 0 then
+                    local maxHP = holder.MaxStats.HP or 1
+                    local heal = math.max(1, math.floor(maxHP / 16))
+                    local beforeHP = holder.Stats.HP or 0
+                    holder.Stats.HP = math.min(maxHP, beforeHP + heal)
+                    local cname = (holder.Nickname or holder.Name or (isPlayerSide and "Your creature" or "Foe"))
+                    local step = {
+                        Type = "Heal",
+                        Amount = heal,
+                        IsPlayer = isPlayerSide, -- Keep IsPlayer flag correct for UI targeting
+                        Message = tostring(cname) .. " regained some HP thanks to Crumbs!",
+                        DelaySeconds = 0.6,
+                        EndOfTurn = true,
+                        NewHP = holder.Stats.HP,
+                        MaxHP = maxHP,
+                    }
+                    -- Add ALL Crumbs to enemyActions to ensure correct order
+                    table.insert(enemyActions, step)
+                    if isPlayerSide then
+                        local pd = ClientData:Get(Player)
+                        if pd and pd.Party and battle.PlayerCreatureIndex then
+                            local slot = pd.Party[battle.PlayerCreatureIndex]
+                            if slot then
+                                slot.Stats = slot.Stats or {}
+                                slot.Stats.HP = holder.Stats.HP
+                                local m = holder.MaxStats and holder.MaxStats.HP or slot.MaxStats and slot.MaxStats.HP
+                                if m and m > 0 then
+                                    slot.CurrentHP = math.clamp(math.floor((holder.Stats.HP / m) * 100 + 0.5), 0, 100)
+                                end
+                                if ClientData.UpdateClientData then ClientData:UpdateClientData(Player, pd) end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+        
+        processCrumbsForOrder(battle.PlayerCreature, true)
+        processCrumbsForOrder(battle.FoeCreature, false)
+        
+        -- Process Ability end-of-turn effects (Speed Boost, Desert Reservoir, etc.)
+        local function processAbilityEndTurn(creature, isPlayerCreature)
+            local Abilities = require(game:GetService("ReplicatedStorage").Shared.Abilities)
+            local ability = Abilities.GetName(creature)
+            if not ability then return end
+            local norm = string.lower(ability)
+            
+            -- Desert Reservoir: Recovers HP in sunlight (or switch out, handled elsewhere)
+            -- if norm == "desert reservoir" and battle.Weather == "Sunlight" then
+                -- Heal(creature, 1/16)
+            -- end
+            
+            -- Speed Boost (Steadspeed?)
+            -- if norm == "speed boost" then ... end
+        end
+        processAbilityEndTurn(battle.PlayerCreature, true)
+        processAbilityEndTurn(battle.FoeCreature, false)
+    end
 
 
     -- Ensure every Damage step carries NewHP for the defender so client can apply at the correct time
@@ -3120,11 +2643,11 @@ function ServerFunctions:ProcessTurn(Player)
     DBG:print("=== SENDING TURN RESULT TO CLIENT ===")
     DBG:print("Friendly actions count:", #friendlyActions)
     for i, action in ipairs(friendlyActions) do
-        DBG:print("Friendly", i, "Type:", action.Type, "IsPlayer:", action.IsPlayer, "Creature:", action.Creature)
+        DBG:print("Friendly", i, "Type:", action.Type, "IsPlayer:", action.IsPlayer, "Creature:", action.Creature, "Move:", action.Move, "Message:", action.Message)
     end
     DBG:print("Enemy actions count:", #enemyActions)
     for i, action in ipairs(enemyActions) do
-        DBG:print("Enemy", i, "Type:", action.Type, "IsPlayer:", action.IsPlayer, "Creature:", action.Creature)
+        DBG:print("Enemy", i, "Type:", action.Type, "IsPlayer:", action.IsPlayer, "Creature:", action.Creature, "Move:", action.Move, "Message:", action.Message)
     end
     DBG:print("=== END TURN RESULT ===")
     
@@ -3195,7 +2718,7 @@ function ServerFunctions:ProcessTurn(Player)
     if battle.CaptureCompleted then
         endBattle = true
         endReason = "Capture"
-    elseif shouldEndAfterPromotion or (battle.FoeCreature and battle.FoeCreature.Stats and battle.FoeCreature.Stats.HP <= 0) then
+    elseif shouldEndAfterPromotion or isFinalFoeFaint or (foeFaintedThisTurn and battle.Type == "Wild") or (battle.FoeCreature and battle.FoeCreature.Stats and battle.FoeCreature.Stats.HP <= 0) then
         -- For trainer battles, check if there are any remaining usable creatures
         if battle.Type == "Trainer" and type(battle.TrainerParty) == "table" then
             DBG:print("[BattleEnd] Checking trainer party for remaining creatures")
@@ -3222,8 +2745,10 @@ function ServerFunctions:ProcessTurn(Player)
                 DBG:print("[BattleEnd] Trainer has no remaining creatures - battle ends")
             end
         else
+            -- Wild battle: foe faint always ends battle
             endBattle = true
             endReason = "Win"
+            DBG:print("[BattleEnd] Wild battle - foe fainted, battle ends")
         end
     elseif battle.PlayerCreature.Stats.HP <= 0 then
         local pd = ClientData:Get(Player)
@@ -3433,6 +2958,34 @@ function ServerFunctions:DetermineTurnOrder(battle, playerAction, enemyAction)
     local playerSpeed = playerCreature.Stats.Speed or 0
     local enemySpeed = foeCreature.Stats.Speed or 0
     
+    -- Apply Status Speed Modifiers (Paralysis reduces speed)
+    local StatusModule = require(game:GetService("ReplicatedStorage").Shared.Status)
+    local playerStatusMult = StatusModule.GetSpeedMultiplier(playerCreature)
+    local enemyStatusMult = StatusModule.GetSpeedMultiplier(foeCreature)
+    playerSpeed = math.floor(playerSpeed * playerStatusMult)
+    enemySpeed = math.floor(enemySpeed * enemyStatusMult)
+    
+    -- Apply Ability Speed Modifiers (Sand Speed, Swift Current)
+    local Abilities = require(game:GetService("ReplicatedStorage").Shared.Abilities)
+    local pAbil = Abilities.GetName(playerCreature)
+    local fAbil = Abilities.GetName(foeCreature)
+    
+    -- Sand Speed: 2x Speed in Sandstorm
+    -- Swift Current: 2x Speed in Rain
+    if pAbil then
+        local a = string.lower(pAbil)
+        if a == "sand speed" and battle.Weather == "Sandstorm" then playerSpeed *= 2 end
+        if a == "swift current" and battle.Weather == "Rain" then playerSpeed *= 2 end
+        if a == "steadspeed" then
+             -- Prevent lowering (not relevant for calculation, but nice to know)
+        end
+    end
+    if fAbil then
+        local a = string.lower(fAbil)
+        if a == "sand speed" and battle.Weather == "Sandstorm" then enemySpeed *= 2 end
+        if a == "swift current" and battle.Weather == "Rain" then enemySpeed *= 2 end
+    end
+    
     -- Determine order based on priority first, then speed
     local playerFirst = false
     
@@ -3480,9 +3033,9 @@ function ServerFunctions:ExecuteAction(Player, actionData, battle)
     local isPlayer = actionData.IsPlayer
     
     if action.Type == "Move" then
-        return ServerFunctions:ExecuteMoveAction(Player, action, battle, isPlayer)
+        return BattleSystem.ExecuteMoveAction(Player, action, battle, isPlayer)
     elseif action.Type == "Switch" then
-        return ServerFunctions:ExecuteSwitchAction(Player, action, battle, isPlayer)
+        return BattleSystem.ExecuteSwitchAction(Player, action, battle, isPlayer)
     elseif action.Type == "Capture" then
         -- Drive capture scan steps; server already computed outcome in UseItem
         local foe = battle.FoeCreature
@@ -3529,9 +3082,53 @@ function ServerFunctions:ExecuteMoveAction(Player, action, battle, isPlayer)
     local attacker = isPlayer and battle.PlayerCreature or battle.FoeCreature
     local defender = isPlayer and battle.FoeCreature or battle.PlayerCreature
     local moveName = action.Move
+    local Abilities = require(game:GetService("ReplicatedStorage").Shared.Abilities)
+    local StatusModule = require(game:GetService("ReplicatedStorage").Shared.Status)
+    
+    -- Check if attacker can act (status conditions)
+    local canAct, statusMessage = StatusModule.CanAct(attacker)
+    if not canAct then
+        -- Attacker can't act due to status
+        local steps = {
+            { Type = "Move", Move = moveName, Actor = attacker.Name or (isPlayer and "Your creature" or "Foe"), IsPlayer = isPlayer },
+            { Type = "Message", Message = statusMessage or "The creature can't move!", IsPlayer = isPlayer }
+        }
+        return steps
+    end
+    
+    -- Check volatile status conditions (Confusion, Infatuation, Flinch)
+    local canActVolatile, volatileMessage, selfDamage = StatusModule.CanActVolatile(attacker)
+    if not canActVolatile then
+        local steps = {}
+        -- For Flinch, don't show the move name - just show the flinch message
+        if volatileMessage and string.find(volatileMessage, "flinched", 1, true) then
+            -- Flinch: just show the flinch message
+            table.insert(steps, { Type = "Message", Message = volatileMessage, IsPlayer = isPlayer })
+        else
+            -- Other volatile statuses: show move attempt then message
+            table.insert(steps, { Type = "Move", Move = moveName, Actor = attacker.Name or (isPlayer and "Your creature" or "Foe"), IsPlayer = isPlayer })
+            table.insert(steps, { Type = "Message", Message = volatileMessage or "The creature can't move!", IsPlayer = isPlayer })
+        end
+        -- If confusion self-hit, apply damage
+        if selfDamage and selfDamage > 0 then
+            local beforeHP = attacker.Stats.HP or 0
+            attacker.Stats.HP = math.max(0, beforeHP - selfDamage)
+            table.insert(steps, { Type = "Damage", Effectiveness = "Normal", IsPlayer = isPlayer, NewHP = attacker.Stats.HP })
+        end
+        return steps
+    end
     
     -- Self-heal moves: if move defines HealsPercent, apply heal instead of damage
     local moveDef = MovesModule[moveName]
+    
+    -- Apply ability move type modification
+    local modifiedType = moveDef and Abilities.ModifyMoveType(attacker, moveDef.Type) or (moveDef and moveDef.Type)
+    
+    -- Check if Fire-type move thaws frozen defender
+    if defender.Status and defender.Status.Type == "FRZ" and modifiedType == "Fire" then
+        StatusModule.Thaw(defender)
+    end
+    
     if moveDef and type(moveDef.HealsPercent) == "number" and moveDef.HealsPercent > 0 then
         local function getCurrentHP(creature)
             if not creature or not creature.MaxStats then return 0, 1 end
@@ -3565,20 +3162,32 @@ function ServerFunctions:ExecuteMoveAction(Player, action, battle, isPlayer)
     local accuracyStage = (attacker.StatStages and attacker.StatStages.Accuracy) or 0
     local evasionStage = (defender.StatStages and defender.StatStages.Evasion) or 0
     
-    local hit = DamageCalculator.CheckAccuracy(moveName, accuracyStage, evasionStage)
+    -- Pass attacker to CheckAccuracy for ability checks (e.g. Recon Flight)
+    local hit = DamageCalculator.CheckAccuracy(moveName, accuracyStage, evasionStage, attacker)
     if not hit then
-        -- Move missed - return miss step
+        -- Move missed - return miss step only (don't include Move step to prevent double execution)
         local missMessage = isPlayer and "The foe avoided the attack!" or "Your creature avoided the attack!"
         DBG:print("[MISS]", (attacker.Nickname or attacker.Name or (isPlayer and "Player" or "Enemy")), "used", moveName, "but it missed!")
         return {
-            { Type = "Move", Move = moveName, Actor = attacker.Name or (isPlayer and "Your creature" or "Foe"), IsPlayer = isPlayer },
-            { Type = "Miss", Message = missMessage, IsPlayer = isPlayer }
+            { Type = "Miss", Message = missMessage, Move = moveName, Actor = attacker.Name or (isPlayer and "Your creature" or "Foe"), IsPlayer = isPlayer }
         }
     end
 
     -- Calculate damage
-    local isCrit = (math.random(1, 16) == 1)
-    local damage, mods = CalculateDamage(attacker, defender, moveName, isCrit)
+    local critBonus = Abilities.GetCritStageBonus(attacker, not isPlayer) -- not isPlayer implies opponent used move last turn? No, param is just creature.
+    -- Wait, GetCritStageBonus 2nd param is "opponentUsedMove". We don't track that easily here.
+    -- For now, ignore Spy Lens conditional or assume false.
+    
+    local isCrit = (math.random(1, 16) == 1) -- Base crit. TODO: Use crit stages.
+    
+    -- Modify moveDef temporarily for calculation if type changed
+    local effectiveMoveData = moveDef
+    if modifiedType ~= moveDef.Type then
+        effectiveMoveData = table.clone(moveDef)
+        effectiveMoveData.Type = modifiedType
+    end
+
+    local damage, mods = CalculateDamage(attacker, defender, effectiveMoveData, isCrit)
     -- Global damage tuning: soften incoming damage to the player a bit for early routes
     if not isPlayer then
         damage = math.max(1, math.floor(damage * 0.7)) -- 30% reduction to enemy damage
@@ -3600,6 +3209,7 @@ function ServerFunctions:ExecuteMoveAction(Player, action, battle, isPlayer)
     -- Focus Bandage: sometimes leaves the holder at 1 HP instead of fainting
     do
         local held = defender.HeldItem
+        -- Sturdy / Hard Head logic could go here? No, Hard Head is recoil. Sturdy is OHKO protection.
         if held and string.lower(held) == string.lower("Focus Bandage") and after <= 0 and before > 0 then
             if math.random() < 0.1 then -- 10% chance
                 after = 1
@@ -3611,6 +3221,18 @@ function ServerFunctions:ExecuteMoveAction(Player, action, battle, isPlayer)
     after = defender.Stats.HP or 0
     DBG:print("[DAMAGE]", (attacker.Nickname or attacker.Name or (isPlayer and "Player" or "Enemy")), "used", moveName, "on", (defender.Nickname or defender.Name or (isPlayer and "Enemy" or "Player")), "dmg:", damage, "HP:", before, "->", after)
     
+    -- Apply Recoil (if any - need move flag or similar, assuming none for now unless specified)
+    -- If move has recoil flag:
+    -- if moveDef.Recoil and not Abilities.NegatesRecoil(attacker) then applyRecoil() end
+    -- (Implementation pending move data having Recoil field)
+    
+    -- Contact effects (Needle Guard, Corrosive Skin, etc.)
+    -- Assuming physical moves are contact.
+    -- if moveDef.Category == "Physical" or (not moveDef.Category and moveDef.Type ~= "Special") then -- Simplified check
+        -- local contactEffect = Abilities.CheckContactEffect(defender)
+        -- if contactEffect == "Damage" then ... end
+    -- end
+
     -- Update client data if player was damaged
     if not isPlayer then
             local PlayerData = ClientData:Get(Player)
@@ -3652,6 +3274,58 @@ function ServerFunctions:ExecuteMoveAction(Player, action, battle, isPlayer)
         NewHP = defender.Stats and defender.Stats.HP or nil,
     }
 
+    -- Echo Bell: heal attacker slightly on successful damage
+    local steps = {result, damageStep}
+    do
+        if attacker and attacker.HeldItem and string.lower(attacker.HeldItem) == string.lower("Echo Bell") then
+            if damage > 0 and attacker.Stats and attacker.MaxStats then
+                local maxHP = attacker.MaxStats.HP or 1
+                local heal = math.max(1, math.floor(maxHP / 16))
+                local cur = attacker.Stats.HP or 0
+                attacker.Stats.HP = math.min(maxHP, cur + heal)
+                table.insert(steps, { Type = "Heal", Amount = heal, IsPlayer = isPlayer, Message = "Echo Bell restored some HP!" })
+            end
+        end
+    end
+    
+    -- Apply status effects from move (if move has status effect)
+    if moveDef and moveDef.StatusEffect and damage > 0 then
+        local statusType = moveDef.StatusEffect
+        local statusChance = moveDef.StatusChance or 100
+        
+        -- Validate statusType is a string (status code)
+        if type(statusType) ~= "string" then
+            DBG:warn("[ServerFunctions] Invalid StatusEffect type - expected string, got:", type(statusType), "Value:", statusType, "Move:", moveName)
+            -- Skip status application if invalid
+        elseif math.random(1, 100) <= statusChance then
+            local statusApplied = StatusModule.Apply(defender, statusType, (statusType == "SLP") and math.random(1, 3) or nil)
+            if statusApplied then
+                local statusMessage = string.format("%s was %s!", defender.Nickname or defender.Name, 
+                    statusType == "BRN" and "burned" or
+                    statusType == "PAR" and "paralyzed" or
+                    statusType == "PSN" and "poisoned" or
+                    statusType == "TOX" and "badly poisoned" or
+                    statusType == "SLP" and "put to sleep" or
+                    statusType == "FRZ" and "frozen" or "affected")
+                table.insert(steps, { Type = "Status", Status = statusType, Message = statusMessage, IsPlayer = not isPlayer })
+                DBG:print("[ServerFunctions] Status step created - Status:", statusType, "Message:", statusMessage)
+            end
+        end
+    end
+    
+    -- Apply flinch if move causes flinch (apply when move hits, regardless of damage amount)
+    -- Flinch should apply whenever the move successfully hits the target
+    if moveDef and moveDef.CausesFlinch and hit then
+        StatusModule.ApplyVolatile(defender, "Flinch")
+        DBG:print("[FLINCH] Applied flinch to", defender.Nickname or defender.Name, "from move", moveName)
+    end
+    
+    -- Apply confusion if move causes confusion
+    if moveDef and moveDef.CausesConfusion and damage > 0 then
+        StatusModule.ApplyVolatile(defender, "Confusion", math.random(1, 4))
+    end
+    
+    -- Check for faint AFTER applying effects (flinch should still apply even if target faints)
     if defender.Stats.HP <= 0 then
         local faintStep = {
             Type = "Faint",
@@ -3669,23 +3343,9 @@ function ServerFunctions:ExecuteMoveAction(Player, action, battle, isPlayer)
         -- XP is now processed at battle end, not here
         -- This prevents XP from being awarded mid-battle in trainer battles
         
-        -- Return results with damage then faint; categorizer will route by IsPlayer
-        return {result, damageStep, faintStep}
+        table.insert(steps, faintStep)
     end
     
-    -- Echo Bell: heal attacker slightly on successful damage
-    local steps = {result, damageStep}
-    do
-        if attacker and attacker.HeldItem and string.lower(attacker.HeldItem) == string.lower("Echo Bell") then
-            if damage > 0 and attacker.Stats and attacker.MaxStats then
-                local maxHP = attacker.MaxStats.HP or 1
-                local heal = math.max(1, math.floor(maxHP / 16))
-                local cur = attacker.Stats.HP or 0
-                attacker.Stats.HP = math.min(maxHP, cur + heal)
-                table.insert(steps, { Type = "Heal", Amount = heal, IsPlayer = isPlayer, Message = "Echo Bell restored some HP!" })
-            end
-        end
-    end
     return steps
 end
 
@@ -4035,14 +3695,7 @@ end
 
 -- Optimized enemy action building (unified with ProcessEnemyTurn logic)
 function ServerFunctions:BuildEnemyAction(Player)
-    local battle = ActiveBattles[Player]
-    if not battle then return nil end
-
-    if battle.Type == "Trainer" then
-        return ServerFunctions:ProcessTrainerEnemyTurn(Player)
-    else
-        return ServerFunctions:ProcessWildEnemyTurn(Player)
-    end
+	return BattleSystem.BuildEnemyAction(Player)
 end
 
 function ServerFunctions:SwitchCreature(Player, newCreatureSlot)
