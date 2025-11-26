@@ -246,11 +246,14 @@ function ServerFunctions:AwardBattleXP(Player: Player, defeatedCreature: any, ba
         if levelsGained > 0 then
             local startLevel = activeCreature.Level - levelsGained
             for i = 1, levelsGained do
+                -- Include XPProgress for the final level (after all level-ups)
+                local xpProgress = (i == levelsGained) and (activeCreature.XPProgress or 0) or nil
                 table.insert(xpSteps, {
                     Type = "LevelUp",
                     Creature = creatureName,
                     Level = startLevel + i,
                     IsPlayer = true,
+                    XPProgress = xpProgress,
                 })
                 DBG:print("[XP]", creatureName, "reached level", startLevel + i)
             end
@@ -289,13 +292,25 @@ function ServerFunctions:AwardBattleXP(Player: Player, defeatedCreature: any, ba
             -- Add individual level ups for shared creatures
             for _, data in ipairs(sharedCreatures) do
                 if data.levels > 0 then
+                    -- Find the creature in party to get its XPProgress
+                    local shareCreature = nil
+                    for _, creature in ipairs(PlayerData.Party) do
+                        local nm = creature.Nickname or creature.Name
+                        if nm == data.name then
+                            shareCreature = creature
+                            break
+                        end
+                    end
                     local startLevel = data.level - data.levels
                     for i = 1, data.levels do
+                        -- Include XPProgress for the final level (after all level-ups)
+                        local xpProgress = (i == data.levels) and shareCreature and (shareCreature.XPProgress or 0) or nil
                         table.insert(xpSteps, {
                             Type = "LevelUp",
                             Creature = data.name,
                             Level = startLevel + i,
                             IsPlayer = true,
+                            XPProgress = xpProgress,
                         })
                         DBG:print("[XP]", data.name, "reached level", startLevel + i, "(shared)")
                     end
@@ -1388,7 +1403,8 @@ end
 		if not AllowedHealerChunks[CurrentChunk] then
 			return false
 		end
-		-- Heal creatures: set HP to max and CurrentHP percent to 100
+		-- Heal creatures: set HP to max, CurrentHP percent to 100, and clear status conditions
+		local StatusModule = require(game:GetService("ReplicatedStorage").Shared.Status)
 		if PlayerData and PlayerData.Party then
 			for _, creature in ipairs(PlayerData.Party) do
 				if creature then
@@ -1399,6 +1415,14 @@ end
 						creature.Stats = creature.Stats or {}
 						creature.Stats.HP = creature.MaxStats.HP
 					end
+					-- Clear status conditions (burn, poison, paralysis, sleep, freeze)
+					if StatusModule and StatusModule.Remove then
+						StatusModule.Remove(creature)
+					else
+						creature.Status = nil
+					end
+					-- Clear volatile status conditions (confusion, infatuation, flinch)
+					creature.VolatileStatus = nil
 				end
 			end
 			-- Persist/update client-side cache
@@ -2125,6 +2149,29 @@ function ServerFunctions:ProcessTurn(Player)
         DBG:print("Player creature:", battle.PlayerCreature.Name, "HP:", battle.PlayerCreature.Stats.HP)
         DBG:print("Faint reason - Flag:", battle.PlayerFainted, "HP <= 0:", battle.PlayerCreature.Stats.HP <= 0)
         
+        -- Clear status conditions when creature faints
+        local StatusModule = require(game:GetService("ReplicatedStorage").Shared.Status)
+        if StatusModule and StatusModule.Remove then
+            StatusModule.Remove(battle.PlayerCreature)
+        else
+            battle.PlayerCreature.Status = nil
+        end
+        battle.PlayerCreature.VolatileStatus = nil
+        
+        -- Also clear status in party data
+        local PlayerData = ClientData:Get(Player)
+        if PlayerData and PlayerData.Party and battle.PlayerCreatureIndex then
+            local partyCreature = PlayerData.Party[battle.PlayerCreatureIndex]
+            if partyCreature then
+                if StatusModule and StatusModule.Remove then
+                    StatusModule.Remove(partyCreature)
+                else
+                    partyCreature.Status = nil
+                end
+                partyCreature.VolatileStatus = nil
+            end
+        end
+        
         -- Create faint step for the player creature
         local faintStep = {
             Type = "Faint",
@@ -2259,6 +2306,16 @@ function ServerFunctions:ProcessTurn(Player)
                         playerFaintedThisTurn = true
                     else
                         foeFaintedThisTurn = true
+                        -- Clear status conditions when foe creature faints
+                        local StatusModule = require(game:GetService("ReplicatedStorage").Shared.Status)
+                        if battle.FoeCreature then
+                            if StatusModule and StatusModule.Remove then
+                                StatusModule.Remove(battle.FoeCreature)
+                            else
+                                battle.FoeCreature.Status = nil
+                            end
+                            battle.FoeCreature.VolatileStatus = nil
+                        end
                     end
                     if stepIsPlayer then
                         if not playerFaintAdded then
@@ -2319,6 +2376,16 @@ function ServerFunctions:ProcessTurn(Player)
                         playerFaintedThisTurn = true
                     else
                         foeFaintedThisTurn = true
+                        -- Clear status conditions when foe creature faints
+                        local StatusModule = require(game:GetService("ReplicatedStorage").Shared.Status)
+                        if battle.FoeCreature then
+                            if StatusModule and StatusModule.Remove then
+                                StatusModule.Remove(battle.FoeCreature)
+                            else
+                                battle.FoeCreature.Status = nil
+                            end
+                            battle.FoeCreature.VolatileStatus = nil
+                        end
                     end
                     if stepIsPlayer then
                         if not playerFaintAdded then
@@ -2353,6 +2420,15 @@ function ServerFunctions:ProcessTurn(Player)
         if battle.CaptureCompleted then
         endNow = true
     elseif battle.FoeCreature and battle.FoeCreature.Stats and battle.FoeCreature.Stats.HP <= 0 then
+        -- Clear status conditions when foe creature faints
+        local StatusModule = require(game:GetService("ReplicatedStorage").Shared.Status)
+        if StatusModule and StatusModule.Remove then
+            StatusModule.Remove(battle.FoeCreature)
+        else
+            battle.FoeCreature.Status = nil
+        end
+        battle.FoeCreature.VolatileStatus = nil
+        
         -- Mark current foe as defeated in the party (update HP to reflect fainted state)
         if battle.Type == "Trainer" and type(battle.TrainerParty) == "table" and battle.FoeCreatureIndex then
             local currentFoe = battle.TrainerParty[battle.FoeCreatureIndex]
@@ -2363,6 +2439,13 @@ function ServerFunctions:ProcessTurn(Player)
                 if currentFoe.CurrentHP ~= nil then
                     currentFoe.CurrentHP = 0
                 end
+                -- Clear status in trainer party data too
+                if StatusModule and StatusModule.Remove then
+                    StatusModule.Remove(currentFoe)
+                else
+                    currentFoe.Status = nil
+                end
+                currentFoe.VolatileStatus = nil
                 DBG:print("[KO/Switch] Marked party slot", battle.FoeCreatureIndex, "as defeated:", (currentFoe.Nickname or currentFoe.Name))
             end
         end
@@ -4057,6 +4140,29 @@ function ServerFunctions:SwitchCreature(Player, newCreatureSlot)
 					DBG:print("Player creature:", battle.PlayerCreature.Name, "HP:", newHP)
 					DBG:print("Creating faint step for player creature")
 					DBG:print("=== END PLAYER FAINT DETECTION ===")
+					
+					-- Clear status conditions when creature faints
+					local StatusModule = require(game:GetService("ReplicatedStorage").Shared.Status)
+					if StatusModule and StatusModule.Remove then
+						StatusModule.Remove(battle.PlayerCreature)
+					else
+						battle.PlayerCreature.Status = nil
+					end
+					battle.PlayerCreature.VolatileStatus = nil
+					
+					-- Also clear status in party data
+					local PlayerData = ClientData:Get(Player)
+					if PlayerData and PlayerData.Party and battle.PlayerCreatureIndex then
+						local partyCreature = PlayerData.Party[battle.PlayerCreatureIndex]
+						if partyCreature then
+							if StatusModule and StatusModule.Remove then
+								StatusModule.Remove(partyCreature)
+							else
+								partyCreature.Status = nil
+							end
+							partyCreature.VolatileStatus = nil
+						end
+					end
 					
 					-- Create a faint step for the player and append it AFTER the enemy move
 					local faintStep = {

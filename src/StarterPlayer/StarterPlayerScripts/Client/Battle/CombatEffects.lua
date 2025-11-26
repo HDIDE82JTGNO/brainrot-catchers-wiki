@@ -599,11 +599,48 @@ function CombatEffects:PlayStatusEffect(model: Model, status: string)
 		return
 	end
 	
-	-- Play status sound
-	if self._sfx then
-		local sound = self._sfx:FindFirstChild("Status" .. status)
-		if sound then
-			sound:Play()
+	-- Status audio IDs mapping
+	local statusAudioIds: {[string]: string} = {
+		BRN = "rbxassetid://72777760410962",
+		PAR = "rbxassetid://114020093372684",
+		PSN = "rbxassetid://118711941569199",
+		TOX = "rbxassetid://118711941569199", -- Use same as PSN for now
+		SLP = "rbxassetid://106972850524292",
+		FRZ = "rbxassetid://109691529279394",
+		Confusion = "rbxassetid://80012622109613",
+	}
+	
+	-- Normalize status to uppercase for lookup
+	local statusUpper = status and string.upper(tostring(status)) or ""
+	
+	-- Get audio ID for this status
+	local audioId = statusAudioIds[statusUpper]
+	
+	if audioId then
+		-- Create and play sound
+		local SoundService = game:GetService("SoundService")
+		local sound = Instance.new("Sound")
+		sound.SoundId = audioId
+		sound.Volume = 0.5
+		sound.Parent = SoundService
+		sound:Play()
+		
+		-- Clean up sound after it finishes
+		sound.Ended:Connect(function()
+			sound:Destroy()
+		end)
+		
+		print("[CombatEffects] PlayStatusEffect: Playing audio for status:", statusUpper, "AudioId:", audioId)
+	else
+		-- Fallback: try to find sound in SFX folder
+		if self._sfx then
+			local sound = self._sfx:FindFirstChild("Status" .. statusUpper)
+			if sound then
+				sound:Play()
+				print("[CombatEffects] PlayStatusEffect: Using fallback SFX sound for:", statusUpper)
+			else
+				print("[CombatEffects] PlayStatusEffect: No audio found for status:", statusUpper)
+			end
 		end
 	end
 	

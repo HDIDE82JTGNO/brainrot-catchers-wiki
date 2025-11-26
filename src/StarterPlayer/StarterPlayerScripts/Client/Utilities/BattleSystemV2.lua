@@ -1222,6 +1222,21 @@ function BattleSystemV2:_startBlackoutSequence()
 				local chunkName = (ChunkLoader:GetCurrentChunk() and ChunkLoader:GetCurrentChunk().Model and ChunkLoader:GetCurrentChunk().Model.Name) or nil
 				RelocationSignals.FirePostBattleRelocated({ Reason = "KyroIntro", Chunk = chunkName })
 			end)
+		elseif self._battleInfo and self._battleInfo.Type == "Trainer" and self._battleInfo.TrainerId == "Rival_Ayla_1" then
+			-- Ayla battle in Cresamore Town: do NOT relocate/blackout to catchcare; Ayla will heal you
+			print("[BattleSystemV2] Player defeated vs Ayla (Rival_Ayla_1) - skipping relocation and healing in place")
+			self._lossReason = false
+			handledCustomLoss = true
+			-- Server-authoritative heal (Ayla heals you up)
+			pcall(function()
+				Events.Request:InvokeServer({"HealParty"})
+			end)
+			-- Signal to listeners (e.g., cutscenes) that post-battle flow is complete without relocation
+			pcall(function()
+				local ChunkLoader = require(script.Parent:WaitForChild("ChunkLoader"))
+				local chunkName = (ChunkLoader:GetCurrentChunk() and ChunkLoader:GetCurrentChunk().Model and ChunkLoader:GetCurrentChunk().Model.Name) or nil
+				RelocationSignals.FirePostBattleRelocated({ Reason = "AylaLoss", Chunk = chunkName })
+			end)
 		end
 		if not handledCustomLoss then
 			self._lossReason = false

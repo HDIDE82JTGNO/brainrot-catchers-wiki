@@ -37,11 +37,36 @@ function WorldSystem.LoadChunkPlayer(Player: Player, ChunkName: string): any?
 	local PlayerData = ClientData:Get(Player)
 	local Authorized = false
 
-	DBG:warn("Player:", Player.Name, "| Requested Chunk:", ChunkName)
+	DBG:warn("[LoadChunkPlayer] Player:", Player.Name, "| Requested Chunk:", ChunkName)
+
+	-- CRITICAL: Chunk1 should always be accessible as emergency fallback
+	-- Check this FIRST before any other validation to prevent players from getting stuck
+	if ChunkName == "Chunk1" then
+		DBG:warn("[LoadChunkPlayer] Chunk1 requested - will always allow as emergency fallback")
+		Authorized = true
+	end
+
+	-- Validate PlayerData exists
+	if not PlayerData then
+		DBG:warn("[LoadChunkPlayer] CRITICAL: PlayerData is nil for player:", Player.Name)
+		-- If Chunk1 was requested, still try to load it even without PlayerData
+		if ChunkName == "Chunk1" and Authorized then
+			DBG:warn("[LoadChunkPlayer] Attempting Chunk1 load despite nil PlayerData")
+			-- Create minimal PlayerData for Chunk1 load
+			PlayerData = {
+				Chunk = "nil",
+				LastChunk = nil,
+				LeaveData = nil,
+			}
+		else
+			-- Return nil instead of kicking - let client handle retry
+			return nil
+		end
+	end
 
 	if not PlayerData.Chunk then
 		PlayerData.Chunk = "nil"
-		DBG:warn("No previous Chunk found in session, defaulted to 'nil'")
+		DBG:warn("[LoadChunkPlayer] No previous Chunk found in session, defaulted to 'nil'")
 	end
 
 	-- Failsafe: prevent re-entering CatchCare from its own exit
@@ -69,6 +94,10 @@ function WorldSystem.LoadChunkPlayer(Player: Player, ChunkName: string): any?
 			if fallback then
 				DBG:warn("[CatchCare Failsafe] Redirecting requested chunk from CatchCare to:", fallback)
 				ChunkName = fallback
+				-- Update authorization if redirected to Chunk1
+				if fallback == "Chunk1" then
+					Authorized = true
+				end
 			end
 		end
 	end
@@ -77,6 +106,12 @@ function WorldSystem.LoadChunkPlayer(Player: Player, ChunkName: string): any?
 
 	if not ChunkData then
 		DBG:warn("Chunk not found in GameData:", tostring(ChunkName))
+		-- If Chunk1 is missing from ChunkList, this is a critical configuration error
+		if ChunkName == "Chunk1" then
+			DBG:warn("[CRITICAL] Chunk1 not found in ChunkList! This is a critical configuration error.")
+			DBG:warn("[CRITICAL] Chunk1 must exist in ChunkList - game cannot function without it!")
+			return nil
+		end
 		Player:Kick("Unable to find requested chunk! RQ: " .. tostring(ChunkName))
 		return nil
 	end
@@ -86,11 +121,21 @@ function WorldSystem.LoadChunkPlayer(Player: Player, ChunkName: string): any?
 		DBG:warn("Player came from same chunk: Authorized")
 	end
 
-	local ok, errMsg = ChunkService:IsChunkTransitionAuthorized(Player, PlayerData, ChunkName)
-	if ok then
-		Authorized = true
-	else
-		DBG:warn(errMsg or ("Unauthorized chunk transition to " .. tostring(ChunkName)))
+	-- Only check authorization if not already authorized (e.g., Chunk1 emergency fallback)
+	if not Authorized then
+		local ok, errMsg = ChunkService:IsChunkTransitionAuthorized(Player, PlayerData, ChunkName)
+		if ok then
+			Authorized = true
+		else
+			DBG:warn(errMsg or ("Unauthorized chunk transition to " .. tostring(ChunkName)))
+			-- Special case: Chunk1 should always be accessible as a safe fallback
+			-- This prevents players from getting stuck on the loading screen
+			-- Allow Chunk1 regardless of current chunk state (nil, Title, or any other chunk)
+			if ChunkName == "Chunk1" then
+				DBG:warn("[LoadChunkPlayer] Allowing Chunk1 load as emergency fallback for player coming from:", tostring(PlayerData.Chunk))
+				Authorized = true
+			end
+		end
 	end
 
 	-- Starter gate: prevent leaving Professor's Lab without a starter
@@ -142,6 +187,48 @@ function WorldSystem.LoadChunkPlayer(Player: Player, ChunkName: string): any?
 
 	if not SourceFolder then
 		DBG:warn("Could not locate chunk in storage:", ChunkName, "IsSubRoom:", ChunkData.IsSubRoom)
+		
+		-- Enhanced debugging for missing chunks
+		local ServerStorage = game:GetService("ServerStorage")
+		local ChunksFolder = ServerStorage:FindFirstChild("Chunks")
+		local InteriorsFolder = ServerStorage:FindFirstChild("Interiors")
+		
+		if ChunkName == "Chunk1" then
+			DBG:warn("[CRITICAL] Chunk1 not found in ServerStorage! This is a critical configuration error.")
+			DBG:warn("[CRITICAL] Chunk1 must exist in ServerStorage.Chunks - game cannot function without it!")
+			if ChunksFolder then
+				DBG:warn("[CRITICAL] ServerStorage.Chunks exists. Available chunks:")
+				for _, child in ipairs(ChunksFolder:GetChildren()) do
+					DBG:warn("  -", child.Name)
+				end
+			else
+				DBG:warn("[CRITICAL] ServerStorage.Chunks folder does not exist!")
+			end
+			-- Return nil instead of kicking - let client handle the error gracefully
+			return nil
+		end
+		
+		-- For other chunks, provide more detailed error info
+		if ChunkData.IsSubRoom then
+			if InteriorsFolder then
+				DBG:warn("Available interior chunks:")
+				for _, child in ipairs(InteriorsFolder:GetChildren()) do
+					DBG:warn("  -", child.Name)
+				end
+			else
+				DBG:warn("ServerStorage.Interiors folder does not exist!")
+			end
+		else
+			if ChunksFolder then
+				DBG:warn("Available main chunks:")
+				for _, child in ipairs(ChunksFolder:GetChildren()) do
+					DBG:warn("  -", child.Name)
+				end
+			else
+				DBG:warn("ServerStorage.Chunks folder does not exist!")
+			end
+		end
+		
 		Player:Kick("Requested chunk not found in storage! :: RQ: " .. ChunkName)
 		return nil
 	end

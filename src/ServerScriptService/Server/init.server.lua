@@ -4,9 +4,39 @@ local ServerFunctions = require(script.ServerFunctions)
 local DexBroadcaster = require(script.DexBroadcaster)
 local Players = game:GetService("Players")
 local ChunkList = require(script.GameData.ChunkList)
+local DBG = require(game:GetService("ReplicatedStorage").Shared.DBG)
 
 -- Initialize Dex broadcasting system
 DexBroadcaster:Init()
+
+-- Validate critical chunks exist in ServerStorage at startup
+do
+	local ServerStorage = game:GetService("ServerStorage")
+	local ChunksFolder = ServerStorage:FindFirstChild("Chunks")
+	local InteriorsFolder = ServerStorage:FindFirstChild("Interiors")
+	
+	if not ChunksFolder then
+		warn("[CRITICAL] ServerStorage.Chunks folder does not exist! Chunks cannot be loaded!")
+	else
+		-- Verify Chunk1 exists (critical for game to function)
+		local Chunk1 = ChunksFolder:FindFirstChild("Chunk1")
+		if not Chunk1 then
+			warn("[CRITICAL] Chunk1 not found in ServerStorage.Chunks!")
+			warn("[CRITICAL] Available chunks in ServerStorage.Chunks:")
+			for _, child in ipairs(ChunksFolder:GetChildren()) do
+				warn("  -", child.Name)
+			end
+		else
+			DBG:print("[Startup] Chunk1 validated in ServerStorage.Chunks")
+		end
+	end
+	
+	if not InteriorsFolder then
+		warn("[WARNING] ServerStorage.Interiors folder does not exist! Interior chunks cannot be loaded!")
+	else
+		DBG:print("[Startup] ServerStorage.Interiors validated")
+	end
+end
 
 -- Disable player-vs-player collisions
 do

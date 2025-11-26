@@ -773,7 +773,7 @@ function BattleSystem.ProcessTurn(Player: Player): boolean
 				Effectiveness = "Normal",
 				IsPlayer = isPlayerSide,
 				Message = statusMessage,
-				DelaySeconds = 0.6, -- allow UI time to display message before HP tween
+				DelaySeconds = 0, -- No delay - HP should update immediately when message appears (Pokemon-style)
 				EndOfTurn = true, -- signal client to avoid pre-damage visual adjustments
 				NewHP = creature.Stats.HP, -- explicit target HP after the damage
 				MaxHP = maxHP,
@@ -1252,7 +1252,7 @@ function BattleSystem.ExecuteMoveAction(Player: Player, action: any, battle: any
 	local damageStep = {
 		Type = "Damage",
 		Effectiveness = effCat,
-		IsPlayer = isPlayer,
+		IsPlayer = not isPlayer, -- IsPlayer indicates which creature was damaged (defender), not attacker
 		NewHP = defender.Stats and defender.Stats.HP or nil,
 	}
 
@@ -1280,6 +1280,10 @@ function BattleSystem.ExecuteMoveAction(Player: Player, action: any, battle: any
 		if type(statusType) ~= "string" then
 			DBG:warn("[BattleSystem] Invalid StatusEffect type - expected string, got:", type(statusType), "Value:", statusType, "Move:", moveName)
 			-- Skip status application if invalid
+		-- Check if creature already has this status condition (Pokemon-style: can't re-apply same status)
+		elseif defender.Status and defender.Status.Type == statusType then
+			-- Creature already has this status - don't apply again
+			DBG:print("[BattleSystem] Status", statusType, "already applied to", defender.Nickname or defender.Name, "- skipping")
 		elseif math.random(1, 100) <= statusChance then
 			local statusApplied = StatusModule.Apply(defender, statusType, (statusType == "SLP") and math.random(1, 3) or nil)
 			if statusApplied then

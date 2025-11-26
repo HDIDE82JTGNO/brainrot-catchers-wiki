@@ -242,16 +242,117 @@ return {
 				local agentHRP: BasePart? = agent and agent:FindFirstChild("HumanoidRootPart")
 				local agentHum: Humanoid? = agent and agent:FindFirstChildOfClass("Humanoid")
 				local agentOrigCF: CFrame? = agentHRP and agentHRP.CFrame or nil
-				agentHRP.Anchored = false
+				if agentHRP then
+					agentHRP.Anchored = false
+				end
+
+			-- Store original positions for cleanup on loss
+			local kyroOrigCF: CFrame? = nil
+			local shardOrigCF: CFrame? = nil
+			local shardOrigSize: Vector3? = nil
+			local shardOrigColor: Color3? = nil
+			local shardOrigMaterial: Enum.Material? = nil
+			local shardDestroyed: boolean = false
+			
+			-- Store Kyro's original position
+			if kyro then
+				local kyHRP: BasePart? = kyro:FindFirstChild("HumanoidRootPart")
+				if kyHRP then
+					kyroOrigCF = kyHRP.CFrame
+				end
+			end
+			
+			-- Store shard's original state (clone the part to preserve all properties)
+			local shardPart: BasePart? = kyroFolder and kyroFolder:FindFirstChild("Shard")
+			local shardTemplate: BasePart? = nil
+			if shardPart and shardPart:IsA("BasePart") then
+				shardOrigCF = shardPart.CFrame
+				shardOrigSize = shardPart.Size
+				shardOrigColor = shardPart.Color
+				shardOrigMaterial = shardPart.Material
+				-- Clone the part to preserve all properties including attachments, decals, etc.
+				shardTemplate = shardPart:Clone()
+			end
+
+			-- Cleanup function to reset all cutscene state for retry
+			local function cleanupCutsceneState()
+				-- Stop all movement operations and clean up BodyGyro instances
+				if agentHum then
+					pcall(function() agentHum:Move(Vector3.new(0, 0, 0)) end)
+				end
+				if agentHRP then
+					local gyro = agentHRP:FindFirstChild("BC_MoveToGyro")
+					if gyro then
+						pcall(function() gyro:Destroy() end)
+					end
+				end
+				
+				if kyro then
+					local kyHum: Humanoid? = kyro:FindFirstChildOfClass("Humanoid")
+					if kyHum then
+						pcall(function() kyHum:Move(Vector3.new(0, 0, 0)) end)
+					end
+					local kyHRP: BasePart? = kyro:FindFirstChild("HumanoidRootPart")
+					if kyHRP then
+						local gyro = kyHRP:FindFirstChild("BC_MoveToGyro")
+						if gyro then
+							pcall(function() gyro:Destroy() end)
+						end
+					end
+				end
+				
+				-- Reset agent position
+				if agent and agentHRP and agentOrigCF then
+					agentHRP.CFrame = agentOrigCF
+					agentHRP.Anchored = false
+				end
+				
+				-- Reset Kyro position
+				if kyro and kyroOrigCF then
+					local kyHRP: BasePart? = kyro:FindFirstChild("HumanoidRootPart")
+					if kyHRP then
+						kyHRP.CFrame = kyroOrigCF
+						kyHRP.Anchored = false
+					end
+				end
+				
+				-- Recreate shard if it was destroyed
+				if shardDestroyed and kyroFolder and shardOrigCF then
+					local existingShard = kyroFolder:FindFirstChild("Shard")
+					if not existingShard then
+						local newShard: BasePart
+						if shardTemplate then
+							-- Use cloned template to preserve all properties
+							newShard = shardTemplate:Clone()
+							newShard.CFrame = shardOrigCF
+						else
+							-- Fallback: create new part with basic properties
+							newShard = Instance.new("Part")
+							newShard.Size = shardOrigSize or Vector3.new(1, 1, 1)
+							newShard.Color = shardOrigColor or Color3.new(1, 1, 1)
+							newShard.Material = shardOrigMaterial or Enum.Material.SmoothPlastic
+							newShard.CFrame = shardOrigCF
+						end
+						newShard.Name = "Shard"
+						newShard.Anchored = true
+						newShard.CanCollide = false
+						newShard.Parent = kyroFolder
+						shardDestroyed = false
+					end
+				end
+			end
 
 			-- 2) Cutscene trigger: move to shard, play pickup, Kyro runs in, then Agent confrontation and battle
 			local function beginShardSequence()
 				if csActive then return end
 				csActive = true
-				UI.TopBar:Hide()
+			
 				pcall(function() Events.Request:InvokeServer({"SetCutsceneActive", true}) end)
-				CharacterFunctions:SetSuppressed(true)
+				
+				UI.TopBar:Hide()
+				UI.TopBar:SetSuppressed(true)
 				CharacterFunctions:CanMove(false)
+				CharacterFunctions:SetSuppressed(true)
 				
 				-- Initialize camera manager for cutscene
 				local camManager = CameraManager.new()
@@ -264,6 +365,7 @@ return {
 					pcall(function() Interactables:_playPickupAnimation() end)
 					task.wait(0.5)
 					shardPart:Destroy()
+					shardDestroyed = true
 				end
 
 				-- Teleport Kyro behind player at FindShardCF, then run to player and speak
@@ -393,9 +495,12 @@ return {
 							if rc then rc:Disconnect() end
 							local reason = (type(data) == "table" and data.Reason) or nil
 							if reason ~= "Win" then
-								-- Loss: allow re-trigger again
+								-- Loss: cleanup all cutscene state and allow re-trigger
+								cleanupCutsceneState()
 								camManager:ResetToGameplay()
 								UI.TopBar:Show()
+								UI.TopBar:SetSuppressed(false)
+								pcall(function() Events.Request:InvokeServer({"SetCutsceneActive", false}) end)
 								CharacterFunctions:SetSuppressed(false)
 								CharacterFunctions:CanMove(true)
 								csActive = false
@@ -1669,71 +1774,166 @@ return {
 			-- Wait for battle to end and relocation back to overworld, then run post-battle dialogue
 			do
 				local BattleAwait = require(script.Parent.BattleAwait)
-				local ok, _reason = BattleAwait.waitForBattleOverAndRelocation(90)
+				local RelocationSignals = require(script.Parent.RelocationSignals)
+				
+				-- Capture relocation context to check for AylaLoss reason
+				local relocationReason = nil
+				local relocationConn = RelocationSignals.OnPostBattleRelocated(function(ctx)
+					if ctx and type(ctx) == "table" and ctx.Reason then
+						relocationReason = ctx.Reason
+					end
+				end)
+				
+				local ok, reason = BattleAwait.waitForBattleOverAndRelocation(90)
+				
+				-- Clean up relocation connection
+				if relocationConn then
+					relocationConn:Disconnect()
+				end
+				
+				local pname = nickname
+				
+				-- Check if player lost (reason is not "Win" or relocation reason is "AylaLoss")
+				local playerLost = (reason ~= "Win" and reason ~= nil) or (relocationReason == "AylaLoss")
+				
 				-- Post-battle conversation (Ayla, Kyro, Player)
 				if ok then
-					local pname = nickname
-					-- Ayla to Player
-					Say:Say("Ayla", true, {
-						{ Text = "Woah… you’re so strong!", Emotion = "Excited" },
-						{ Text = "I really gave it my all, but you’re something else, " .. pname .. ".", Emotion = "Happy" },
-					}, CutsceneFolder.Ayla)
-					-- Kyro to Ayla
-					Say:Say("Kyro", true, {
-						{ Text = "Told ya! He’s pretty good — always has been.", Emotion = "Smug" },
-					}, CutsceneFolder.Kyro, CutsceneFolder.Ayla)
-					-- Ayla to Player
-					Say:Say("Ayla", true, {
-						{ Text = "I hope to one day reach your potential, " .. pname .. "!", Emotion = "Happy" },
-						{ Text = "You make me want to train even harder.", Emotion = "Excited" },
-					}, CutsceneFolder.Ayla)
-					-- Kyro to Ayla (curious)
-					Say:Say("Kyro", true, {
-						{ Text = "…Still, I’m curious. Why were those Team Rift members after you two anyway?", Emotion = "Thinking" },
-					}, CutsceneFolder.Kyro, CutsceneFolder.Ayla)
-					-- Ayla to Kyro (shard story)
-					Say:Say("Ayla", true, {
-						{ Text = "Well… see, I was on Route 5 the other day. My Brainrot was caught near this strange shard — it was glowing, and it gave me these really creepy vibes.", Emotion = "Thinking" },
-						{ Text = "I didn’t touch it. I just caught Ava and left.", Emotion = "Talking" },
-					}, CutsceneFolder.Ayla, CutsceneFolder.Kyro)
-					-- Kyro to Ayla (reasoning)
-					Say:Say("Kyro", true, {
-						{ Text = "Hmm… so they probably thought Ava could lead them to the shard.", Emotion = "Thinking" },
-						{ Text = "Do you remember where exactly you saw it?", Emotion = "Talking" },
-					}, CutsceneFolder.Kyro, CutsceneFolder.Ayla)
-					-- Ayla to Kyro (uncertain)
-					Say:Say("Ayla", true, {
-						{ Text = "Not really… it’s all kind of a blur.", Emotion = "Sad" },
-					}, CutsceneFolder.Ayla, CutsceneFolder.Kyro)
-					-- Kyro planning (to Ayla)
-					Say:Say("Kyro", true, {
-						{ Text = "Then we’ll need to find it before they do. If Team Rift’s gathering these shards, the Professor needs to know ASAP.", Emotion = "Talking" },
-					}, CutsceneFolder.Kyro, CutsceneFolder.Ayla)
-					-- Ayla agreeing (to Kyro)
-					Say:Say("Ayla", true, {
-						{ Text = "Yeah… I don’t want anyone else going through what I went through.", Emotion = "Sad" },
-					}, CutsceneFolder.Ayla, CutsceneFolder.Kyro)
-					-- Kyro gives guidance (to Player)
-					Say:Say("Kyro", true, {
-						{ Text = "There’s a CatchCare here in town. " .. pname .. ", you should stop by there — you can heal your Brainrots and stock up on items.", Emotion = "Talking" },
-					}, CutsceneFolder.Kyro)
-					-- Kyro to Ayla
-					Say:Say("Kyro", true, {
-						{ Text = "Ayla, we should go too and heal your Ava.", Emotion = "Talking" },
-					}, CutsceneFolder.Kyro, CutsceneFolder.Ayla)
-					-- Ayla to Player
-					Say:Say("Ayla", true, {
-						{ Text = "You’re right. " .. pname .. ", I’ll see you soon, okay?", Emotion = "Happy" },
-					}, CutsceneFolder.Ayla)
-					-- Kyro to Player
-					Say:Say("Kyro", true, {
-						{ Text = "Later, " .. pname .. ". Don’t slack off now!", Emotion = "Smug" },
-					}, CutsceneFolder.Kyro)
+					if playerLost then
+						-- Loss case: Ayla heals player and shows supportive dialogue
+						Say:Say("Ayla", true, {
+							{ Text = "Well, I guess you lost...", Emotion = "Sad" },
+							{ Text = "Don't worry, I'll help heal your creatures!", Emotion = "Happy" },
+						}, CutsceneFolder.Ayla)
+						
+						-- Ayla heals the player (already done server-side, but show dialogue)
+						task.wait(1)
+						Say:Say("Ayla", true, {
+							{ Text = "There! All better now.", Emotion = "Happy" },
+							{ Text = "You know, losing isn't the end of the world. We can always try again!", Emotion = "Excited" },
+						}, CutsceneFolder.Ayla)
+						
+						-- Kyro supportive comment
+						Say:Say("Kyro", true, {
+							{ Text = "That's the spirit, Ayla! " .. pname .. ", don't let this get you down.", Emotion = "Happy" },
+							{ Text = "Every battle is a learning experience.", Emotion = "Talking" },
+						}, CutsceneFolder.Kyro)
+						
+						-- Ayla encourages player
+						Say:Say("Ayla", true, {
+							{ Text = "Exactly! " .. pname .. ", when you're ready, we can battle again!", Emotion = "Happy" },
+						}, CutsceneFolder.Ayla)
+						
+						-- Continue with shard story conversation
+						Say:Say("Kyro", true, {
+							{ Text = "…Still, I'm curious. Why were those Team Rift members after you two anyway?", Emotion = "Thinking" },
+						}, CutsceneFolder.Kyro, CutsceneFolder.Ayla)
+						-- Ayla to Kyro (shard story)
+						Say:Say("Ayla", true, {
+							{ Text = "Well… see, I was on Route 5 the other day. My Brainrot was caught near this strange shard — it was glowing, and it gave me these really creepy vibes.", Emotion = "Thinking" },
+							{ Text = "I didn't touch it. I just caught Ava and left.", Emotion = "Talking" },
+						}, CutsceneFolder.Ayla, CutsceneFolder.Kyro)
+						-- Kyro to Ayla (reasoning)
+						Say:Say("Kyro", true, {
+							{ Text = "Hmm… so they probably thought Ava could lead them to the shard.", Emotion = "Thinking" },
+							{ Text = "Do you remember where exactly you saw it?", Emotion = "Talking" },
+						}, CutsceneFolder.Kyro, CutsceneFolder.Ayla)
+						-- Ayla to Kyro (uncertain)
+						Say:Say("Ayla", true, {
+							{ Text = "Not really… it's all kind of a blur.", Emotion = "Sad" },
+						}, CutsceneFolder.Ayla, CutsceneFolder.Kyro)
+						-- Kyro planning (to Ayla)
+						Say:Say("Kyro", true, {
+							{ Text = "Then we'll need to find it before they do. If Team Rift's gathering these shards, the Professor needs to know ASAP.", Emotion = "Talking" },
+						}, CutsceneFolder.Kyro, CutsceneFolder.Ayla)
+						-- Ayla agreeing (to Kyro)
+						Say:Say("Ayla", true, {
+							{ Text = "Yeah… I don't want anyone else going through what I went through.", Emotion = "Sad" },
+						}, CutsceneFolder.Ayla, CutsceneFolder.Kyro)
+						-- Kyro gives guidance (to Player)
+						Say:Say("Kyro", true, {
+							{ Text = "There's a CatchCare here in town. " .. pname .. ", you should stop by there — you can heal your Brainrots and stock up on items.", Emotion = "Talking" },
+						}, CutsceneFolder.Kyro)
+						-- Kyro to Ayla
+						Say:Say("Kyro", true, {
+							{ Text = "Ayla, we should go too and heal your Ava.", Emotion = "Talking" },
+						}, CutsceneFolder.Kyro, CutsceneFolder.Ayla)
+						-- Ayla to Player
+						Say:Say("Ayla", true, {
+							{ Text = "You're right. " .. pname .. ", I'll see you soon, okay?", Emotion = "Happy" },
+						}, CutsceneFolder.Ayla)
+						-- Kyro to Player
+						Say:Say("Kyro", true, {
+							{ Text = "Later, " .. pname .. ". Don't slack off now!", Emotion = "Smug" },
+						}, CutsceneFolder.Kyro)
+					else
+						-- Win case: original dialogue
+						-- Ayla to Player
+						Say:Say("Ayla", true, {
+							{ Text = "Woah… you're so strong!", Emotion = "Excited" },
+							{ Text = "I really gave it my all, but you're something else, " .. pname .. ".", Emotion = "Happy" },
+						}, CutsceneFolder.Ayla)
+						-- Kyro to Ayla
+						Say:Say("Kyro", true, {
+							{ Text = "Told ya! He's pretty good — always has been.", Emotion = "Smug" },
+						}, CutsceneFolder.Kyro, CutsceneFolder.Ayla)
+						-- Ayla to Player
+						Say:Say("Ayla", true, {
+							{ Text = "I hope to one day reach your potential, " .. pname .. "!", Emotion = "Happy" },
+							{ Text = "You make me want to train even harder.", Emotion = "Excited" },
+						}, CutsceneFolder.Ayla)
+						-- Kyro to Ayla (curious)
+						Say:Say("Kyro", true, {
+							{ Text = "…Still, I'm curious. Why were those Team Rift members after you two anyway?", Emotion = "Thinking" },
+						}, CutsceneFolder.Kyro, CutsceneFolder.Ayla)
+						-- Ayla to Kyro (shard story)
+						Say:Say("Ayla", true, {
+							{ Text = "Well… see, I was on Route 5 the other day. My Brainrot was caught near this strange shard — it was glowing, and it gave me these really creepy vibes.", Emotion = "Thinking" },
+							{ Text = "I didn't touch it. I just caught Ava and left.", Emotion = "Talking" },
+						}, CutsceneFolder.Ayla, CutsceneFolder.Kyro)
+						-- Kyro to Ayla (reasoning)
+						Say:Say("Kyro", true, {
+							{ Text = "Hmm… so they probably thought Ava could lead them to the shard.", Emotion = "Thinking" },
+							{ Text = "Do you remember where exactly you saw it?", Emotion = "Talking" },
+						}, CutsceneFolder.Kyro, CutsceneFolder.Ayla)
+						-- Ayla to Kyro (uncertain)
+						Say:Say("Ayla", true, {
+							{ Text = "Not really… it's all kind of a blur.", Emotion = "Sad" },
+						}, CutsceneFolder.Ayla, CutsceneFolder.Kyro)
+						-- Kyro planning (to Ayla)
+						Say:Say("Kyro", true, {
+							{ Text = "Then we'll need to find it before they do. If Team Rift's gathering these shards, the Professor needs to know ASAP.", Emotion = "Talking" },
+						}, CutsceneFolder.Kyro, CutsceneFolder.Ayla)
+						-- Ayla agreeing (to Kyro)
+						Say:Say("Ayla", true, {
+							{ Text = "Yeah… I don't want anyone else going through what I went through.", Emotion = "Sad" },
+						}, CutsceneFolder.Ayla, CutsceneFolder.Kyro)
+						-- Kyro gives guidance (to Player)
+						Say:Say("Kyro", true, {
+							{ Text = "There's a CatchCare here in town. " .. pname .. ", you should stop by there — you can heal your Brainrots and stock up on items.", Emotion = "Talking" },
+						}, CutsceneFolder.Kyro)
+						-- Kyro to Ayla
+						Say:Say("Kyro", true, {
+							{ Text = "Ayla, we should go too and heal your Ava.", Emotion = "Talking" },
+						}, CutsceneFolder.Kyro, CutsceneFolder.Ayla)
+						-- Ayla to Player
+						Say:Say("Ayla", true, {
+							{ Text = "You're right. " .. pname .. ", I'll see you soon, okay?", Emotion = "Happy" },
+						}, CutsceneFolder.Ayla)
+						-- Kyro to Player
+						Say:Say("Kyro", true, {
+							{ Text = "Later, " .. pname .. ". Don't slack off now!", Emotion = "Smug" },
+						}, CutsceneFolder.Kyro)
+					end
 
 					UIFunctions:Transition(true)
 					task.wait(1.5)
 					UIFunctions:Transition(false)
 				end
+				
+				-- Mark event as complete so cutscene doesn't retrigger (regardless of win/loss)
+				pcall(function() 
+					Events.Request:InvokeServer({"SetEvent", "MET_KYRO_ROUTE_3", true}) 
+				end)
 			end
 
 			CutsceneFolder.Ayla:Destroy()

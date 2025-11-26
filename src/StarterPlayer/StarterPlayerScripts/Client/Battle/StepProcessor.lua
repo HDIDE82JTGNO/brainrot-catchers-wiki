@@ -324,6 +324,16 @@ end
 ]]
 function StepProcessor:_processMessage(step: MessageStep, drain: boolean?, onComplete: StepCallback?)
     if step.Message then
+        -- Check if message indicates a status application and play audio
+        local message = tostring(step.Message):lower()
+        if string.find(message, "became confused") or string.find(message, "is confused") then
+            -- Play Confusion audio
+            local model = self._sceneManager and (self._sceneManager:GetPlayerCreature() or self._sceneManager:GetFoeCreature())
+            if model and self._combatEffects then
+                self._combatEffects:PlayStatusEffect(model, "Confusion")
+            end
+        end
+        
         self._messageQueue:Enqueue(step.Message)
     end
     if drain then
@@ -524,52 +534,55 @@ function StepProcessor:_processDamage(step: any, isPlayer: boolean, onComplete: 
     -- Show message first if provided (for end-of-turn status damage like burn)
     if step.Message then
         self._messageQueue:Enqueue(step.Message)
-        -- Wait for message to drain before proceeding (like Crumbs)
-        if self._messageQueue and self._messageQueue.WaitForDrain then
-            self._messageQueue:WaitForDrain()
+    end
+
+    -- For end-of-turn damage (like burn), update HP immediately when message appears (Pokemon-style)
+    if step and type(step.NewHP) == "number" and step.EndOfTurn == true then
+        local creature = targetIsPlayer and self._battleState.PlayerCreature or self._battleState.FoeCreature
+        if creature and creature.Stats then
+            -- Update the creature data with new HP immediately
+            local updatedCreature = table.clone(creature)
+            updatedCreature.Stats = updatedCreature.Stats or {}
+            updatedCreature.Stats.HP = math.max(0, step.NewHP)
+            if type(step.MaxHP) == "number" then
+                updatedCreature.MaxStats = updatedCreature.MaxStats or {}
+                updatedCreature.MaxStats.HP = step.MaxHP
+            end
+            
+            -- Update battle state with new HP
+            if targetIsPlayer then
+                self._battleState:UpdatePlayerCreature(updatedCreature, self._battleState.PlayerCreatureIndex or 1)
+            else
+                self._battleState:UpdateFoeCreature(updatedCreature)
+            end
+            
+            -- Update UI with tween immediately (Pokemon-style: HP drops as message appears)
+            self._uiController:UpdateCreatureUI(targetIsPlayer, updatedCreature, true)
+            self._uiController:UpdateLevelUI(updatedCreature, false)
+            self._uiController:UpdateHPBar(targetIsPlayer, updatedCreature, true)
+            
+            print("[StepProcessor] End-of-turn damage applied immediately - Target:", targetIsPlayer and "Player" or "Foe", "NewHP:", step.NewHP, "MaxHP:", step.MaxHP)
         end
     end
 
-    -- Optional delay (e.g., burn/poison end-of-turn damage, similar to Crumbs)
+    -- Wait for message to drain before proceeding (Pokemon-style: message shows, HP updates, then continue)
+    if step.Message and self._messageQueue and self._messageQueue.WaitForDrain then
+        self._messageQueue:WaitForDrain()
+    end
+
+    -- Optional delay (for non-end-of-turn damage steps)
     local delaySec = tonumber(step.DelaySeconds) or tonumber(step.Delay) or 0
-    if delaySec and delaySec > 0 then
+    if delaySec and delaySec > 0 and not step.EndOfTurn then
         task.wait(delaySec)
     end
 
-    -- If server provided per-hit NewHP, apply it to the target creature now (authoritative)
-    if step and type(step.NewHP) == "number" then
+    -- If server provided per-hit NewHP for normal damage (not end-of-turn), apply it now
+    if step and type(step.NewHP) == "number" and not step.EndOfTurn then
         local creature = targetIsPlayer and self._battleState.PlayerCreature or self._battleState.FoeCreature
         if creature and creature.Stats then
             creature.Stats.HP = math.max(0, step.NewHP)
-            -- For end-of-turn damage (like burn), update UI immediately with tween
-            if step.EndOfTurn == true then
-                -- Update the creature data with new HP
-                local updatedCreature = table.clone(creature)
-                updatedCreature.Stats = updatedCreature.Stats or {}
-                updatedCreature.Stats.HP = math.max(0, step.NewHP)
-                if type(step.MaxHP) == "number" then
-                    updatedCreature.MaxStats = updatedCreature.MaxStats or {}
-                    updatedCreature.MaxStats.HP = step.MaxHP
-                end
-                
-                -- Update battle state with new HP
-                if targetIsPlayer then
-                    self._battleState:UpdatePlayerCreature(updatedCreature, self._battleState.PlayerCreatureIndex or 1)
-                else
-                    self._battleState:UpdateFoeCreature(updatedCreature)
-                end
-                
-                -- Update UI with tween
-                self._uiController:UpdateCreatureUI(targetIsPlayer, updatedCreature, true)
-                self._uiController:UpdateLevelUI(updatedCreature, false)
-                self._uiController:UpdateHPBar(targetIsPlayer, updatedCreature, true)
-                
-                print("[StepProcessor] End-of-turn damage applied - Target:", targetIsPlayer and "Player" or "Foe", "NewHP:", step.NewHP, "MaxHP:", step.MaxHP)
-            end
             -- Do not tween HP here for normal damage; HP UI is updated strictly at the Hit marker in _processMove
         end
-    else
-        -- No NewHP provided; defer entirely to the Hit marker-driven update path
     end
 
     -- Play damage flash

@@ -91,7 +91,20 @@ local function ToGame(Data: any, IntroChunk: Instance?)
     end
 
 	-- Attempt to load target chunk
-	if ChunkLoader:ClientRequestChunk(TargetChunk) then
+	local chunkLoaded = ChunkLoader:ClientRequestChunk(TargetChunk)
+	
+	-- If initial load failed and we're not already trying Chunk1, retry with Chunk1 as fallback
+	if not chunkLoaded and TargetChunk ~= "Chunk1" then
+		DBG:warn("[ToGame] Initial chunk load failed for:", TargetChunk, "- Retrying with Chunk1 fallback")
+		task.wait(0.5) -- Brief delay before retry
+		chunkLoaded = ChunkLoader:ClientRequestChunk("Chunk1")
+		if chunkLoaded then
+			DBG:print("[ToGame] Successfully loaded Chunk1 as fallback")
+			TargetChunk = "Chunk1" -- Update for UI purposes
+		end
+	end
+	
+	if chunkLoaded then
 		workspace.CurrentCamera.CameraType = Enum.CameraType.Custom
 		workspace.CurrentCamera.FieldOfView = 70
 		CharacterFunctions:CanMove(true)
@@ -104,9 +117,25 @@ local function ToGame(Data: any, IntroChunk: Instance?)
 		end
 		UI.TopBar:Create()
 	else
-		DBG:print("Failed to load chunk:", TargetChunk)
-		-- Re-enable movement if chunk loading failed
-		CharacterFunctions:CanMove(true)
+		DBG:warn("[ToGame] CRITICAL: Failed to load chunk after fallback:", TargetChunk)
+		DBG:warn("[ToGame] Player may be stuck on loading screen - attempting emergency Chunk1 load")
+		-- Emergency fallback: try one more time with Chunk1 after a longer delay
+		task.wait(1.0)
+		local emergencyLoad = ChunkLoader:ClientRequestChunk("Chunk1")
+		if emergencyLoad then
+			DBG:print("[ToGame] Emergency Chunk1 load succeeded")
+			workspace.CurrentCamera.CameraType = Enum.CameraType.Custom
+			workspace.CurrentCamera.FieldOfView = 70
+			CharacterFunctions:CanMove(true)
+			if IntroUI then
+				IntroUI:Destroy()
+			end
+			UI.TopBar:Create()
+		else
+			DBG:warn("[ToGame] EMERGENCY LOAD FAILED - Player will be stuck!")
+			-- Re-enable movement as last resort
+			CharacterFunctions:CanMove(true)
+		end
 	end
 end
 

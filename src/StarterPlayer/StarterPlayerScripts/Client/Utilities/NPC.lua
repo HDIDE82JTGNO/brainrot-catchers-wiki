@@ -597,6 +597,10 @@ function NPC:Setup(NPC, ClickFunction)
 	clickDetector.Parent = NPC
 
 	local function onClick()
+		-- Check if dialogue is already active - prevent multiple dialogues
+		if Say:IsActive() then
+			return -- Don't allow NPC interaction while dialogue is active
+		end
 		-- Check if any TopBar menu is open - prevent NPC interactions
 		if UI.TopBar:IsMenuOpen() then
 			return -- Don't allow NPC interaction when menus are open

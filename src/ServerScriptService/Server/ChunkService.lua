@@ -59,6 +59,17 @@ function ChunkService:IsChunkTransitionAuthorized(player: Player, playerData, ch
 	local validFromLast = table.find(validPrev, playerData.LastChunk)
 	local anyAllowed = table.find(validPrev, "Any")
 	local loadingSelf = (playerData.Chunk == chunkName or playerData.SubChunk == chunkName)
+	
+	-- Debug logging for Route 4 -> Asterden transitions
+	if chunkName == "Chunk5" and playerData.Chunk == "Chunk6" then
+		DBG:print("[ChunkService] Route 4 -> Asterden transition check:")
+		DBG:print("  Current Chunk:", playerData.Chunk)
+		DBG:print("  LastChunk:", playerData.LastChunk)
+		DBG:print("  Target Chunk:", chunkName)
+		DBG:print("  ValidPrevious:", table.concat(validPrev, ", "))
+		DBG:print("  validFromChunk:", validFromChunk ~= nil)
+		DBG:print("  validFromLast:", validFromLast ~= nil)
+	end
 
 	-- Special rule: returning from universal facility (like CatchCare) back to LastChunk
 	local returningFromUniversal = false
@@ -117,6 +128,9 @@ function ChunkService:IsChunkTransitionAuthorized(player: Player, playerData, ch
 			elseif currentChunk == "Chunk2" and chunkName == "Chunk1" then
 				defeatScenario = true
 			elseif currentChunk == "Chunk3" and chunkName == "Chunk2" then
+				defeatScenario = true
+			elseif currentChunk == "Chunk6" and chunkName == "Chunk5" then
+				-- Route 4 -> Asterden (returning from Route 4)
 				defeatScenario = true
 			end
 		end

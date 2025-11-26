@@ -75,7 +75,15 @@ function XPAwarder.AwardBattleXPForAll(Player: Player, defeatedCreatures: {any},
 			local startLevel = activeCreature.Level - levelsGained
 			for i = 1, levelsGained do
 				local level = startLevel + i
-				table.insert(xpSteps, { Type = "LevelUp", Creature = creatureName, Level = level, IsPlayer = true })
+				-- Include XPProgress for the final level (after all level-ups)
+				local xpProgress = (i == levelsGained) and (activeCreature.XPProgress or 0) or nil
+				table.insert(xpSteps, { 
+					Type = "LevelUp", 
+					Creature = creatureName, 
+					Level = level, 
+					IsPlayer = true,
+					XPProgress = xpProgress,
+				})
 				-- Learned moves at this level
 				local species = CreaturesModule[activeCreature.Name]
 				local learnset = species and species.Learnset
@@ -177,7 +185,15 @@ function XPAwarder.AwardBattleXP(Player: Player, defeatedCreature: any, battle: 
 			local startLevel = activeCreature.Level - levelsGained
 			for i = 1, levelsGained do
 				local level = startLevel + i
-				table.insert(xpSteps, { Type = "LevelUp", Creature = creatureName, Level = level, IsPlayer = true })
+				-- Include XPProgress for the final level (after all level-ups)
+				local xpProgress = (i == levelsGained) and (activeCreature.XPProgress or 0) or nil
+				table.insert(xpSteps, { 
+					Type = "LevelUp", 
+					Creature = creatureName, 
+					Level = level, 
+					IsPlayer = true,
+					XPProgress = xpProgress,
+				})
 				-- Moves at this level (same behavior as AwardForAll)
 				local species = CreaturesModule[activeCreature.Name]
 				local learnset = species and species.Learnset

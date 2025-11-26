@@ -127,6 +127,33 @@ function CatchCareShop:_bindButton(button: GuiButton?, handler: (GuiButton) -> (
 	table.insert(self._activeButtons, button)
 end
 
+function CatchCareShop:_updatePlayerInfo()
+	local gui = self._ui
+	if not gui then
+		return
+	end
+	local topBar = gui:FindFirstChild("TopBar") or gui:FindFirstChild("Topbar")
+	if not (topBar and topBar:IsA("Frame")) then
+		return
+	end
+	
+	local data = ClientData:Get()
+	
+	-- Update PlayerName (trainer's nickname, not username or display name)
+	local playerNameLabel = topBar:FindFirstChild("PlayerName")
+	if playerNameLabel and playerNameLabel:IsA("TextLabel") then
+		local nickname = (data and data.Nickname) or nil
+		playerNameLabel.Text = (type(nickname) == "string" and nickname ~= "") and nickname or ""
+	end
+	
+	-- Update StudCount
+	local studCountLabel = topBar:FindFirstChild("StudCount")
+	if studCountLabel and studCountLabel:IsA("TextLabel") then
+		local studs = (data and type(data.Studs) == "number") and data.Studs or 0
+		studCountLabel.Text = formatNumber(studs)
+	end
+end
+
 function CatchCareShop:_applyLocationMetadata()
 	local data = ClientData:Get()
 	local lastChunk = (data and data.LastChunk) or ""
@@ -155,7 +182,7 @@ function CatchCareShop:_applyLocationMetadata()
 	if not gui then
 		return
 	end
-	local topBar = gui:FindFirstChild("Topbar")
+	local topBar = gui:FindFirstChild("TopBar") or gui:FindFirstChild("Topbar")
 	if topBar and topBar:IsA("Frame") then
 		local locLabel = topBar:FindFirstChild("LocationName")
 		local tierLabel = topBar:FindFirstChild("LocationTier")
@@ -166,6 +193,9 @@ function CatchCareShop:_applyLocationMetadata()
 			tierLabel.Text = string.format("Tier %d", self._locationTier)
 		end
 	end
+	
+	-- Update player info (name and studs)
+	self:_updatePlayerInfo()
 end
 
 function CatchCareShop:_resetItemInfoPanel()
@@ -439,6 +469,8 @@ function CatchCareShop:_commitPurchase()
 		if response.Success == true then
 			ok = true
 			resultMessage = response.Message or ("Purchased " .. itemData.ItemName .. "!")
+			-- Update player info after successful purchase (studs may have changed)
+			self:_updatePlayerInfo()
 		else
 			resultMessage = response.Message or "Purchase failed."
 		end

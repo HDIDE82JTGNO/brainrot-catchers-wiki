@@ -656,11 +656,57 @@ end
 function ChunkManager:ClientRequestChunk(ChunkName)
 	local Call = Events.Request:InvokeServer({"RequestChunk",ChunkName})
 	local properName
+	
+	-- Handle nil response from server (authorization failure, chunk not found, etc.)
+	if Call == nil then
+		DBG:warn("[ClientRequestChunk] Server returned nil for chunk:", ChunkName)
+		
+		-- Enhanced error reporting
+		local PlayerGui = game.Players.LocalPlayer.PlayerGui
+		DBG:warn("[ClientRequestChunk] Current PlayerGui children:")
+		for _, child in ipairs(PlayerGui:GetChildren()) do
+			DBG:warn("  -", child.Name, "(" .. child.ClassName .. ")")
+		end
+		
+		-- If trying to load Chunk1 and it fails, this is critical
+		if ChunkName == "Chunk1" then
+			DBG:warn("[ClientRequestChunk] CRITICAL: Failed to load Chunk1 - this should always be accessible!")
+			DBG:warn("[ClientRequestChunk] This may indicate:")
+			DBG:warn("  1. Chunk1 folder missing from ServerStorage.Chunks")
+			DBG:warn("  2. ServerStorage.Chunks folder missing")
+			DBG:warn("  3. Authorization failure (should not happen for Chunk1)")
+			DBG:warn("  4. PlayerData initialization failure")
+			-- Return false to trigger fallback handling in calling code
+			return false, nil
+		end
+		return false, nil
+	end
+	
 	if typeof(Call) == "table" then
 		-- Server may redirect the requested chunk (e.g., Title Continue, CatchCare recovery)
 		local serverChunkName = Call[1] or ChunkName
 		properName = Call[2]
-		local FoundChunk = PlayerGui:WaitForChild(serverChunkName)
+		
+		-- Check if chunk already exists in PlayerGui (server may have sent it before)
+		local FoundChunk = PlayerGui:FindFirstChild(serverChunkName)
+		
+		if not FoundChunk then
+			-- Add timeout to prevent infinite waiting if server fails to send chunk
+			DBG:print("[ClientRequestChunk] Waiting for chunk in PlayerGui:", serverChunkName)
+			FoundChunk = PlayerGui:WaitForChild(serverChunkName, 10) -- 10 second timeout
+		end
+		
+		if not FoundChunk then
+			DBG:warn("[ClientRequestChunk] Chunk not found in PlayerGui after 10 seconds:", serverChunkName)
+			DBG:warn("[ClientRequestChunk] Current PlayerGui children:")
+			for _, child in ipairs(PlayerGui:GetChildren()) do
+				DBG:warn("  -", child.Name, "(" .. child.ClassName .. ")")
+			end
+			return false, nil
+		end
+		
+		DBG:print("[ClientRequestChunk] Found chunk in PlayerGui:", FoundChunk.Name)
+		
 		local ok, chunk = ChunkManager:Load(FoundChunk,false,true)
 		if ok then
 			-- Stash for post-transition location banner
@@ -670,8 +716,13 @@ function ChunkManager:ClientRequestChunk(ChunkName)
 			pcall(function()
 				ChunkManager.CurrentChunk.ProperName = properName or serverChunkName
 			end)
+		else
+			DBG:warn("[ClientRequestChunk] Failed to load chunk after server sent it:", serverChunkName)
 		end
 		return ok, chunk
+	else
+		DBG:warn("[ClientRequestChunk] Server returned unexpected type:", typeof(Call), "for chunk:", ChunkName)
+		return false, nil
 	end
 end
 
