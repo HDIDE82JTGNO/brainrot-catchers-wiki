@@ -156,6 +156,7 @@ local _ALLOWED_VERBS: {[string]: boolean} = {
     GetUnstuck = true,
     PurchaseCatchCareItem = true,
     RedeemCode = true,
+    ToggleCreatureSpawn = true,
 }
 
 local function _rateLimitOk(player: Player): boolean
@@ -685,7 +686,8 @@ function ServerFunctions:AttemptEscape(Player)
             battle.PlayerCreature.Stats.HP = newHP
             enemyAction.HPDelta = { Player = -enemyDamage }
             -- Include an explicit Damage step so the client applies damage at the correct time
-            damageStep = { Type = "Damage", Effectiveness = "Normal", IsPlayer = false, NewHP = newHP }
+            -- IsPlayer indicates which creature was damaged (defender), not attacker
+            damageStep = { Type = "Damage", Effectiveness = "Normal", IsPlayer = true, NewHP = newHP }
 
             -- Mirror damage to persistent party data (Stats.HP and CurrentHP percent)
             local PlayerData = ClientData:Get(Player)
@@ -2041,6 +2043,62 @@ end
 		return studsLoss
 	end
 	
+	if Request[1] == "ToggleCreatureSpawn" then
+		local slotIndex = Request[2]
+		if type(slotIndex) ~= "number" or slotIndex < 1 or slotIndex > 6 then
+			return false, "Invalid slot index"
+		end
+		
+		local PlayerData = ClientData:Get(Player)
+		if not PlayerData or not PlayerData.Party then
+			return false, "No party data"
+		end
+		
+		local creature = PlayerData.Party[slotIndex]
+		if not creature then
+			return false, "No creature in slot"
+		end
+		
+		-- Track spawned state per player (server-side only for validation)
+		if not ServerFunctions._spawnedCreatures then
+			ServerFunctions._spawnedCreatures = {}
+		end
+		if not ServerFunctions._spawnedCreatures[Player] then
+			ServerFunctions._spawnedCreatures[Player] = nil
+		end
+		
+		local currentlySpawnedSlot = ServerFunctions._spawnedCreatures[Player]
+		
+		-- If clicking the same slot that's spawned, despawn it
+		if currentlySpawnedSlot == slotIndex then
+			ServerFunctions._spawnedCreatures[Player] = nil
+			-- Notify client to despawn
+			local Events = ReplicatedStorage:WaitForChild("Events")
+			local Communicate = Events:WaitForChild("Communicate")
+			Communicate:FireClient(Player, "CreatureDespawned", slotIndex)
+			return true
+		else
+			-- If another slot is spawned, despawn it first
+			if currentlySpawnedSlot then
+				local Events = ReplicatedStorage:WaitForChild("Events")
+				local Communicate = Events:WaitForChild("Communicate")
+				Communicate:FireClient(Player, "CreatureDespawned", currentlySpawnedSlot)
+			end
+			
+			-- Spawn the new creature
+			ServerFunctions._spawnedCreatures[Player] = slotIndex
+			local Events = ReplicatedStorage:WaitForChild("Events")
+			local Communicate = Events:WaitForChild("Communicate")
+			DBG:print("[ServerFunctions] Firing CreatureSpawned event to", Player.Name, "slotIndex:", slotIndex, "creature:", creature.Name)
+			Communicate:FireClient(Player, "CreatureSpawned", {
+				SlotIndex = slotIndex,
+				CreatureData = creature
+			})
+			DBG:print("[ServerFunctions] Event fired successfully")
+			return true
+		end
+	end
+	
 	-- Catch-all for unhandled requests
 	DBG:warn("Unhandled request type:", Request[1], "from player:", Player.Name)
 	return false, "Unhandled request type: " .. tostring(Request[1])
@@ -2050,6 +2108,11 @@ end
 Players.PlayerRemoving:Connect(function(Player: Player)
 	DBG:print("Player leaving:", Player.Name, "- clearing battle state")
 	ServerFunctions:ClearBattleData(Player)
+	
+	-- Clean up spawned creature tracking
+	if ServerFunctions._spawnedCreatures and ServerFunctions._spawnedCreatures[Player] then
+		ServerFunctions._spawnedCreatures[Player] = nil
+	end
 end)
 
 -- Execute player move and process enemy turn
@@ -3350,10 +3413,11 @@ function ServerFunctions:ExecuteMoveAction(Player, action, battle, isPlayer)
     -- Check for faint
     -- Prepare a Damage step to carry effectiveness/message semantics to client
     -- Include per-hit NewHP so the client can update the correct side at the correct time
+    -- IsPlayer indicates which creature was damaged (defender), not attacker
     local damageStep = {
         Type = "Damage",
         Effectiveness = effCat,
-        IsPlayer = isPlayer,
+        IsPlayer = not isPlayer, -- Defender is opposite of attacker
         NewHP = defender.Stats and defender.Stats.HP or nil,
     }
 
@@ -4127,9 +4191,10 @@ function ServerFunctions:SwitchCreature(Player, newCreatureSlot)
 				-- Always include the enemy move step first
 				table.insert(enemySteps, enemyAction)
                 -- Include explicit Damage step so client updates HP UI and plays impact effects
+                -- IsPlayer indicates which creature was damaged (defender), not attacker
                 table.insert(enemySteps, {
                     Type = "Damage",
-                    IsPlayer = false,
+                    IsPlayer = true, -- Player's creature is being damaged by enemy
                     NewHP = newHP,
                     Effectiveness = "Normal",
                 })

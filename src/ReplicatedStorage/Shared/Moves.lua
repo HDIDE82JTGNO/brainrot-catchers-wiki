@@ -46,7 +46,7 @@ return { -- BasePower, Accuracy, Priority, Type, Description
     ["Tackle"] = createMove(40, 100, 0, Types.Normal, "A straightforward physical charge."),
     ["Scratch"] = createMove(40, 100, 0, Types.Normal, "A quick claw swipe."),
     ["Earthquake"] = createMove(100, 100, 0, Types.Ground, "A massive tremor that shakes all around."),
-    ["Fast Attack"] = createMove(40, 100, 1, Types.Normal, "A swift strike that often hits first.", nil, "BRN", 100),
+    ["Fast Attack"] = createMove(40, 100, 1, Types.Normal, "A swift strike that often hits first.", nil, "FRZ", 100),
     ["Crunch"] = createMove(80, 100, 0, Types.Dark, "Crushes the foe with sharp fangs.", nil, nil, true), -- Causes Flinch
     ["Sand Storm"] = createMove(60, 100, 0, Types.Ground, "Blasts the foe with cutting sand."),
     ["Peck"] = createMove(60, 85, 0, Types.Flying, "A sharp beak jab.", nil, nil, true), -- Causes Flinch

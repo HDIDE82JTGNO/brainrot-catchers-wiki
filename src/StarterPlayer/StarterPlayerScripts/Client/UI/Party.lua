@@ -14,6 +14,7 @@ local UserInputService: UserInputService = game:GetService("UserInputService")
 local UIFunctions = require(script.Parent:WaitForChild("UIFunctions"))
 local SummaryUI = require(script.Parent:WaitForChild("Summary"))
 local ClientData = require(script.Parent.Parent:WaitForChild("Plugins"):WaitForChild("ClientData"))
+local CreatureSpawner = require(script.Parent.Parent:WaitForChild("Utilities"):WaitForChild("CreatureSpawner"))
 
 local Audio = script.Parent.Parent.Assets:WaitForChild("Audio")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -223,7 +224,7 @@ local function sendReorderToServer(order: {number})
 	return ok
 end
 
-local function renderSlotFromCreature(btn: TextButton, creatureData: any)
+local function renderSlotFromCreature(btn: TextButton, creatureData: any, slotIndex: number?)
 	-- Update basic fields in an existing slot button
 	local CreatureName = btn:FindFirstChild("CreatureName")
 	local CreatureLevel = btn:FindFirstChild("CreatureLevel")
@@ -234,6 +235,8 @@ local function renderSlotFromCreature(btn: TextButton, creatureData: any)
 	local HeldItemIcon = btn:FindFirstChild("HeldItem")
 	local GenderIcon = btn:FindFirstChild("Gender")
 	local CreatureHP = btn:FindFirstChild("CreatureHP")
+	local FollowButton = btn:FindFirstChild("FollowButton")
+	local StatusIcon = FollowButton and FollowButton:FindFirstChild("Status")
 
 	if creatureData then
 		if CreatureName and CreatureName:IsA("TextLabel") then
@@ -293,6 +296,27 @@ local function renderSlotFromCreature(btn: TextButton, creatureData: any)
 				GenderIcon.Visible = false
 			end
 		end
+		
+		-- Update FollowButton Status icon
+		if StatusIcon and StatusIcon:IsA("ImageLabel") and slotIndex then
+			local spawnedSlot = CreatureSpawner:GetSpawnedSlotIndex()
+			print("[PartyUI] renderSlotFromCreature - slotIndex:", slotIndex, "spawnedSlot:", spawnedSlot, "StatusIcon:", StatusIcon)
+			
+			if spawnedSlot == slotIndex then
+				-- Spawned: use spawned icon
+				StatusIcon.Image = "rbxassetid://125802977251327"
+				print("[PartyUI] Set status icon to spawned for slot", slotIndex)
+			else
+				-- Not spawned: use not spawned icon
+				StatusIcon.Image = "rbxassetid://113482931893438"
+				print("[PartyUI] Set status icon to not spawned for slot", slotIndex)
+			end
+		elseif not StatusIcon then
+			warn("[PartyUI] StatusIcon not found for slot", slotIndex)
+		elseif not slotIndex then
+			warn("[PartyUI] No slotIndex provided to renderSlotFromCreature")
+		end
+		
 		btn.AutoButtonColor = true
 		btn.Active = true
 		btn.Visible = true
@@ -313,7 +337,7 @@ local function renderAllSlots(PartyData)
 			local creature = (PartyData.Party and srcIndex and PartyData.Party[srcIndex]) or nil
             local name = creature and (creature.Nickname or creature.Name) or "nil"
             print("[PartyUI] render slot", i, "<-", srcIndex, name)
-			renderSlotFromCreature(btn, creature)
+			renderSlotFromCreature(btn, creature, srcIndex)
 		end
 	end
 end
@@ -324,7 +348,7 @@ local function renderSlotIndex(PartyData, index: number)
 	local creature = (PartyData.Party and srcIndex and PartyData.Party[srcIndex]) or nil
     local name = creature and (creature.Nickname or creature.Name) or "nil"
     print("[PartyUI] renderSlotIndex", index, "<-", srcIndex, name)
-	renderSlotFromCreature(Slots[index], creature)
+	renderSlotFromCreature(Slots[index], creature, srcIndex)
 end
 
 local function beginDrag(PartyUI: ScreenGui, index: number, inputPosition: Vector2)
@@ -496,6 +520,39 @@ local function ensureDragHandlers(PartyUI: ScreenGui)
 		local btn = slotButtons[i]
 		if btn then
 			print("[PartyUI] Setting up handlers for slot", i)
+			
+			-- Setup FollowButton click handler
+			local FollowButton = btn:FindFirstChild("FollowButton")
+			if FollowButton and FollowButton:IsA("GuiButton") then
+				local followClickConnection = FollowButton.MouseButton1Click:Connect(function()
+					print("[PartyUI] FollowButton clicked for slot", i)
+					-- Prevent event bubbling to parent button
+					
+					local data = ClientData:Get()
+					local srcIndex = CurrentOrder[i]
+					local creature = data and data.Party and srcIndex and data.Party[srcIndex]
+					if creature then
+						print("[PartyUI] Sending toggle spawn request for slot", srcIndex, "creature:", creature.Name)
+						-- Request spawn/despawn from server
+						local Request = ReplicatedStorage:WaitForChild("Events"):WaitForChild("Request")
+						local success, result = pcall(function()
+							return Request:InvokeServer({"ToggleCreatureSpawn", srcIndex})
+						end)
+						if success and result then
+							print("[PartyUI] Toggle spawn request successful for slot", srcIndex)
+							-- Status icon will update via event listener in Init()
+						else
+							warn("[PartyUI] Failed to toggle spawn for slot", srcIndex, "result:", result)
+						end
+					else
+						warn("[PartyUI] No creature found in slot", srcIndex)
+					end
+				end)
+				table.insert(SlotConnections[i], followClickConnection)
+				print("[PartyUI] FollowButton handler connected for slot", i)
+			else
+				warn("[PartyUI] FollowButton not found for slot", i, "button:", btn.Name)
+			end
 			
 			-- Summary on click: only fire if not dragging and not moved
 			local clickConnection = btn.MouseButton1Click:Connect(function()
@@ -689,6 +746,27 @@ function LoadSummary(PartyData, CreatureData, slotIndex)
 end
 
 function PartyModule:Init()
+	-- Initialize CreatureSpawner
+	print("[PartyUI] Initializing CreatureSpawner...")
+	CreatureSpawner:Init()
+	print("[PartyUI] CreatureSpawner initialized")
+	
+	-- Listen for spawn state changes to update UI
+	local Events = ReplicatedStorage:WaitForChild("Events")
+	local Communicate = Events:WaitForChild("Communicate")
+	Communicate.OnClientEvent:Connect(function(eventType, data)
+		if eventType == "CreatureSpawned" or eventType == "CreatureDespawned" then
+			print("[PartyUI] Spawn state changed:", eventType, "data:", data)
+			-- Wait a frame to ensure CreatureSpawner has updated its state
+			RunService.Heartbeat:Wait()
+			local spawnedSlot = CreatureSpawner:GetSpawnedSlotIndex()
+			print("[PartyUI] Current spawned slot index:", spawnedSlot)
+			-- Refresh party display to update status icons
+			print("[PartyUI] Calling UpdatePartyDisplay after spawn state change")
+			PartyModule:UpdatePartyDisplay()
+		end
+	end)
+	
 	-- Initialize party display
 	self:UpdatePartyDisplay()
 end

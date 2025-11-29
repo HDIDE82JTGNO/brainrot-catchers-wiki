@@ -42,8 +42,18 @@ function UIController.new(): any
 	self._youUIPosition = nil
 	self._foeUIPosition = nil
 	self._foeFaintedByIndex = {} :: {[number]: boolean}
+	self._previousStatus = {} :: {[boolean]: string?}  -- Track previous status for each side
+	self._combatEffects = nil  -- Will be set by BattleSystem
 	
 	return self
+end
+
+--[[
+	Sets the combat effects reference for thaw detection
+	@param combatEffects The CombatEffects instance
+]]
+function UIController:SetCombatEffects(combatEffects: any)
+	self._combatEffects = combatEffects
 end
 
 --[[
@@ -696,6 +706,23 @@ function UIController:UpdateStatusDisplay(isPlayer: boolean, creatureData: any)
 	end
 	
 	local StatusModule = require(ReplicatedStorage.Shared.Status)
+	
+	-- Check if status was cleared (was FRZ, now nil)
+	local previousStatus = self._previousStatus[isPlayer]
+	local currentStatus = creatureData.Status and creatureData.Status.Type and tostring(creatureData.Status.Type):upper() or nil
+	
+	-- If creature was frozen and is now thawed, trigger thaw effect
+	if previousStatus == "FRZ" and currentStatus ~= "FRZ" then
+		print("[UIController] Status changed from FRZ to", currentStatus or "nil", "- triggering thaw")
+		-- Get the creature model and thaw it
+		if self._combatEffects and self._combatEffects.ThawCreature then
+			-- We need to get the model from somewhere - this will be handled by StepProcessor via message callback
+			-- But we can also check here if we have access to scene manager
+		end
+	end
+	
+	-- Update previous status
+	self._previousStatus[isPlayer] = currentStatus
 	
 	-- Check if creature has a status condition
 	if creatureData.Status and creatureData.Status.Type then

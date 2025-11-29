@@ -31,6 +31,8 @@ function MessageQueue.new(battleNotification: Frame): any
 	self._messageLabel = battleNotification:FindFirstChild("Message")
 	self._suppressPostFaint = false
 	self._faintAnimationCallback = nil
+	self._statusEffectCallback = nil
+	self._thawCallback = nil
 	
 	return self
 end
@@ -41,6 +43,22 @@ end
 ]]
 function MessageQueue:SetFaintAnimationCallback(callback: (() -> ())?)
 	self._faintAnimationCallback = callback
+end
+
+--[[
+	Sets a callback to be triggered when a status message is displayed
+	@param callback The callback function
+]]
+function MessageQueue:SetStatusEffectCallback(callback: (() -> ())?)
+	self._statusEffectCallback = callback
+end
+
+--[[
+	Sets a callback to be triggered when a thaw message is displayed
+	@param callback The callback function
+]]
+function MessageQueue:SetThawCallback(callback: (() -> ())?)
+	self._thawCallback = callback
 end
 
 --[[]
@@ -206,6 +224,33 @@ function MessageQueue:_displayMessage(message: string)
 	self._messageLabel.Text = message
 	self._messageLabel.MaxVisibleGraphemes = 0  -- Hide text immediately to prevent flash
 	self._messageLabel.Size = UDim2.new(0.83, 0, 0.34, 0)
+
+	-- Check if this is a thaw message (status removal)
+	local messageLower = message:lower()
+	local isThawMessage = string.find(messageLower, "thawed out")
+	
+	-- Check if this is a status message and trigger status effect callback immediately
+	local isStatusMessage = string.find(messageLower, "burned") or 
+	                       string.find(messageLower, "paralyzed") or 
+	                       string.find(messageLower, "poisoned") or 
+	                       string.find(messageLower, "asleep") or 
+	                       string.find(messageLower, "frozen") or
+	                       string.find(messageLower, "confused") or
+	                       string.find(messageLower, "hurt by") or
+	                       string.find(messageLower, "frozen solid")
+	
+	if isStatusMessage and self._statusEffectCallback then
+		print("[MessageQueue] Status message detected - triggering status effect callback")
+		task.spawn(self._statusEffectCallback)
+		self._statusEffectCallback = nil  -- Clear the callback after use
+	end
+	
+	-- Trigger thaw callback if this is a thaw message
+	if isThawMessage and self._thawCallback then
+		print("[MessageQueue] Thaw message detected - triggering thaw callback")
+		task.spawn(self._thawCallback)
+		self._thawCallback = nil  -- Clear the callback after use
+	end
 
 	-- Notify display hook
 	if self._onDisplay then

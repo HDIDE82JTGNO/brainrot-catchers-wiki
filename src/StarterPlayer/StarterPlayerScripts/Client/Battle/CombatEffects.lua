@@ -23,7 +23,9 @@ function CombatEffects.new(animationController: any): any
 	
 	self._animationController = animationController
 	self._activeCaptureCube = nil :: Model?
-
+	self._frozenIceCubes = {} :: {[Model]: MeshPart}  -- Track ice cubes for frozen creatures
+	self._iceCubeConnections = {} :: {[Model]: RBXScriptConnection}  -- Track connections for ice cube alignment
+	
 	-- Cache common asset folders for effects
 	local assets = ReplicatedStorage:FindFirstChild("Assets")
 	self._assets = assets
@@ -98,15 +100,27 @@ end
 -- Plays a hit impact particle at the defender's position. Category can be
 -- "Super", "Weak"/"NotVery", or nil (defaults to Normal).
 function CombatEffects:PlayHitImpact(defenderModel: Model, category: string?)
-	if not defenderModel then return end
+	if not defenderModel then 
+		warn("[CombatEffects] PlayHitImpact - defenderModel is nil")
+		return 
+	end
 	local hrp = defenderModel:FindFirstChild("HumanoidRootPart")
 	local primary: BasePart? = (hrp and hrp:IsA("BasePart")) and hrp or defenderModel.PrimaryPart
-	if not primary then return end
+	if not primary then 
+		warn("[CombatEffects] PlayHitImpact - No primary part found for", defenderModel.Name)
+		return 
+	end
 
 	local effects = self._effects
-	if not effects then return end
+	if not effects then 
+		warn("[CombatEffects] PlayHitImpact - effects folder not found")
+		return 
+	end
 	local hitFolder = effects:FindFirstChild("HitFX")
-	if not hitFolder then return end
+	if not hitFolder then 
+		warn("[CombatEffects] PlayHitImpact - HitFX folder not found in effects")
+		return 
+	end
 
 	local name = "NormalHit"
 	if category == "Super" then
@@ -117,7 +131,10 @@ function CombatEffects:PlayHitImpact(defenderModel: Model, category: string?)
 
 	local template = hitFolder:FindFirstChild(name)
 	if template and template:IsA("BasePart") then
+		print("[CombatEffects] Playing hit impact:", name, "at", primary.CFrame)
 		self:_emitFromTemplate(template, primary.CFrame, workspace)
+	else
+		warn("[CombatEffects] PlayHitImpact - Template not found:", name, "in HitFX folder")
 	end
 end
 
@@ -456,6 +473,9 @@ function CombatEffects:PlayFaintAnimation(
 		return
 	end
 	
+	-- Fade out ice cube if creature is frozen
+	self:FadeOutIceCube(model)
+	
 	-- Use hologram spawn effect for faint (fade out)
 	print("[CombatEffects] Using hologram effect for faint - IsPlayer:", isPlayer)
 	
@@ -618,11 +638,10 @@ function CombatEffects:PlayStatusEffect(model: Model, status: string)
 	
 	if audioId then
 		-- Create and play sound
-		local SoundService = game:GetService("SoundService")
 		local sound = Instance.new("Sound")
 		sound.SoundId = audioId
-		sound.Volume = 0.5
-		sound.Parent = SoundService
+		sound.Volume = 3
+		sound.Parent = workspace
 		sound:Play()
 		
 		-- Clean up sound after it finishes
@@ -644,7 +663,67 @@ function CombatEffects:PlayStatusEffect(model: Model, status: string)
 		end
 	end
 	
-	-- TODO: Add visual status effect (icons, particles, etc.)
+	-- Special handling for freeze status
+	if statusUpper == "FRZ" then
+		self:_applyFreezeEffect(model)
+		return
+	end
+	
+	-- Play particle effects for status conditions
+	local hrp = model:FindFirstChild("HumanoidRootPart")
+	if hrp and hrp:IsA("BasePart") then
+		-- Get status effects folder
+		local effects = self._effects
+		if effects then
+			local statusFolder = effects:FindFirstChild("Status")
+			if statusFolder then
+				-- Map status codes to attachment names (handle Confusion vs confusion)
+				local attachmentName = statusUpper
+				if statusUpper == "CONFUSION" then
+					attachmentName = "Confusion"
+				else
+					attachmentName = statusUpper  -- BRN, PAR, PSN, TOX, SLP
+				end
+				
+				local statusAttachment = statusFolder:FindFirstChild(attachmentName)
+				if statusAttachment and statusAttachment:IsA("Attachment") then
+					-- Clone the attachment to the creature's HRP
+					local clonedAttachment = statusAttachment:Clone()
+					clonedAttachment.Parent = hrp
+					print("[CombatEffects] PlayStatusEffect: Cloned status attachment:", attachmentName, "to HRP")
+					
+					-- Wait 0.85 seconds, then disable all particle emitters
+					task.delay(0.85, function()
+						if clonedAttachment and clonedAttachment.Parent then
+							-- Find all ParticleEmitters in the attachment and disable them
+							for _, descendant in ipairs(clonedAttachment:GetDescendants()) do
+								if descendant:IsA("ParticleEmitter") then
+									descendant.Enabled = false
+									print("[CombatEffects] PlayStatusEffect: Disabled particle emitter:", descendant.Name)
+								end
+							end
+							
+							-- Wait 3 seconds, then destroy the attachment
+							task.delay(3, function()
+								if clonedAttachment and clonedAttachment.Parent then
+									clonedAttachment:Destroy()
+									print("[CombatEffects] PlayStatusEffect: Destroyed status attachment:", attachmentName)
+								end
+							end)
+						end
+					end)
+				else
+					print("[CombatEffects] PlayStatusEffect: Status attachment not found:", attachmentName)
+				end
+			else
+				print("[CombatEffects] PlayStatusEffect: Status effects folder not found")
+			end
+		else
+			print("[CombatEffects] PlayStatusEffect: Effects folder not found")
+		end
+	else
+		print("[CombatEffects] PlayStatusEffect: No HumanoidRootPart found for particle effects")
+	end
 end
 
 --[[
@@ -689,11 +768,238 @@ function CombatEffects:CreateFloatingText(model: Model, text: string, color: Col
 end
 
 --[[
+	Internal: Applies freeze effect to a creature
+	@param model The creature model to freeze
+]]
+function CombatEffects:_applyFreezeEffect(model: Model)
+	if not model then
+		return
+	end
+	
+	-- Freeze the animation
+	if self._animationController and self._animationController.FreezeAnimation then
+		self._animationController:FreezeAnimation(model)
+	end
+	
+	-- Get HRP for ice cube positioning
+	local hrp = model:FindFirstChild("HumanoidRootPart")
+	if not hrp or not hrp:IsA("BasePart") then
+		print("[CombatEffects] _applyFreezeEffect: No HumanoidRootPart found")
+		return
+	end
+	
+	-- Check if already frozen (don't create duplicate ice cube)
+	if self._frozenIceCubes[model] then
+		print("[CombatEffects] _applyFreezeEffect: Creature already frozen, skipping ice cube creation")
+		return
+	end
+	
+	-- Get status effects folder
+	local effects = self._effects
+	if not effects then
+		print("[CombatEffects] _applyFreezeEffect: Effects folder not found")
+		return
+	end
+	
+	local statusFolder = effects:FindFirstChild("Status")
+	if not statusFolder then
+		print("[CombatEffects] _applyFreezeEffect: Status effects folder not found")
+		return
+	end
+	
+	-- Play FRZ attachment particle effect (same as other status effects)
+	local frzAttachment = statusFolder:FindFirstChild("FRZ")
+	if frzAttachment and frzAttachment:IsA("Attachment") then
+		-- Clone the attachment to the creature's HRP
+		local clonedAttachment = frzAttachment:Clone()
+		clonedAttachment.Parent = hrp
+		print("[CombatEffects] _applyFreezeEffect: Cloned FRZ attachment to HRP")
+		
+		-- Wait 0.85 seconds, then disable all particle emitters
+		task.delay(0.85, function()
+			if clonedAttachment and clonedAttachment.Parent then
+				-- Find all ParticleEmitters in the attachment and disable them
+				for _, descendant in ipairs(clonedAttachment:GetDescendants()) do
+					if descendant:IsA("ParticleEmitter") then
+						descendant.Enabled = false
+						print("[CombatEffects] _applyFreezeEffect: Disabled particle emitter:", descendant.Name)
+					end
+				end
+				
+				-- Wait 3 seconds, then destroy the attachment
+				task.delay(3, function()
+					if clonedAttachment and clonedAttachment.Parent then
+						clonedAttachment:Destroy()
+						print("[CombatEffects] _applyFreezeEffect: Destroyed FRZ attachment")
+					end
+				end)
+			end
+		end)
+	else
+		print("[CombatEffects] _applyFreezeEffect: FRZ attachment not found")
+	end
+	
+	-- Find and clone the ice cube
+	local iceCubeTemplate = statusFolder:FindFirstChild("FRZ_IceCube")
+	if not iceCubeTemplate or not iceCubeTemplate:IsA("MeshPart") then
+		print("[CombatEffects] _applyFreezeEffect: FRZ_IceCube not found or not a MeshPart")
+		return
+	end
+	
+	-- Clone the ice cube
+	local iceCube = iceCubeTemplate:Clone()
+	iceCube.Name = "FrozenIceCube"
+	iceCube.Anchored = true
+	iceCube.CanCollide = false
+	iceCube.CFrame = hrp.CFrame
+	iceCube.Parent = workspace
+	
+	-- Track the ice cube
+	self._frozenIceCubes[model] = iceCube
+	
+	-- Keep ice cube aligned with HRP using a connection
+	local connection
+	connection = game:GetService("RunService").Heartbeat:Connect(function()
+		if not model or not model.Parent or not hrp or not hrp.Parent then
+			if connection then
+				connection:Disconnect()
+			end
+			self._iceCubeConnections[model] = nil
+			return
+		end
+		
+		if iceCube and iceCube.Parent then
+			iceCube.CFrame = hrp.CFrame
+		else
+			if connection then
+				connection:Disconnect()
+			end
+			self._iceCubeConnections[model] = nil
+		end
+	end)
+	
+	-- Store connection for cleanup
+	self._iceCubeConnections[model] = connection
+	
+	print("[CombatEffects] _applyFreezeEffect: Applied freeze effect to", model.Name)
+end
+
+--[[
+	Internal: Fades out and destroys an ice cube
+	@param iceCube The ice cube MeshPart to fade out
+	@param onComplete Optional callback when fade completes
+]]
+function CombatEffects:_fadeOutIceCube(iceCube: MeshPart, onComplete: (() -> ())?)
+	if not iceCube or not iceCube.Parent then
+		if onComplete then
+			onComplete()
+		end
+		return
+	end
+	
+	-- Fade out transparency
+	local tween = TweenService:Create(
+		iceCube,
+		TweenInfo.new(0.5, Enum.EasingStyle.Sine, Enum.EasingDirection.In),
+		{Transparency = 1}
+	)
+	
+	tween.Completed:Connect(function()
+		if iceCube and iceCube.Parent then
+			iceCube:Destroy()
+			print("[CombatEffects] _fadeOutIceCube: Destroyed ice cube after fade")
+		end
+		if onComplete then
+			onComplete()
+		end
+	end)
+	
+	tween:Play()
+end
+
+--[[
+	Thaws a frozen creature (removes freeze effect)
+	@param model The creature model to thaw
+]]
+function CombatEffects:ThawCreature(model: Model)
+	if not model then
+		return
+	end
+	
+	-- Unfreeze the animation
+	if self._animationController and self._animationController.UnfreezeAnimation then
+		self._animationController:UnfreezeAnimation(model)
+	end
+	
+	-- Disconnect ice cube alignment connection
+	local connection = self._iceCubeConnections[model]
+	if connection then
+		connection:Disconnect()
+		self._iceCubeConnections[model] = nil
+	end
+	
+	-- Fade out and destroy the ice cube
+	local iceCube = self._frozenIceCubes[model]
+	if iceCube and iceCube.Parent then
+		self:_fadeOutIceCube(iceCube)
+		print("[CombatEffects] ThawCreature: Fading out ice cube for", model.Name)
+	end
+	
+	-- Clear tracking
+	self._frozenIceCubes[model] = nil
+	
+	print("[CombatEffects] ThawCreature: Thawed", model.Name)
+end
+
+--[[
+	Fades out ice cube for a creature (used when creature faints or is recalled)
+	@param model The creature model
+]]
+function CombatEffects:FadeOutIceCube(model: Model)
+	if not model then
+		return
+	end
+	
+	-- Disconnect ice cube alignment connection
+	local connection = self._iceCubeConnections[model]
+	if connection then
+		connection:Disconnect()
+		self._iceCubeConnections[model] = nil
+	end
+	
+	-- Fade out and destroy the ice cube
+	local iceCube = self._frozenIceCubes[model]
+	if iceCube and iceCube.Parent then
+		self:_fadeOutIceCube(iceCube)
+		print("[CombatEffects] FadeOutIceCube: Fading out ice cube for", model.Name)
+	end
+	
+	-- Clear tracking
+	self._frozenIceCubes[model] = nil
+end
+
+--[[
 	Cleanup all active effects
 ]]
 function CombatEffects:Cleanup()
 	-- Stop any ongoing effects
 	-- Clear any temporary effect instances
+	
+	-- Clean up all frozen ice cubes and connections
+	for model, iceCube in pairs(self._frozenIceCubes) do
+		-- Disconnect connection
+		local connection = self._iceCubeConnections[model]
+		if connection then
+			connection:Disconnect()
+		end
+		
+		-- Destroy ice cube
+		if iceCube and iceCube.Parent then
+			iceCube:Destroy()
+		end
+	end
+	self._frozenIceCubes = {}
+	self._iceCubeConnections = {}
 end
 
 return CombatEffects

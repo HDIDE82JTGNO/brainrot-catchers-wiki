@@ -26,6 +26,9 @@ function AnimationController.new(): any
 	self._cameraCycleRunning = false
 	self._idleTracks = {} :: {[Model]: AnimationTrack}
 	self._idleSpeed = {} :: {[Model]: number}
+	self._frozenTracks = {} :: {[Model]: AnimationTrack}  -- Track frozen animation tracks
+	self._frozenTimePositions = {} :: {[Model]: number}  -- Store time position when frozen
+	self._frozenModels = {} :: {[Model]: boolean}  -- Track which models are frozen
 	
 	return self
 end
@@ -39,6 +42,18 @@ end
 ]]
 function AnimationController:PlayAnimation(model: Model, animationName: string, onComplete: (() -> ())?): AnimationTrack?
 	if not model or not animationName then
+		return nil
+	end
+	
+	-- Check if creature is frozen - prevent attack/damaged animations
+	local nameLower = string.lower(animationName)
+	local isActionAnimation = nameLower == "attack" or nameLower == "damaged" or nameLower == "damage"
+	if isActionAnimation and self._frozenModels[model] then
+		print("[AnimationController] PlayAnimation: Creature is frozen, blocking", animationName, "animation")
+		-- Still call onComplete callback to prevent hanging
+		if onComplete then
+			task.spawn(onComplete)
+		end
 		return nil
 	end
 	
@@ -60,11 +75,10 @@ function AnimationController:PlayAnimation(model: Model, animationName: string, 
 	
     local track = animator:LoadAnimation(animation)
     -- Set priority based on animation type
-    local nameLower = string.lower(animationName)
     if nameLower == "idle" then
         track.Priority = Enum.AnimationPriority.Idle
         track.Looped = true
-    elseif nameLower == "attack" or nameLower == "damaged" or nameLower == "damage" then
+    elseif isActionAnimation then
         track.Priority = Enum.AnimationPriority.Action4
     end
 	
@@ -104,6 +118,20 @@ function AnimationController:PlayAnimationWithHit(
 	if not model or not animationName then
 		if onComplete then
 			onComplete()
+		end
+		return nil
+	end
+	
+	-- Check if creature is frozen - prevent attack animations
+	local nameLower = string.lower(animationName)
+	if nameLower == "attack" and self._frozenModels[model] then
+		print("[AnimationController] PlayAnimationWithHit: Creature is frozen, blocking attack animation")
+		-- Still call callbacks to prevent hanging
+		if onHit then
+			task.spawn(onHit)
+		end
+		if onComplete then
+			task.spawn(onComplete)
 		end
 		return nil
 	end
@@ -302,6 +330,80 @@ function AnimationController:StopAnimation(track: AnimationTrack?)
 	local index = table.find(self._activeAnimations, track)
 	if index then
 		table.remove(self._activeAnimations, index)
+	end
+end
+
+--[[
+	Freezes a creature's animation at the current frame
+	@param model The creature model to freeze
+]]
+function AnimationController:FreezeAnimation(model: Model)
+	if not model then
+		return
+	end
+	
+	-- Mark model as frozen
+	self._frozenModels[model] = true
+	
+	-- Get the idle track for this model
+	local idleTrack = self._idleTracks[model]
+	if not idleTrack or not idleTrack.IsPlaying then
+		-- If no idle track, try to get any playing animation
+		local humanoid = model:FindFirstChildOfClass("Humanoid")
+		local animator = humanoid and humanoid:FindFirstChildOfClass("Animator")
+		if animator then
+			local playingTracks = animator:GetPlayingAnimationTracks()
+			for _, track in ipairs(playingTracks) do
+				if track.IsPlaying then
+					idleTrack = track
+					break
+				end
+			end
+		end
+	end
+	
+	if idleTrack and idleTrack.IsPlaying then
+		-- Store the current time position
+		local timePos = idleTrack.TimePosition
+		self._frozenTimePositions[model] = timePos
+		self._frozenTracks[model] = idleTrack
+		
+		-- Stop the animation and set it to loop at the frozen frame
+		idleTrack.Looped = false
+		idleTrack:AdjustSpeed(0)  -- Set speed to 0 to freeze
+		
+		print("[AnimationController] Frozen animation for", model.Name, "at time position", timePos)
+	else
+		warn("[AnimationController] No playing animation found to freeze for", model.Name)
+	end
+end
+
+--[[
+	Unfreezes a creature's animation and resumes normal playback
+	@param model The creature model to unfreeze
+]]
+function AnimationController:UnfreezeAnimation(model: Model)
+	if not model then
+		return
+	end
+	
+	-- Clear frozen flag
+	self._frozenModels[model] = nil
+	
+	local frozenTrack = self._frozenTracks[model]
+	if frozenTrack then
+		-- Restore normal speed
+		frozenTrack:AdjustSpeed(1)
+		frozenTrack.Looped = true
+		
+		-- Clear frozen state
+		self._frozenTracks[model] = nil
+		self._frozenTimePositions[model] = nil
+		
+		print("[AnimationController] Unfrozen animation for", model.Name)
+	else
+		-- If no frozen track, just ensure idle is playing normally
+		self:PlayIdleAnimation(model)
 	end
 end
 

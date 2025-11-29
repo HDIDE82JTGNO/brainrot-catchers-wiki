@@ -478,18 +478,50 @@ function StepProcessor:_processMove(step: any, isPlayer: boolean, onComplete: St
 		local hpDelta = (step and type(step.HPDelta) == "table") and step.HPDelta or nil
 		local willMiss = (hpDelta == nil) or (isPlayer and (not hpDelta.Enemy or hpDelta.Enemy == 0)) or (not isPlayer and (not hpDelta.Player or hpDelta.Player == 0))
 		
+		-- Get effectiveness from Move step for hit impact effects
+		local effectiveness = step.Effectiveness
+		local targetIsPlayer = (not isPlayer) == true
+		
+		-- Check if move actually deals damage (has HPDelta)
+		local hasDamage = hpDelta ~= nil and (
+			(isPlayer and hpDelta.Enemy and hpDelta.Enemy < 0) or 
+			(not isPlayer and hpDelta.Player and hpDelta.Player < 0)
+		)
+		
+		-- Debug: Log move step details
+		print("[StepProcessor] _processMove - effectiveness:", effectiveness, "willMiss:", willMiss, "hasDamage:", hasDamage, "defenderModel:", defenderModel)
+		
 		self._combatEffects:PlayMoveAttack(
 			attackerModel,
 			defenderModel,
 			step.MoveName or "Unknown",
 			function()
+				-- Hit marker reached - trigger hit impact effects immediately
+				-- Trigger effects if move hit and deals damage (not a miss)
+				print("[StepProcessor] Hit marker reached - willMiss:", willMiss, "hasDamage:", hasDamage, "defenderModel:", defenderModel)
+				if not willMiss and hasDamage and defenderModel then
+					-- Determine effectiveness category for hit impact VFX
+					local category: string? = nil
+					if effectiveness == "Super" then
+						category = "Super"
+					elseif effectiveness == "NotVery" then
+						category = "Weak"
+					end
+					print("[StepProcessor] Triggering hit effects - category:", category, "effectiveness:", effectiveness)
+					-- Play hit impact effects on the defender at the hit marker
+					self._combatEffects:PlayHitImpact(defenderModel, category)
+					-- Play damage flash effect
+					self._combatEffects:PlayDamageFlash(defenderModel, effectiveness)
+				else
+					print("[StepProcessor] Skipping hit effects - willMiss:", willMiss, "hasDamage:", hasDamage, "defenderModel:", defenderModel)
+				end
+				
 				-- Commit pending HP only for non-heal moves to avoid early HP updates on heal-only moves (e.g., Perch)
 				local moveName = step.Move or step.MoveName
 				local def = moveName and MovesModule[moveName] or nil
 				local isHealOnly = def and type(def.HealsPercent) == "number" and def.HealsPercent > 0
 				if not isHealOnly then
 					-- Update only the defender for this move at the hit marker
-					local targetIsPlayer = (not isPlayer) == true
 					self:_updateUIWithPendingHP(targetIsPlayer)
 				end
 			end,
@@ -531,12 +563,41 @@ function StepProcessor:_processDamage(step: any, isPlayer: boolean, onComplete: 
     print("[StepProcessor] _processDamage - step.Message:", step.Message, "step.NewHP:", step.NewHP, "step.EndOfTurn:", step.EndOfTurn)
     print("[StepProcessor] _processDamage - Full step:", step)
 
+    -- Check if this is a status damage message and set up status effect callback
+    local statusForEffect = nil
+    if step.Message and type(step.Message) == "string" then
+        local msgLower = step.Message:lower()
+        if string.find(msgLower, "hurt by") then
+            -- Extract status from damage message
+            if string.find(msgLower, "burn") then
+                statusForEffect = "BRN"
+            elseif string.find(msgLower, "toxic") then
+                statusForEffect = "TOX"
+            elseif string.find(msgLower, "poison") then
+                statusForEffect = "PSN"
+            elseif string.find(msgLower, "paralyz") then
+                statusForEffect = "PAR"
+            end
+        end
+    end
+    
+    -- Set status effect callback if this is a status damage message
+    if statusForEffect then
+        local model = targetIsPlayer and self._sceneManager:GetPlayerCreature() or self._sceneManager:GetFoeCreature()
+        if model and self._messageQueue and self._messageQueue.SetStatusEffectCallback then
+            self._messageQueue:SetStatusEffectCallback(function()
+                print("[StepProcessor] Status damage message displayed - playing status effect for:", statusForEffect)
+                self._combatEffects:PlayStatusEffect(model, statusForEffect)
+            end)
+        end
+    end
+
     -- Show message first if provided (for end-of-turn status damage like burn)
     if step.Message then
         self._messageQueue:Enqueue(step.Message)
     end
 
-    -- For end-of-turn damage (like burn), update HP immediately when message appears (Pokemon-style)
+    -- For end-of-turn damage (like burn), update HP and trigger effects immediately when message appears (Pokemon-style)
     if step and type(step.NewHP) == "number" and step.EndOfTurn == true then
         local creature = targetIsPlayer and self._battleState.PlayerCreature or self._battleState.FoeCreature
         if creature and creature.Stats then
@@ -560,6 +621,9 @@ function StepProcessor:_processDamage(step: any, isPlayer: boolean, onComplete: 
             self._uiController:UpdateCreatureUI(targetIsPlayer, updatedCreature, true)
             self._uiController:UpdateLevelUI(updatedCreature, false)
             self._uiController:UpdateHPBar(targetIsPlayer, updatedCreature, true)
+            
+            -- Note: Do not play combat effects (hit impact/damage flash) for end-of-turn status damage like burn
+            -- Only update HP UI, no visual effects
             
             print("[StepProcessor] End-of-turn damage applied immediately - Target:", targetIsPlayer and "Player" or "Foe", "NewHP:", step.NewHP, "MaxHP:", step.MaxHP)
         end
@@ -585,19 +649,25 @@ function StepProcessor:_processDamage(step: any, isPlayer: boolean, onComplete: 
         end
     end
 
-    -- Play damage flash
-    local model = targetIsPlayer and self._sceneManager:GetPlayerCreature() or self._sceneManager:GetFoeCreature()
-    if model then
-        print("[StepProcessor] Damage step effectiveness:", step.Effectiveness)
-        self._combatEffects:PlayDamageFlash(model, step.Effectiveness)
-        -- Also play the impact VFX based on effectiveness
-        local category: string? = nil
-        if step.Effectiveness == "Super" then
-            category = "Super"
-        elseif step.Effectiveness == "NotVery" then
-            category = "Weak"
+    -- Play damage flash and hit impact effects
+    -- Note: For normal move damage, effects are already triggered at the hit marker in _processMove
+    -- End-of-turn damage effects are triggered immediately above when message appears
+    -- Only trigger effects here for standalone damage steps (non-move, non-end-of-turn) that have a message
+    -- This handles cases like confusion self-damage or other status damage that isn't end-of-turn
+    if not step.EndOfTurn and step.Message then
+        local model = targetIsPlayer and self._sceneManager:GetPlayerCreature() or self._sceneManager:GetFoeCreature()
+        if model then
+            print("[StepProcessor] Standalone damage step - triggering effects")
+            self._combatEffects:PlayDamageFlash(model, step.Effectiveness)
+            -- Also play the impact VFX based on effectiveness
+            local category: string? = nil
+            if step.Effectiveness == "Super" then
+                category = "Super"
+            elseif step.Effectiveness == "NotVery" then
+                category = "Weak"
+            end
+            self._combatEffects:PlayHitImpact(model, category)
         end
-        self._combatEffects:PlayHitImpact(model, category)
     end
 
     -- Enqueue effectiveness message when applicable
@@ -944,6 +1014,11 @@ function StepProcessor:_processRecall(step: any, isPlayer: boolean, onComplete: 
 		or self._sceneManager:GetFoeCreature()
 	
 	if model then
+		-- Fade out ice cube if creature is frozen
+		if self._combatEffects then
+			self._combatEffects:FadeOutIceCube(model)
+		end
+		
 		-- Play recall animation using CombatEffects
 		if self._combatEffects then
 			self._combatEffects:PlayRecallAnimation(model, function()
@@ -1037,6 +1112,20 @@ function StepProcessor:_processSendOut(step: any, isPlayer: boolean, onComplete:
         print("[StepProcessor] Creature spawned successfully - IsPlayer:", isPlayer)
         local spawned = isPlayer and self._sceneManager:GetPlayerCreature() or self._sceneManager:GetFoeCreature()
         print("[NewTestLog] SendOut: spawn-complete name=", (creatureData and (creatureData.Nickname or creatureData.Name)) or "?", "isPlayer=", isPlayer, "model=", spawned and spawned.Name or "nil")
+		
+		-- Check if creature is frozen and reapply ice cube (for trainer battles where creature comes back)
+		local spawnedModel = isPlayer and self._sceneManager:GetPlayerCreature() or self._sceneManager:GetFoeCreature()
+		if spawnedModel and creatureData and creatureData.Status and creatureData.Status.Type == "FRZ" then
+			print("[StepProcessor] Creature is frozen - reapplying ice cube")
+			if self._combatEffects and self._combatEffects.PlayStatusEffect then
+				-- Use a small delay to ensure model is fully spawned
+				task.delay(0.1, function()
+					if spawnedModel and spawnedModel.Parent then
+						self._combatEffects:PlayStatusEffect(spawnedModel, "FRZ")
+					end
+				end)
+			end
+		end
 		
 		-- If this is a player creature spawn, move camera for clarity
 		if isPlayer then
@@ -1250,6 +1339,22 @@ function StepProcessor:_processStatus(step: any, isPlayer: boolean, onComplete: 
 		end
 	end
 	
+	-- Get model and status for effect callback
+	local model = affectedIsPlayer 
+		and self._sceneManager:GetPlayerCreature() 
+		or self._sceneManager:GetFoeCreature()
+	
+	-- Use statusType if available, otherwise fall back to step.Status
+	local statusForEffect = statusType or step.Status
+	
+	-- Set status effect callback to play when message is displayed
+	if model and statusForEffect and self._messageQueue and self._messageQueue.SetStatusEffectCallback then
+		self._messageQueue:SetStatusEffectCallback(function()
+			print("[StepProcessor] Status message displayed - playing status effect for:", statusForEffect)
+			self._combatEffects:PlayStatusEffect(model, statusForEffect)
+		end)
+	end
+	
 	-- Generate message
 	if statusType and creatureName then
 		local statusMessage = MessageGenerator.StatusApplied(creatureName, statusType)
@@ -1324,13 +1429,23 @@ function StepProcessor:_processStatus(step: any, isPlayer: boolean, onComplete: 
 		end
 	end
 	
-	-- Play status effect on the affected creature's model (after message is shown)
-	local model = affectedIsPlayer 
-		and self._sceneManager:GetPlayerCreature() 
-		or self._sceneManager:GetFoeCreature()
-	
-	if model and step.Status then
-		self._combatEffects:PlayStatusEffect(model, step.Status)
+	-- Check if this is a thaw message and set up thaw callback
+	if step.Message and type(step.Message) == "string" then
+		local msgLower = step.Message:lower()
+		if string.find(msgLower, "thawed out") then
+			local model = affectedIsPlayer 
+				and self._sceneManager:GetPlayerCreature() 
+				or self._sceneManager:GetFoeCreature()
+			
+			if model and self._messageQueue and self._messageQueue.SetThawCallback then
+				self._messageQueue:SetThawCallback(function()
+					print("[StepProcessor] Thaw message displayed - thawing creature")
+					if self._combatEffects and self._combatEffects.ThawCreature then
+						self._combatEffects:ThawCreature(model)
+					end
+				end)
+			end
+		end
 	end
 	
 	-- Complete after message has drained
