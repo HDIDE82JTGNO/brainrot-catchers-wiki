@@ -65,8 +65,8 @@ export function CopyCreatureButton({ creature, className = '' }: CopyCreatureBut
           onClick={() => setShowFormatMenu(!showFormatMenu)}
           className={`px-3 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${
             copied
-              ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-2 border-green-300 dark:border-green-700'
-              : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-2 border-slate-300 dark:border-slate-600 hover:border-blue-300 dark:hover:border-blue-500 hover:text-blue-600 dark:hover:text-blue-400'
+              ? 'bg-green-100 text-green-700 border-2 border-green-300'
+              : 'bg-slate-100 text-slate-600 border-2 border-slate-300 hover:border-blue-300 hover:text-blue-600'
           } ${className}`}
           title="Copy creature data"
         >
@@ -86,16 +86,16 @@ export function CopyCreatureButton({ creature, className = '' }: CopyCreatureBut
       </AnimatedDiv>
 
       {showFormatMenu && !copied && (
-        <div className="absolute top-full mt-2 right-0 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-lg shadow-xl overflow-hidden z-50 min-w-[120px]">
+        <div className="absolute top-full mt-2 right-0 bg-white border-2 border-slate-200 rounded-lg shadow-xl overflow-hidden z-50 min-w-[120px]">
           <button
             onClick={() => handleCopy('text')}
-            className="w-full px-4 py-2 text-left text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+            className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 transition-colors"
           >
             Copy as Text
           </button>
           <button
             onClick={() => handleCopy('json')}
-            className="w-full px-4 py-2 text-left text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors border-t border-slate-200 dark:border-slate-700"
+            className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 transition-colors border-t border-slate-200"
           >
             Copy as JSON
           </button>
@@ -144,8 +144,8 @@ export function CopyMoveButton({ move, className = '' }: CopyMoveButtonProps) {
           onClick={() => setShowFormatMenu(!showFormatMenu)}
           className={`px-3 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${
             copied
-              ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-2 border-green-300 dark:border-green-700'
-              : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-2 border-slate-300 dark:border-slate-600 hover:border-blue-300 dark:hover:border-blue-500 hover:text-blue-600 dark:hover:text-blue-400'
+              ? 'bg-green-100 text-green-700 border-2 border-green-300'
+              : 'bg-slate-100 text-slate-600 border-2 border-slate-300 hover:border-blue-300 hover:text-blue-600'
           } ${className}`}
           title="Copy move data"
         >
@@ -165,16 +165,16 @@ export function CopyMoveButton({ move, className = '' }: CopyMoveButtonProps) {
       </AnimatedDiv>
 
       {showFormatMenu && !copied && (
-        <div className="absolute top-full mt-2 right-0 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-lg shadow-xl overflow-hidden z-50 min-w-[120px]">
+        <div className="absolute top-full mt-2 right-0 bg-white border-2 border-slate-200 rounded-lg shadow-xl overflow-hidden z-50 min-w-[120px]">
           <button
             onClick={() => handleCopy('text')}
-            className="w-full px-4 py-2 text-left text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+            className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 transition-colors"
           >
             Copy as Text
           </button>
           <button
             onClick={() => handleCopy('json')}
-            className="w-full px-4 py-2 text-left text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors border-t border-slate-200 dark:border-slate-700"
+            className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 transition-colors border-t border-slate-200"
           >
             Copy as JSON
           </button>
@@ -223,8 +223,8 @@ export function CopyTeamButton({ team, className = '' }: CopyTeamButtonProps) {
           onClick={() => setShowFormatMenu(!showFormatMenu)}
           className={`px-3 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${
             copied
-              ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-2 border-green-300 dark:border-green-700'
-              : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-2 border-slate-300 dark:border-slate-600 hover:border-blue-300 dark:hover:border-blue-500 hover:text-blue-600 dark:hover:text-blue-400'
+              ? 'bg-green-100 text-green-700 border-2 border-green-300'
+              : 'bg-slate-100 text-slate-600 border-2 border-slate-300 hover:border-blue-300 hover:text-blue-600'
           } ${className}`}
           title="Copy team data"
         >
@@ -244,16 +244,16 @@ export function CopyTeamButton({ team, className = '' }: CopyTeamButtonProps) {
       </AnimatedDiv>
 
       {showFormatMenu && !copied && (
-        <div className="absolute top-full mt-2 right-0 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-lg shadow-xl overflow-hidden z-50 min-w-[120px]">
+        <div className="absolute top-full mt-2 right-0 bg-white border-2 border-slate-200 rounded-lg shadow-xl overflow-hidden z-50 min-w-[120px]">
           <button
             onClick={() => handleCopy('text')}
-            className="w-full px-4 py-2 text-left text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+            className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 transition-colors"
           >
             Copy as Text
           </button>
           <button
             onClick={() => handleCopy('json')}
-            className="w-full px-4 py-2 text-left text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors border-t border-slate-200 dark:border-slate-700"
+            className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 transition-colors border-t border-slate-200"
           >
             Copy as JSON
           </button>

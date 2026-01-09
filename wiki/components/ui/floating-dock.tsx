@@ -74,7 +74,7 @@ const FloatingDockMobile = ({
 }) => {
   return (
     <div className={cn("fixed top-4 left-1/2 transform -translate-x-1/2 z-50 md:hidden", className)}>
-      <div className="flex h-16 gap-3 rounded-2xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 shadow-lg overflow-x-auto scrollbar-hide max-w-[calc(100vw-2rem)] items-center">
+      <div className="flex h-16 gap-3 rounded-2xl border border-gray-200 bg-white px-3 shadow-lg overflow-x-auto scrollbar-hide max-w-[calc(100vw-2rem)] items-center">
         {items.map((item) => (
           <MobileIconContainer key={item.title} {...item} />
         ))}
@@ -100,7 +100,7 @@ function MobileIconContainer({
     <Link
       href={href}
       prefetch={true}
-      className="relative flex flex-shrink-0 aspect-square h-12 w-12 items-center justify-center rounded-full bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 transition-all duration-300 ease-out hover:bg-gray-200 dark:hover:bg-slate-600 active:scale-95 active:bg-gray-300 dark:active:bg-slate-500 group"
+      className="relative flex flex-shrink-0 aspect-square h-12 w-12 items-center justify-center rounded-full bg-gray-100 text-gray-600 transition-all duration-300 ease-out hover:bg-gray-200 active:scale-95 active:bg-gray-300 group"
       onClick={onClick}
       onTouchStart={() => setIsHovered(true)}
       onTouchEnd={() => setTimeout(() => setIsHovered(false), 200)}
@@ -145,7 +145,7 @@ const FloatingDockDesktop = ({
       }}
         className={cn(
         floatingDockVariants({ variant }),
-        "mx-auto hidden md:flex h-16 gap-4 rounded-2xl bg-white dark:bg-slate-800 px-4 pb-3 shadow-lg border border-gray-200 dark:border-slate-700",
+        "mx-auto hidden md:flex h-16 gap-4 rounded-2xl bg-white px-4 pb-3 shadow-lg border border-gray-200",
         className
       )}
     >
@@ -232,7 +232,7 @@ function IconContainer({
           width, 
           height,
         }}
-        className="aspect-square rounded-full bg-gray-100 dark:bg-slate-700 flex items-center justify-center relative transition-colors duration-300 hover:bg-gray-200 dark:hover:bg-slate-600 cursor-pointer"
+        className="aspect-square rounded-full bg-gray-100 flex items-center justify-center relative transition-colors duration-300 hover:bg-gray-200 cursor-pointer"
       >
         <motion.div
           style={{ width: widthIcon, height: heightIcon }}
@@ -247,7 +247,7 @@ function IconContainer({
             duration: 0.2,
             ease: [0.4, 0, 0.2, 1],
           }}
-          className="absolute top-full mt-2 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md bg-gray-800 dark:bg-slate-700 px-3 py-1.5 text-xs font-medium text-white dark:text-slate-100 pointer-events-none z-50 shadow-lg"
+          className="absolute top-full mt-2 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md bg-gray-800 px-3 py-1.5 text-xs font-medium text-white pointer-events-none z-50 shadow-lg"
         >
           {title}
         </motion.div>

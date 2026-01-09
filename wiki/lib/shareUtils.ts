@@ -110,6 +110,7 @@ export function shareTeam(team: TeamMember[]): string {
     evs: member.evs,
     moves: member.moves,
     level: member.level,
+    heldItem: member.heldItem,
   }));
 
   try {
@@ -141,19 +142,22 @@ export function parseTeamFromUrl(allCreatures: Creature[]): TeamMember[] | null 
     try {
       const decoded = JSON.parse(atob(teamParam));
       if (Array.isArray(decoded)) {
-        return decoded.map((data: any) => {
-          const creature = allCreatures.find(c => c.Id === data.id);
-          if (!creature) return null;
-          
-          const member = createDefaultTeamMember(creature);
-          return {
-            ...member,
-            ivs: data.ivs || member.ivs,
-            evs: data.evs || member.evs,
-            moves: data.moves || member.moves,
-            level: data.level || member.level,
-          };
-        }).filter((m): m is TeamMember => m !== null);
+        return decoded
+          .map((data: any): TeamMember | null => {
+            const creature = allCreatures.find(c => c.Id === data.id);
+            if (!creature) return null;
+            
+            const member = createDefaultTeamMember(creature);
+            return {
+              ...member,
+              ivs: data.ivs || member.ivs,
+              evs: data.evs || member.evs,
+              moves: data.moves || member.moves,
+              level: data.level || member.level,
+              heldItem: data.heldItem,
+            };
+          })
+          .filter((m): m is TeamMember => m !== null);
       }
     } catch {
       // Fallback to legacy format (comma-separated creature IDs)

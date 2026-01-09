@@ -5,7 +5,8 @@ import { TeamAnalyzer } from '@/components/TeamAnalyzer';
 import { TeamMemberEditor } from '@/components/TeamMemberEditor';
 import creaturesData from '../../data/creatures.json';
 import movesData from '../../data/moves.json';
-import { Creature, Move } from '@/types';
+import itemsData from '../../data/items.json';
+import { Creature, Move, Item } from '@/types';
 import { TeamMember, createDefaultTeamMember } from '@/lib/teamTypes';
 import { getSpringConfig } from '@/lib/springConfigs';
 import { useSpring, animated } from '@react-spring/web';
@@ -13,6 +14,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { getSpritePath } from '@/lib/spriteUtils';
 import { TypeBadge } from '@/components/TypeBadge';
+import { ItemImage } from '@/components/ItemImage';
 import { parseTeamFromUrl, shareTeam } from '@/lib/shareUtils';
 import { ShareButton } from '@/components/ShareButton';
 import { CopyTeamButton } from '@/components/CopyDataButton';
@@ -20,9 +22,51 @@ import { IconEdit } from '@tabler/icons-react';
 
 const creatures = creaturesData as unknown as Creature[];
 const moves = movesData as unknown as Move[];
+const items = itemsData as unknown as Item[];
 
 const AnimatedDiv = animated.div as any;
 const MAX_TEAM_SIZE = 6;
+const TEAM_STORAGE_KEY = 'brainrot-team-builder-team';
+
+// Helper to save team to localStorage
+function saveTeamToStorage(team: TeamMember[]) {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(TEAM_STORAGE_KEY, JSON.stringify(team));
+  } catch (error) {
+    console.error('Failed to save team to localStorage:', error);
+  }
+}
+
+// Helper to load team from localStorage
+function loadTeamFromStorage(creatures: Creature[]): TeamMember[] | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const stored = localStorage.getItem(TEAM_STORAGE_KEY);
+    if (!stored) return null;
+    const data = JSON.parse(stored);
+    if (!Array.isArray(data)) return null;
+    
+    // Reconstruct team members from stored data
+    return data
+      .map((item: any): TeamMember | null => {
+        const creature = creatures.find(c => c.Id === item.Id);
+        if (!creature) return null;
+        return {
+          ...creature,
+          ivs: item.ivs || { HP: 0, Attack: 0, Defense: 0, SpecialAttack: 0, SpecialDefense: 0, Speed: 0 },
+          evs: item.evs || { HP: 0, Attack: 0, Defense: 0, SpecialAttack: 0, SpecialDefense: 0, Speed: 0 },
+          moves: item.moves || [],
+          level: item.level || 50,
+          heldItem: item.heldItem,
+        };
+      })
+      .filter((m): m is TeamMember => m !== null);
+  } catch (error) {
+    console.error('Failed to load team from localStorage:', error);
+    return null;
+  }
+}
 
 export default function TeamBuilderPage() {
   const [team, setTeam] = useState<TeamMember[]>([]);
@@ -30,16 +74,35 @@ export default function TeamBuilderPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [teamLoadedFromUrl, setTeamLoadedFromUrl] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
 
-  // Load team from URL on mount
+  // Load team from URL or localStorage on mount
   useEffect(() => {
+    if (isInitialized) return;
+    
+    // First check URL
     const urlTeam = parseTeamFromUrl(creatures);
     if (urlTeam && urlTeam.length > 0) {
       setTeam(urlTeam);
       setTeamLoadedFromUrl(true);
       setTimeout(() => setTeamLoadedFromUrl(false), 3000);
+      saveTeamToStorage(urlTeam);
+    } else {
+      // Fallback to localStorage
+      const storedTeam = loadTeamFromStorage(creatures);
+      if (storedTeam && storedTeam.length > 0) {
+        setTeam(storedTeam);
+      }
     }
-  }, []);
+    setIsInitialized(true);
+  }, [isInitialized]);
+
+  // Save team to localStorage whenever it changes
+  useEffect(() => {
+    if (isInitialized) {
+      saveTeamToStorage(team);
+    }
+  }, [team, isInitialized]);
 
   // Filter creatures for selection
   const filteredCreatures = useMemo(() => {
@@ -56,15 +119,20 @@ export default function TeamBuilderPage() {
   const addToTeam = (creature: Creature) => {
     if (team.length >= MAX_TEAM_SIZE) return;
     if (team.some(c => c.Id === creature.Id)) return;
-    setTeam([...team, createDefaultTeamMember(creature)]);
+    const newTeam = [...team, createDefaultTeamMember(creature)];
+    setTeam(newTeam);
   };
 
   const removeFromTeam = (index: number) => {
-    setTeam(team.filter((_, i) => i !== index));
+    const newTeam = team.filter((_, i) => i !== index);
+    setTeam(newTeam);
   };
 
   const clearTeam = () => {
     setTeam([]);
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(TEAM_STORAGE_KEY);
+    }
   };
 
   const updateTeamMember = (index: number, member: TeamMember) => {
@@ -105,15 +173,15 @@ export default function TeamBuilderPage() {
       <AnimatedDiv style={fadeIn} className="space-y-6">
         {/* Team Loaded Notification */}
         {teamLoadedFromUrl && (
-          <div className="bg-green-100 dark:bg-green-900/30 border-2 border-green-300 dark:border-green-700 rounded-lg p-4 text-green-700 dark:text-green-300 text-center">
+          <div className="bg-green-100 border-2 border-green-300 rounded-lg p-4 text-green-700 text-center">
             Team loaded from URL!
           </div>
         )}
 
         {/* Team Slots */}
-        <div className="bg-white dark:bg-slate-800 rounded-2xl border-2 border-slate-200 dark:border-slate-700 shadow-xl p-6">
+        <div className="bg-white rounded-2xl border-2 border-slate-200 shadow-xl p-6">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
-            <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">
+            <h2 className="text-xl font-bold text-slate-900">
               Team ({team.length}/{MAX_TEAM_SIZE})
             </h2>
             <div className="flex gap-2">
@@ -127,7 +195,7 @@ export default function TeamBuilderPage() {
                   />
                   <button
                     onClick={clearTeam}
-                    className="px-4 py-2 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-lg hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors font-medium text-sm"
+                    className="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors font-medium text-sm"
                   >
                     Clear Team
                   </button>
@@ -135,16 +203,19 @@ export default function TeamBuilderPage() {
               )}
             </div>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
             {Array.from({ length: MAX_TEAM_SIZE }).map((_, idx) => {
               const member = team[idx];
+              const totalIVs = member ? Object.values(member.ivs).reduce((a, b) => a + b, 0) : 0;
+              const totalEVs = member ? Object.values(member.evs).reduce((a, b) => a + b, 0) : 0;
+              
               return (
                 <div
                   key={idx}
-                  className={`relative aspect-square border-2 rounded-xl flex flex-col items-center justify-center p-2 ${
+                  className={`relative border-2 rounded-xl p-3 ${
                     member
-                      ? 'border-blue-400 dark:border-blue-500 bg-blue-50 dark:bg-blue-900/30'
-                      : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-700/50 border-dashed'
+                      ? 'border-blue-400 bg-blue-50'
+                      : 'border-slate-200 bg-slate-50 border-dashed min-h-[200px]'
                   }`}
                 >
                   {member ? (
@@ -163,8 +234,8 @@ export default function TeamBuilderPage() {
                         <IconEdit className="w-3 h-3" />
                       </button>
                       <Link href={`/creatures/${encodeURIComponent(member.Name)}`}>
-                        <div className="w-full h-full flex flex-col items-center justify-center cursor-pointer hover:opacity-80 transition-opacity">
-                          <div className="w-16 h-16 mb-1 bg-white dark:bg-slate-800 rounded-full flex items-center justify-center border-2 border-slate-200 dark:border-slate-600">
+                        <div className="w-full flex flex-col items-center cursor-pointer hover:opacity-80 transition-opacity pt-6">
+                          <div className="relative w-16 h-16 mb-2 bg-white rounded-full flex items-center justify-center border-2 border-slate-200">
                             <Image
                               src={getSpritePath(member.Name, shinyCreatures.has(member.Name))}
                               alt={member.Name}
@@ -173,23 +244,66 @@ export default function TeamBuilderPage() {
                               className="w-full h-full object-contain p-1"
                               style={{ imageRendering: 'pixelated' }}
                             />
+                            {member.heldItem && (() => {
+                              const item = items.find(i => i.Name === member.heldItem);
+                              return item ? (
+                                <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-white rounded-full border-2 border-slate-300 flex items-center justify-center shadow-sm">
+                                  <ItemImage item={item} moves={moves} size={20} />
+                                </div>
+                              ) : null;
+                            })()}
                           </div>
-                          <div className="text-xs font-bold text-slate-900 dark:text-slate-100 text-center mb-1">{member.Name}</div>
-                          <div className="flex gap-0.5">
+                          <div className="text-xs font-bold text-slate-900 text-center mb-1">{member.Name}</div>
+                          <div className="flex gap-0.5 mb-2">
                             {member.Types?.map(t => (
                               <TypeBadge key={t} type={t} className="scale-75" />
                             ))}
                           </div>
+                          
+                          {/* Level */}
+                          <div className="text-[10px] text-slate-600 mb-1">
+                            Lv. {member.level}
+                          </div>
+                          
+                          {/* IVs Summary */}
+                          {totalIVs > 0 && (
+                            <div className="text-[9px] text-slate-600 mb-1">
+                              IVs: {totalIVs}/186
+                            </div>
+                          )}
+                          
+                          {/* EVs Summary */}
+                          {totalEVs > 0 && (
+                            <div className="text-[9px] text-slate-600 mb-1">
+                              EVs: {totalEVs}/510
+                            </div>
+                          )}
+                          
+                          {/* Moves */}
                           {member.moves.length > 0 && (
-                            <div className="text-[10px] text-slate-600 dark:text-slate-400 mt-1">
-                              {member.moves.length} move{member.moves.length !== 1 ? 's' : ''}
+                            <div className="mt-1 w-full">
+                              <div className="text-[9px] font-semibold text-slate-700 mb-1">Moves:</div>
+                              <div className="space-y-0.5">
+                                {member.moves.slice(0, 2).map((move, i) => (
+                                  <div key={i} className="text-[8px] text-slate-600 truncate px-1">
+                                    {move}
+                                  </div>
+                                ))}
+                                {member.moves.length > 2 && (
+                                  <div className="text-[8px] text-slate-500 italic px-1">
+                                    +{member.moves.length - 2} more
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           )}
                         </div>
                       </Link>
                     </>
                   ) : (
-                    <div className="text-slate-400 dark:text-slate-500 text-xs text-center">Empty Slot</div>
+                    <div className="flex items-center justify-center h-full min-h-[200px]">
+                      <div className="text-slate-400 text-xs text-center">Empty Slot</div>
+                    </div>
                   )}
                 </div>
               );
@@ -202,6 +316,7 @@ export default function TeamBuilderPage() {
           <TeamMemberEditor
             member={team[editingIndex]}
             moves={moves}
+            items={items}
             onSave={(member) => updateTeamMember(editingIndex, member)}
             onCancel={() => setEditingIndex(null)}
           />
@@ -217,8 +332,8 @@ export default function TeamBuilderPage() {
         )}
 
         {/* Creature Selection */}
-        <div className="bg-white dark:bg-slate-800 rounded-2xl border-2 border-slate-200 dark:border-slate-700 shadow-xl p-6">
-          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-4">Add Creatures to Team</h2>
+        <div className="bg-white rounded-2xl border-2 border-slate-200 shadow-xl p-6">
+          <h2 className="text-xl font-bold text-slate-900 mb-4">Add Creatures to Team</h2>
           
           {/* Search */}
           <div className="relative mb-4">
@@ -230,7 +345,7 @@ export default function TeamBuilderPage() {
             <input
               type="text"
               placeholder="Search creatures..."
-              className="w-full pl-10 pr-4 py-2 border-2 border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+              className="w-full pl-10 pr-4 py-2 border-2 border-slate-300 rounded-lg bg-white text-slate-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -248,13 +363,13 @@ export default function TeamBuilderPage() {
                   disabled={isInTeam || team.length >= MAX_TEAM_SIZE}
                   className={`p-3 border-2 rounded-lg transition-all text-left flex flex-col items-center ${
                     isInTeam
-                      ? 'border-blue-500 dark:border-blue-400 bg-blue-50 dark:bg-blue-900/30 opacity-50 cursor-not-allowed'
+                      ? 'border-blue-500 bg-blue-50 opacity-50 cursor-not-allowed'
                       : team.length >= MAX_TEAM_SIZE
-                      ? 'border-slate-200 dark:border-slate-700 opacity-50 cursor-not-allowed'
-                      : 'border-slate-200 dark:border-slate-700 hover:border-blue-400 dark:hover:border-blue-500 hover:shadow-md dark:bg-slate-700/50'
+                      ? 'border-slate-200 opacity-50 cursor-not-allowed'
+                      : 'border-slate-200 hover:border-blue-400 hover:shadow-md'
                   }`}
                 >
-                  <div className="w-12 h-12 mb-2 bg-white dark:bg-slate-800 rounded-full flex items-center justify-center border-2 border-slate-200 dark:border-slate-600 flex-shrink-0">
+                  <div className="w-12 h-12 mb-2 bg-white rounded-full flex items-center justify-center border-2 border-slate-200 flex-shrink-0">
                     <Image
                       src={getSpritePath(creature.Name, shinyCreatures.has(creature.Name))}
                       alt={creature.Name}
@@ -267,12 +382,12 @@ export default function TeamBuilderPage() {
                   <div className="text-xs font-medium text-slate-600 mb-1">
                     #{String(creature.DexNumber).padStart(3, '0')}
                   </div>
-                  <div className="font-bold text-slate-900 dark:text-slate-100 text-sm mb-1 text-center">{creature.Name}</div>
+                  <div className="font-bold text-slate-900 text-sm mb-1 text-center">{creature.Name}</div>
                   <div className="flex gap-1 flex-wrap justify-center">
                     {creature.Types?.map(t => (
                       <span
                         key={t}
-                        className="text-[8px] px-1 py-0.5 bg-slate-200 dark:bg-slate-600 text-slate-700 dark:text-slate-300 rounded"
+                        className="text-[8px] px-1 py-0.5 bg-slate-200 text-slate-700 rounded"
                       >
                         {t}
                       </span>
@@ -285,9 +400,9 @@ export default function TeamBuilderPage() {
         </div>
 
         {team.length === 0 && (
-          <div className="bg-white dark:bg-slate-800 rounded-2xl border-2 border-slate-200 dark:border-slate-700 shadow-xl p-12 text-center">
-            <p className="text-slate-500 dark:text-slate-400 mb-4">No creatures in team</p>
-            <p className="text-sm text-slate-400 dark:text-slate-500">Search and add creatures above to build your team</p>
+          <div className="bg-white rounded-2xl border-2 border-slate-200 shadow-xl p-12 text-center">
+            <p className="text-slate-500 mb-4">No creatures in team</p>
+            <p className="text-sm text-slate-400">Search and add creatures above to build your team</p>
           </div>
         )}
       </AnimatedDiv>

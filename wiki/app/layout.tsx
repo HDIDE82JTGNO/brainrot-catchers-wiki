@@ -5,7 +5,6 @@ import { FloatingNav } from "@/components/FloatingNav";
 import { ClientPageTransition } from "@/components/ClientPageTransition";
 import { BackgroundEffects } from "@/components/BackgroundEffects";
 import { GlobalSearchWrapper } from "@/components/GlobalSearchWrapper";
-import { ThemeProviderWrapper } from "@/components/ThemeProviderWrapper";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -21,25 +20,23 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${inter.className} bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 min-h-screen flex flex-col relative transition-colors duration-300`}>
-        <ThemeProviderWrapper>
-          <BackgroundEffects />
-          <div className="relative z-20 flex flex-col min-h-screen">
-            <FloatingNav />
-            <div className="fixed top-24 right-4 md:right-8 z-40 hidden md:block">
-              <GlobalSearchWrapper />
-            </div>
-            <main className="flex-grow container mx-auto px-4 pt-24 pb-24 md:pb-8 md:px-6 md:pt-36 lg:px-8 max-w-7xl">
-              <ClientPageTransition>
-                {children}
-              </ClientPageTransition>
-            </main>
-            <footer className="bg-transparent mt-12 py-8 text-center text-white dark:text-slate-300 text-sm">
-              <p>© {new Date().getFullYear()} Brainrot Catchers Wiki. All rights reserved.</p>
-              <p className="mt-2">Made with ❤️ by temp.</p>
-            </footer>
+      <body className={`${inter.className} bg-slate-50 text-slate-900 min-h-screen flex flex-col relative`}>
+        <BackgroundEffects />
+        <div className="relative z-20 flex flex-col min-h-screen">
+          <FloatingNav />
+          <div className="fixed top-24 right-4 md:right-8 z-40 hidden md:block">
+            <GlobalSearchWrapper />
           </div>
-        </ThemeProviderWrapper>
+          <main className="flex-grow container mx-auto px-4 pt-24 pb-24 md:pb-8 md:px-6 md:pt-36 lg:px-8 max-w-7xl">
+            <ClientPageTransition>
+              {children}
+            </ClientPageTransition>
+          </main>
+          <footer className="bg-transparent mt-12 py-8 text-center text-white text-sm">
+            <p>© {new Date().getFullYear()} Brainrot Catchers Wiki. All rights reserved.</p>
+            <p className="mt-2">Made with ❤️ by temp.</p>
+          </footer>
+        </div>
       </body>
     </html>
   );

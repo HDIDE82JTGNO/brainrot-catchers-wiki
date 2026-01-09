@@ -2,7 +2,6 @@
 
 import React from "react";
 import { FloatingDock } from "@/components/ui/floating-dock";
-import { ThemeToggle } from "@/components/ThemeToggle";
 import { motion } from "framer-motion";
 import {
   IconHome,
@@ -118,32 +117,6 @@ export function FloatingNav() {
 
   return (
     <>
-      {/* Theme Toggle - Desktop */}
-      <div className="fixed top-8 right-8 z-50 hidden md:block">
-        <motion.div 
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{
-            duration: 0.6,
-            ease: [0.4, 0, 0.2, 1],
-          }}
-        >
-          <ThemeToggle />
-        </motion.div>
-      </div>
-      {/* Theme Toggle - Mobile */}
-      <div className="fixed top-4 right-4 z-50 md:hidden">
-        <motion.div 
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{
-            duration: 0.6,
-            ease: [0.4, 0, 0.2, 1],
-          }}
-        >
-          <ThemeToggle />
-        </motion.div>
-      </div>
       {/* Desktop navbar with animation */}
       <div className="fixed top-8 left-1/2 transform -translate-x-1/2 z-50 hidden md:block">
         <motion.div 

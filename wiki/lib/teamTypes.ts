@@ -14,6 +14,7 @@ export interface TeamMember extends Creature {
   evs: StatBlock;
   moves: string[];
   level: number;
+  heldItem?: string;
 }
 
 export function createDefaultTeamMember(creature: Creature): TeamMember {
@@ -37,6 +38,7 @@ export function createDefaultTeamMember(creature: Creature): TeamMember {
     },
     moves: [],
     level: 50,
+    heldItem: undefined,
   };
 }
 
