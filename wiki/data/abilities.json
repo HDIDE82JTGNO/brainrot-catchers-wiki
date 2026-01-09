@@ -1,0 +1,482 @@
+[
+  {
+    "Id": "Fireup",
+    "Name": "Fireup",
+    "Description": "Powers up Fire-type moves when HP is low.",
+    "TriggerType": "DamageMultiplier",
+    "TypeBoost": "Fire",
+    "HPThreshold": 33,
+    "Multiplier": 1.5
+  },
+  {
+    "Id": "Blaze",
+    "Name": "Blaze",
+    "Description": "Powers up Fire-type moves when HP is low.",
+    "TriggerType": "DamageMultiplier",
+    "TypeBoost": "Fire",
+    "HPThreshold": 33,
+    "Multiplier": 1.5
+  },
+  {
+    "Id": "Menace",
+    "Name": "Menace",
+    "Description": "Lowers the foe's Attack when entering battle.",
+    "TriggerType": "OnEntry",
+    "Effect": "Intimidate",
+    "StatChange": {
+      "Stat": "Attack",
+      "Stages": -1,
+      "Target": "Foe"
+    }
+  },
+  {
+    "Id": "Intimidate",
+    "Name": "Intimidate",
+    "Description": "Lowers the foe's Attack when entering battle.",
+    "TriggerType": "OnEntry",
+    "Effect": "Intimidate",
+    "StatChange": {
+      "Stat": "Attack",
+      "Stages": -1,
+      "Target": "Foe"
+    }
+  },
+  {
+    "Id": "Solar Wrath",
+    "Name": "Solar Wrath",
+    "Description": "Summons harsh sunlight when entering battle.",
+    "TriggerType": "OnEntry",
+    "Effect": "Sunlight"
+  },
+  {
+    "Id": "Trickster",
+    "Name": "Trickster",
+    "Description": "Gives priority to status moves.",
+    "TriggerType": "PriorityBonus",
+    "Condition": "StatusMove",
+    "Bonus": 1
+  },
+  {
+    "Id": "Wind Wings",
+    "Name": "Wind Wings",
+    "Description": "Gives priority to Flying-type moves.",
+    "TriggerType": "PriorityBonus",
+    "TypeBoost": "Flying",
+    "Bonus": 1
+  },
+  {
+    "Id": "Gale Wings",
+    "Name": "Gale Wings",
+    "Description": "Gives priority to Flying-type moves.",
+    "TriggerType": "PriorityBonus",
+    "TypeBoost": "Flying",
+    "Bonus": 1
+  },
+  {
+    "Id": "Pixelate",
+    "Name": "Pixelate",
+    "Description": "Normal-type moves become Fairy-type and get a power boost.",
+    "TriggerType": "TypeConversion",
+    "FromType": "Normal",
+    "ToType": "Fairy",
+    "DamageBoost": 1.2
+  },
+  {
+    "Id": "Refrigerate",
+    "Name": "Refrigerate",
+    "Description": "Normal-type moves become Ice-type and get a power boost.",
+    "TriggerType": "TypeConversion",
+    "FromType": "Normal",
+    "ToType": "Ice",
+    "DamageBoost": 1.2
+  },
+  {
+    "Id": "Magic Eyes",
+    "Name": "Magic Eyes",
+    "Description": "Normal and Fighting-type moves can hit Ghost-types.",
+    "TriggerType": "ImmunityOverride",
+    "Types": [
+      "Normal",
+      "Fighting"
+    ],
+    "IgnoresImmunity": "Ghost"
+  },
+  {
+    "Id": "Lithe",
+    "Name": "Lithe",
+    "Description": "Prevents paralysis.",
+    "TriggerType": "StatusImmunity",
+    "Immunity": "PAR"
+  },
+  {
+    "Id": "Arcane Veil",
+    "Name": "Arcane Veil",
+    "Description": "Prevents sleep.",
+    "TriggerType": "StatusImmunity",
+    "Immunity": "SLP"
+  },
+  {
+    "Id": "Grass Veil",
+    "Name": "Grass Veil",
+    "Description": "Prevents status conditions in sunlight.",
+    "TriggerType": "StatusImmunity",
+    "Immunity": "All",
+    "WeatherCondition": "Sunlight"
+  },
+  {
+    "Id": "Absolute Focus",
+    "Name": "Absolute Focus",
+    "Description": "Prevents flinching.",
+    "TriggerType": "FlinchImmunity"
+  },
+  {
+    "Id": "Swift Current",
+    "Name": "Swift Current",
+    "Description": "Boosts Speed in rain or when hit by a Water-type move.",
+    "TriggerType": "SpeedModifier",
+    "WeatherCondition": "Rain",
+    "OnHitType": "Water",
+    "StatChange": {
+      "Stat": "Speed",
+      "Stages": 1
+    }
+  },
+  {
+    "Id": "Sand Speed",
+    "Name": "Sand Speed",
+    "Description": "Doubles Speed in a sandstorm.",
+    "TriggerType": "SpeedModifier",
+    "WeatherCondition": "Sandstorm",
+    "SpeedMultiplier": 2
+  },
+  {
+    "Id": "Steadfast",
+    "Name": "Steadfast",
+    "Description": "Boosts Speed when flinched.",
+    "TriggerType": "OnFlinch",
+    "StatChange": {
+      "Stat": "Speed",
+      "Stages": 1
+    }
+  },
+  {
+    "Id": "Steadspeed",
+    "Name": "Steadspeed",
+    "Description": "Gradually boosts Speed over time.",
+    "TriggerType": "EndOfTurn",
+    "StatChange": {
+      "Stat": "Speed",
+      "Stages": 1
+    },
+    "Chance": 30
+  },
+  {
+    "Id": "Scrapper",
+    "Name": "Scrapper",
+    "Description": "Powers up Normal-type moves.",
+    "TriggerType": "DamageMultiplier",
+    "TypeBoost": "Normal",
+    "Multiplier": 1.2
+  },
+  {
+    "Id": "Fairy Sense",
+    "Name": "Fairy Sense",
+    "Description": "Powers up Fairy-type moves.",
+    "TriggerType": "DamageMultiplier",
+    "TypeBoost": "Fairy",
+    "Multiplier": 1.2
+  },
+  {
+    "Id": "Sharp Fins",
+    "Name": "Sharp Fins",
+    "Description": "Powers up Water-type moves.",
+    "TriggerType": "DamageMultiplier",
+    "TypeBoost": "Water",
+    "Multiplier": 1.5
+  },
+  {
+    "Id": "Steel Jaw",
+    "Name": "Steel Jaw",
+    "Description": "Powers up biting moves.",
+    "TriggerType": "DamageMultiplier",
+    "MoveFlag": "Bite",
+    "Multiplier": 1.5
+  },
+  {
+    "Id": "Big Beaks",
+    "Name": "Big Beaks",
+    "Description": "Powers up pecking moves.",
+    "TriggerType": "DamageMultiplier",
+    "MoveFlag": "Peck",
+    "Multiplier": 1.3
+  },
+  {
+    "Id": "Permeate",
+    "Name": "Permeate",
+    "Description": "Powers up Grass-type moves when HP is low.",
+    "TriggerType": "DamageMultiplier",
+    "TypeBoost": "Grass",
+    "HPThreshold": 25,
+    "Multiplier": 1.5
+  },
+  {
+    "Id": "Thickness",
+    "Name": "Thickness",
+    "Description": "Reduces damage from Fire and Ice-type moves.",
+    "TriggerType": "DamageReduction",
+    "Types": [
+      "Fire",
+      "Ice"
+    ],
+    "Multiplier": 0.5
+  },
+  {
+    "Id": "Metallic Glide",
+    "Name": "Metallic Glide",
+    "Description": "Reduces physical damage taken.",
+    "TriggerType": "DamageReduction",
+    "Category": "Physical",
+    "Multiplier": 0.8
+  },
+  {
+    "Id": "Needle Guard",
+    "Name": "Needle Guard",
+    "Description": "Damages attackers that make contact.",
+    "TriggerType": "OnContact",
+    "DamagePercent": 12.5
+  },
+  {
+    "Id": "Corrosive Skin",
+    "Name": "Corrosive Skin",
+    "Description": "May poison attackers that make contact.",
+    "TriggerType": "OnContact",
+    "StatusEffect": "PSN",
+    "Chance": 30
+  },
+  {
+    "Id": "Sap Siphon",
+    "Name": "Sap Siphon",
+    "Description": "Absorbs Grass-type moves to restore HP.",
+    "TriggerType": "TypeAbsorption",
+    "AbsorbType": "Grass",
+    "HealPercent": 25
+  },
+  {
+    "Id": "Water Press",
+    "Name": "Water Press",
+    "Description": "Absorbs Water-type moves to boost Attack.",
+    "TriggerType": "TypeAbsorption",
+    "AbsorbType": "Water",
+    "StatChange": {
+      "Stat": "Attack",
+      "Stages": 1
+    }
+  },
+  {
+    "Id": "Hard Head",
+    "Name": "Hard Head",
+    "Description": "Prevents recoil damage.",
+    "TriggerType": "RecoilImmunity"
+  },
+  {
+    "Id": "Run Away",
+    "Name": "Run Away",
+    "Description": "Guarantees escape from wild battles.",
+    "TriggerType": "GuaranteedEscape"
+  },
+  {
+    "Id": "Elastic Trap",
+    "Name": "Elastic Trap",
+    "Description": "Prevents the foe from escaping.",
+    "TriggerType": "TrapOpponent"
+  },
+  {
+    "Id": "Bubble Trap",
+    "Name": "Bubble Trap",
+    "Description": "Prevents the foe from escaping.",
+    "TriggerType": "TrapOpponent"
+  },
+  {
+    "Id": "Sticky Goo",
+    "Name": "Sticky Goo",
+    "Description": "Prevents the foe from escaping and may slow them.",
+    "TriggerType": "TrapOpponent",
+    "SpeedDrop": true
+  },
+  {
+    "Id": "Great Fortune",
+    "Name": "Great Fortune",
+    "Description": "Boosts critical hit ratio.",
+    "TriggerType": "CritBonus",
+    "Stages": 1
+  },
+  {
+    "Id": "Spy Lens",
+    "Name": "Spy Lens",
+    "Description": "Boosts critical hit ratio after the foe attacks.",
+    "TriggerType": "CritBonus",
+    "Condition": "AfterFoeMove",
+    "Stages": 1
+  },
+  {
+    "Id": "Recon Flight",
+    "Name": "Recon Flight",
+    "Description": "Moves never miss.",
+    "TriggerType": "AccuracyBypass"
+  },
+  {
+    "Id": "Stealth Feathers",
+    "Name": "Stealth Feathers",
+    "Description": "Boosts evasion.",
+    "TriggerType": "EvasionBoost",
+    "Stages": 1
+  },
+  {
+    "Id": "Sun Bounty",
+    "Name": "Sun Bounty",
+    "Description": "Doubles Speed in sunlight.",
+    "TriggerType": "SpeedModifier",
+    "WeatherCondition": "Sunlight",
+    "SpeedMultiplier": 2
+  },
+  {
+    "Id": "Desert Reservoir",
+    "Name": "Desert Reservoir",
+    "Description": "Recovers HP in sunlight.",
+    "TriggerType": "WeatherHeal",
+    "WeatherCondition": "Sunlight",
+    "HealPercent": 6.25
+  },
+  {
+    "Id": "Synchronize",
+    "Name": "Synchronize",
+    "Description": "Passes status conditions to the attacker.",
+    "TriggerType": "OnStatus",
+    "Effect": "PassToAttacker"
+  },
+  {
+    "Id": "Magic Mirror",
+    "Name": "Magic Mirror",
+    "Description": "Reflects status moves back at the attacker.",
+    "TriggerType": "OnStatusMove",
+    "Effect": "Reflect"
+  },
+  {
+    "Id": "Matrix Breaker",
+    "Name": "Matrix Breaker",
+    "Description": "Ignores the foe's ability.",
+    "TriggerType": "AbilityBypass"
+  },
+  {
+    "Id": "Amphibious",
+    "Name": "Amphibious",
+    "Description": "Immune to Water-type moves.",
+    "TriggerType": "TypeImmunity",
+    "ImmuneType": "Water"
+  },
+  {
+    "Id": "Seed Shield",
+    "Name": "Seed Shield",
+    "Description": "Reduces damage from Grass-type moves.",
+    "TriggerType": "DamageReduction",
+    "Types": [
+      "Grass"
+    ],
+    "Multiplier": 0.5
+  },
+  {
+    "Id": "Sludge Shield",
+    "Name": "Sludge Shield",
+    "Description": "Reduces damage from Poison-type moves and prevents poisoning.",
+    "TriggerType": "DamageReduction",
+    "Types": [
+      "Poison"
+    ],
+    "Multiplier": 0.5,
+    "StatusImmunity": "PSN"
+  },
+  {
+    "Id": "Jetstream",
+    "Name": "Jetstream",
+    "Description": "Boosts Speed when using Flying-type moves.",
+    "TriggerType": "OnMoveUse",
+    "TypeCondition": "Flying",
+    "StatChange": {
+      "Stat": "Speed",
+      "Stages": 1
+    }
+  },
+  {
+    "Id": "Overdrive",
+    "Name": "Overdrive",
+    "Description": "Greatly boosts Attack when HP is low, but takes recoil.",
+    "TriggerType": "DamageMultiplier",
+    "HPThreshold": 25,
+    "Multiplier": 2,
+    "TakesRecoil": true
+  },
+  {
+    "Id": "Triple Kick",
+    "Name": "Triple Kick",
+    "Description": "Multi-hit moves are more likely to hit maximum times.",
+    "TriggerType": "MultiHitBonus"
+  },
+  {
+    "Id": "Drumming Beat",
+    "Name": "Drumming Beat",
+    "Description": "Sound-based moves are powered up.",
+    "TriggerType": "DamageMultiplier",
+    "MoveFlag": "Sound",
+    "Multiplier": 1.3
+  },
+  {
+    "Id": "Stubborn Waddle",
+    "Name": "Stubborn Waddle",
+    "Description": "Cannot be forced to switch out.",
+    "TriggerType": "SwitchImmunity"
+  },
+  {
+    "Id": "Mudslide",
+    "Name": "Mudslide",
+    "Description": "Ground-type moves get a power boost.",
+    "TriggerType": "DamageMultiplier",
+    "TypeBoost": "Ground",
+    "Multiplier": 1.3
+  },
+  {
+    "Id": "Waddle Stomp",
+    "Name": "Waddle Stomp",
+    "Description": "Contact moves may cause the foe to flinch.",
+    "TriggerType": "OnContactAttack",
+    "Effect": "Flinch",
+    "Chance": 10
+  },
+  {
+    "Id": "Sand Cover",
+    "Name": "Sand Cover",
+    "Description": "Boosts evasion in a sandstorm.",
+    "TriggerType": "EvasionBoost",
+    "WeatherCondition": "Sandstorm",
+    "Stages": 1
+  },
+  {
+    "Id": "Dispirit",
+    "Name": "Dispirit",
+    "Description": "Lowers the foe's Attack when entering battle.",
+    "TriggerType": "OnEntry",
+    "Effect": "Intimidate",
+    "StatChange": {
+      "Stat": "Attack",
+      "Stages": -1,
+      "Target": "Foe"
+    }
+  },
+  {
+    "Id": "Ball Room",
+    "Name": "Ball Room",
+    "Description": "Powers up ally Fairy-type moves.",
+    "TriggerType": "AllyBoost",
+    "TypeBoost": "Fairy",
+    "Multiplier": 1.3
+  }
+]

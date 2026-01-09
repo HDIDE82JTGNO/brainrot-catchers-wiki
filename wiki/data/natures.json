@@ -1,0 +1,202 @@
+[
+  {
+    "Name": "Hardy",
+    "Increases": "None",
+    "Decreases": "None",
+    "IncreaseKey": "None",
+    "DecreaseKey": "None",
+    "IsNeutral": true
+  },
+  {
+    "Name": "Lonely",
+    "Increases": "Attack",
+    "Decreases": "Defense",
+    "IncreaseKey": "Atk",
+    "DecreaseKey": "Def",
+    "IsNeutral": false
+  },
+  {
+    "Name": "Brave",
+    "Increases": "Attack",
+    "Decreases": "Speed",
+    "IncreaseKey": "Atk",
+    "DecreaseKey": "Spe",
+    "IsNeutral": false
+  },
+  {
+    "Name": "Adamant",
+    "Increases": "Attack",
+    "Decreases": "SpecialAttack",
+    "IncreaseKey": "Atk",
+    "DecreaseKey": "SpA",
+    "IsNeutral": false
+  },
+  {
+    "Name": "Naughty",
+    "Increases": "Attack",
+    "Decreases": "SpecialDefense",
+    "IncreaseKey": "Atk",
+    "DecreaseKey": "SpD",
+    "IsNeutral": false
+  },
+  {
+    "Name": "Bold",
+    "Increases": "Defense",
+    "Decreases": "Attack",
+    "IncreaseKey": "Def",
+    "DecreaseKey": "Atk",
+    "IsNeutral": false
+  },
+  {
+    "Name": "Docile",
+    "Increases": "None",
+    "Decreases": "None",
+    "IncreaseKey": "None",
+    "DecreaseKey": "None",
+    "IsNeutral": true
+  },
+  {
+    "Name": "Relaxed",
+    "Increases": "Defense",
+    "Decreases": "Speed",
+    "IncreaseKey": "Def",
+    "DecreaseKey": "Spe",
+    "IsNeutral": false
+  },
+  {
+    "Name": "Impish",
+    "Increases": "Defense",
+    "Decreases": "SpecialAttack",
+    "IncreaseKey": "Def",
+    "DecreaseKey": "SpA",
+    "IsNeutral": false
+  },
+  {
+    "Name": "Lax",
+    "Increases": "Defense",
+    "Decreases": "SpecialDefense",
+    "IncreaseKey": "Def",
+    "DecreaseKey": "SpD",
+    "IsNeutral": false
+  },
+  {
+    "Name": "Timid",
+    "Increases": "Speed",
+    "Decreases": "Attack",
+    "IncreaseKey": "Spe",
+    "DecreaseKey": "Atk",
+    "IsNeutral": false
+  },
+  {
+    "Name": "Hasty",
+    "Increases": "Speed",
+    "Decreases": "Defense",
+    "IncreaseKey": "Spe",
+    "DecreaseKey": "Def",
+    "IsNeutral": false
+  },
+  {
+    "Name": "Serious",
+    "Increases": "None",
+    "Decreases": "None",
+    "IncreaseKey": "None",
+    "DecreaseKey": "None",
+    "IsNeutral": true
+  },
+  {
+    "Name": "Jolly",
+    "Increases": "Speed",
+    "Decreases": "SpecialAttack",
+    "IncreaseKey": "Spe",
+    "DecreaseKey": "SpA",
+    "IsNeutral": false
+  },
+  {
+    "Name": "Naive",
+    "Increases": "Speed",
+    "Decreases": "SpecialDefense",
+    "IncreaseKey": "Spe",
+    "DecreaseKey": "SpD",
+    "IsNeutral": false
+  },
+  {
+    "Name": "Modest",
+    "Increases": "SpecialAttack",
+    "Decreases": "Attack",
+    "IncreaseKey": "SpA",
+    "DecreaseKey": "Atk",
+    "IsNeutral": false
+  },
+  {
+    "Name": "Mild",
+    "Increases": "SpecialAttack",
+    "Decreases": "Defense",
+    "IncreaseKey": "SpA",
+    "DecreaseKey": "Def",
+    "IsNeutral": false
+  },
+  {
+    "Name": "Quiet",
+    "Increases": "SpecialAttack",
+    "Decreases": "Speed",
+    "IncreaseKey": "SpA",
+    "DecreaseKey": "Spe",
+    "IsNeutral": false
+  },
+  {
+    "Name": "Bashful",
+    "Increases": "None",
+    "Decreases": "None",
+    "IncreaseKey": "None",
+    "DecreaseKey": "None",
+    "IsNeutral": true
+  },
+  {
+    "Name": "Rash",
+    "Increases": "SpecialAttack",
+    "Decreases": "SpecialDefense",
+    "IncreaseKey": "SpA",
+    "DecreaseKey": "SpD",
+    "IsNeutral": false
+  },
+  {
+    "Name": "Calm",
+    "Increases": "SpecialDefense",
+    "Decreases": "Attack",
+    "IncreaseKey": "SpD",
+    "DecreaseKey": "Atk",
+    "IsNeutral": false
+  },
+  {
+    "Name": "Gentle",
+    "Increases": "SpecialDefense",
+    "Decreases": "Defense",
+    "IncreaseKey": "SpD",
+    "DecreaseKey": "Def",
+    "IsNeutral": false
+  },
+  {
+    "Name": "Sassy",
+    "Increases": "SpecialDefense",
+    "Decreases": "Speed",
+    "IncreaseKey": "SpD",
+    "DecreaseKey": "Spe",
+    "IsNeutral": false
+  },
+  {
+    "Name": "Careful",
+    "Increases": "SpecialDefense",
+    "Decreases": "SpecialAttack",
+    "IncreaseKey": "SpD",
+    "DecreaseKey": "SpA",
+    "IsNeutral": false
+  },
+  {
+    "Name": "Quirky",
+    "Increases": "None",
+    "Decreases": "None",
+    "IncreaseKey": "None",
+    "DecreaseKey": "None",
+    "IsNeutral": true
+  }
+]

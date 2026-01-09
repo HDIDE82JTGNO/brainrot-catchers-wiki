@@ -1,0 +1,604 @@
+[
+  {
+    "Id": "Apple",
+    "Slug": "apple",
+    "Name": "Apple",
+    "Stats": {
+      "HP": 35,
+      "Attack": 0,
+      "Defense": 0,
+      "Speed": 0
+    },
+    "Description": "A crispy red apple that boosts your creature's HP by 35 percent.",
+    "Category": "Heals",
+    "UsableInBattle": true,
+    "UsableInOverworld": true,
+    "Image": "rbxassetid://89580074029562"
+  },
+  {
+    "Id": "Potion",
+    "Slug": "potion",
+    "Name": "Potion",
+    "Stats": {
+      "HP": 25,
+      "Attack": 0,
+      "Defense": 0,
+      "Speed": 0
+    },
+    "Description": "A potion that boosts your creature's HP by 25 percent.",
+    "Category": "Heals",
+    "UsableInBattle": true,
+    "UsableInOverworld": true,
+    "Image": "rbxassetid://113507846322926"
+  },
+  {
+    "Id": "Epic Potion",
+    "Slug": "epic-potion",
+    "Name": "Epic Potion",
+    "Stats": {
+      "HP": 50,
+      "Attack": 0,
+      "Defense": 0,
+      "Speed": 0
+    },
+    "Description": "A high-quality potion that restores 50 percent HP.",
+    "Category": "Heals",
+    "UsableInBattle": true,
+    "UsableInOverworld": true,
+    "Image": "rbxassetid://105838711562581"
+  },
+  {
+    "Id": "Maximum Potion",
+    "Slug": "maximum-potion",
+    "Name": "Maximum Potion",
+    "Stats": {
+      "HP": 100,
+      "Attack": 0,
+      "Defense": 0,
+      "Speed": 0
+    },
+    "Description": "A top-tier potion that restores 100 percent HP.",
+    "Category": "Heals",
+    "UsableInBattle": true,
+    "UsableInOverworld": true,
+    "Image": "rbxassetid://118496899872192"
+  },
+  {
+    "Id": "Revive",
+    "Slug": "revive",
+    "Name": "Revive",
+    "Stats": {
+      "HP": 0,
+      "Attack": 0,
+      "Defense": 0,
+      "Speed": 0
+    },
+    "Description": "Revives your creature, restoring 50% of total HP.",
+    "Category": "Heals",
+    "UsableInBattle": true,
+    "UsableInOverworld": true,
+    "Image": "rbxassetid://134114221174913"
+  },
+  {
+    "Id": "Maximum Revive",
+    "Slug": "maximum-revive",
+    "Name": "Maximum Revive",
+    "Stats": {
+      "HP": 0,
+      "Attack": 0,
+      "Defense": 0,
+      "Speed": 0
+    },
+    "Description": "Revives your creature, restoring 100% of total HP.",
+    "Category": "Heals",
+    "UsableInBattle": true,
+    "UsableInOverworld": true,
+    "Image": "rbxassetid://132224763853286"
+  },
+  {
+    "Id": "Toxic Candy",
+    "Slug": "toxic-candy",
+    "Name": "Toxic Candy",
+    "Stats": {
+      "HP": -10,
+      "Attack": 25,
+      "Defense": 0,
+      "Speed": 10
+    },
+    "Description": "Raises Attack and Speed but slightly harms HP. Risky but powerful.",
+    "Category": "Heals",
+    "UsableInBattle": true,
+    "UsableInOverworld": true,
+    "Image": "rbxassetid://104789865067236"
+  },
+  {
+    "Id": "Golden Apple",
+    "Slug": "golden-apple",
+    "Name": "Golden Apple",
+    "Stats": {
+      "HP": 100,
+      "Attack": 0,
+      "Defense": 0,
+      "Speed": 0
+    },
+    "Description": "A mythical fruit that fully restores HP and cleanses all status effects.",
+    "Category": "Heals",
+    "UsableInBattle": true,
+    "UsableInOverworld": true,
+    "Image": "rbxassetid://101214224866598"
+  },
+  {
+    "Id": "Capture Cube",
+    "Slug": "capture-cube",
+    "Name": "Capture Cube",
+    "Stats": {
+      "HP": 0,
+      "Attack": 0,
+      "Defense": 0,
+      "Speed": 0
+    },
+    "Description": "The best invention of the century, use it to capture creatures!",
+    "Category": "CaptureCubes",
+    "UsableInBattle": true,
+    "UsableInOverworld": false,
+    "Image": "rbxassetid://78797852452861"
+  },
+  {
+    "Id": "Premium Cube",
+    "Slug": "premium-cube",
+    "Name": "Premium Cube",
+    "Stats": {
+      "HP": 0,
+      "Attack": 0,
+      "Defense": 0,
+      "Speed": 0
+    },
+    "Description": "A more expensive capture cube that has a higher success rate.",
+    "Category": "CaptureCubes",
+    "UsableInBattle": true,
+    "UsableInOverworld": false,
+    "Image": "rbxassetid://78797852452861"
+  },
+  {
+    "Id": "Excellence Cube",
+    "Slug": "excellence-cube",
+    "Name": "Excellence Cube",
+    "Stats": {
+      "HP": 0,
+      "Attack": 0,
+      "Defense": 0,
+      "Speed": 0
+    },
+    "Description": "A very expensive capture cube that has a very high success rate.",
+    "Category": "CaptureCubes",
+    "UsableInBattle": true,
+    "UsableInOverworld": false,
+    "Image": "rbxassetid://78797852452861"
+  },
+  {
+    "Id": "Rot Cube",
+    "Slug": "rot-cube",
+    "Name": "Rot Cube",
+    "Stats": {
+      "HP": 0,
+      "Attack": 0,
+      "Defense": 0,
+      "Speed": 0
+    },
+    "Description": "Infused with chaotic energy. Said to have the highest success rate out of any cubes.",
+    "Category": "CaptureCubes",
+    "UsableInBattle": true,
+    "UsableInOverworld": false
+  },
+  {
+    "Id": "Glitch Cube",
+    "Slug": "glitch-cube",
+    "Name": "Glitch Cube",
+    "Stats": {
+      "HP": 0,
+      "Attack": 0,
+      "Defense": 0,
+      "Speed": 0
+    },
+    "Description": "A strange unstable cube. Has a very small chance to duplicate the captured creature... or fail completely.",
+    "Category": "CaptureCubes",
+    "UsableInBattle": true,
+    "UsableInOverworld": false
+  },
+  {
+    "Id": "Rapid Cube",
+    "Slug": "rapid-cube",
+    "Name": "Rapid Cube",
+    "Stats": {
+      "HP": 0,
+      "Attack": 0,
+      "Defense": 0,
+      "Speed": 0
+    },
+    "Description": "When used on the first turn of a battle, it has a higher success rate.",
+    "Category": "CaptureCubes",
+    "UsableInBattle": true,
+    "UsableInOverworld": false
+  },
+  {
+    "Id": "Metal Fist",
+    "Slug": "metal-fist",
+    "Name": "Metal Fist",
+    "Stats": {
+      "HP": 0,
+      "Attack": 0,
+      "Defense": 0,
+      "Speed": 0
+    },
+    "Description": "Boosts Steel-type moves when held by a Fighting-type creature.",
+    "Category": "Items",
+    "UsableInBattle": false,
+    "UsableInOverworld": false,
+    "Image": "rbxassetid://123491437551514"
+  },
+  {
+    "Id": "Fairy Dust",
+    "Slug": "fairy-dust",
+    "Name": "Fairy Dust",
+    "Stats": {
+      "HP": 0,
+      "Attack": 0,
+      "Defense": 0,
+      "Speed": 0
+    },
+    "Description": "Boosts Fairy-type moves.",
+    "Category": "Items",
+    "UsableInBattle": false,
+    "UsableInOverworld": false,
+    "Image": "rbxassetid://84406508756109"
+  },
+  {
+    "Id": "Static Chip",
+    "Slug": "static-chip",
+    "Name": "Static Chip",
+    "Stats": {
+      "HP": 0,
+      "Attack": 0,
+      "Defense": 0,
+      "Speed": 0
+    },
+    "Description": "Boosts Electric-type moves slightly.",
+    "Category": "Items",
+    "UsableInBattle": false,
+    "UsableInOverworld": false
+  },
+  {
+    "Id": "Spike Band",
+    "Slug": "spike-band",
+    "Name": "Spike Band",
+    "Stats": {
+      "HP": 0,
+      "Attack": 10,
+      "Defense": -5,
+      "Speed": 0
+    },
+    "Description": "Boosts Attack but slightly lowers Defense.",
+    "Category": "Items",
+    "UsableInBattle": false,
+    "UsableInOverworld": false,
+    "Image": "rbxassetid://127002348069157"
+  },
+  {
+    "Id": "Rage Core",
+    "Slug": "rage-core",
+    "Name": "Rage Core",
+    "Stats": {
+      "HP": 0,
+      "Attack": 25,
+      "Defense": -10,
+      "Speed": 5
+    },
+    "Description": "Raises Attack sharply when HP drops below 25%.",
+    "Category": "Items",
+    "UsableInBattle": false,
+    "UsableInOverworld": false,
+    "Image": "rbxassetid://102157045676821"
+  },
+  {
+    "Id": "Crumbs",
+    "Slug": "crumbs",
+    "Name": "Crumbs",
+    "Stats": {
+      "HP": 0,
+      "Attack": 0,
+      "Defense": 0,
+      "Speed": 0
+    },
+    "Description": "Heals the creature at the end of every turn by 1/16th of its HP.",
+    "Category": "Items",
+    "UsableInBattle": false,
+    "UsableInOverworld": false,
+    "Image": "rbxassetid://101218544460247"
+  },
+  {
+    "Id": "Echo Bell",
+    "Slug": "echo-bell",
+    "Name": "Echo Bell",
+    "Stats": {
+      "HP": 0,
+      "Attack": 0,
+      "Defense": 0,
+      "Speed": 0
+    },
+    "Description": "When held, slightly heals the creature when it deals damage.",
+    "Category": "Items",
+    "UsableInBattle": false,
+    "UsableInOverworld": false,
+    "Image": "rbxassetid://105427967462490"
+  },
+  {
+    "Id": "Focus Bandage",
+    "Slug": "focus-bandage",
+    "Name": "Focus Bandage",
+    "Stats": {
+      "HP": 0,
+      "Attack": 0,
+      "Defense": 0,
+      "Speed": 0
+    },
+    "Description": "A mysterious cloth that sometimes allows the holder to endure a fatal hit with 1 HP remaining.",
+    "Category": "Items",
+    "UsableInBattle": false,
+    "UsableInOverworld": false,
+    "Image": "rbxassetid://77092682172457"
+  },
+  {
+    "Id": "Stone Armor",
+    "Slug": "stone-armor",
+    "Name": "Stone Armor",
+    "Stats": {
+      "HP": 0,
+      "Attack": 0,
+      "Defense": 20,
+      "Speed": -10
+    },
+    "Description": "Increases Defense but reduces Speed. Good for tanky creatures.",
+    "Category": "Items",
+    "UsableInBattle": false,
+    "UsableInOverworld": false
+  },
+  {
+    "Id": "Sleep Mask",
+    "Slug": "sleep-mask",
+    "Name": "Sleep Mask",
+    "Stats": {
+      "HP": 0,
+      "Attack": 0,
+      "Defense": 0,
+      "Speed": 0
+    },
+    "Description": "Prevents the holder from falling asleep during battle.",
+    "Category": "Items",
+    "UsableInBattle": false,
+    "UsableInOverworld": false,
+    "Image": "rbxassetid://103377350545351"
+  },
+  {
+    "Id": "Bright Core",
+    "Slug": "bright-core",
+    "Name": "Bright Core",
+    "Stats": {
+      "HP": 0,
+      "Attack": 0,
+      "Defense": 0,
+      "Speed": 0
+    },
+    "Description": "When held, slightly increases accuracy of all moves.",
+    "Category": "Items",
+    "UsableInBattle": false,
+    "UsableInOverworld": false,
+    "Image": "rbxassetid://82882248622375"
+  },
+  {
+    "Id": "Inferno Seed",
+    "Slug": "inferno-seed",
+    "Name": "Inferno Seed",
+    "Stats": {
+      "HP": 0,
+      "Attack": 0,
+      "Defense": 0,
+      "Speed": 0
+    },
+    "Description": "Used to evolve certain Fire-type creatures.",
+    "Category": "Items",
+    "UsableInBattle": false,
+    "UsableInOverworld": false
+  },
+  {
+    "Id": "Tore Stone",
+    "Slug": "tore-stone",
+    "Name": "Tore Stone",
+    "Stats": {
+      "HP": 0,
+      "Attack": 0,
+      "Defense": 0,
+      "Speed": 0
+    },
+    "Description": "When held by a beaked creature, it is said to trigger a mystical event.",
+    "Category": "Items",
+    "UsableInBattle": false,
+    "UsableInOverworld": false,
+    "Image": "rbxassetid://86893072345080"
+  },
+  {
+    "Id": "Focus Spray",
+    "Slug": "focus-spray",
+    "Name": "Focus Spray",
+    "Stats": {
+      "HP": 0,
+      "Attack": 0,
+      "Defense": 0,
+      "Speed": 0
+    },
+    "Description": "Keeps wild encounters away for a short time.",
+    "Category": "Items",
+    "UsableInBattle": false,
+    "UsableInOverworld": true,
+    "Image": "rbxassetid://90607842337478"
+  },
+  {
+    "Id": "Super Focus Spray",
+    "Slug": "super-focus-spray",
+    "Name": "Super Focus Spray",
+    "Stats": {
+      "HP": 0,
+      "Attack": 0,
+      "Defense": 0,
+      "Speed": 0
+    },
+    "Description": "A stronger spray that lasts longer.",
+    "Category": "Items",
+    "UsableInBattle": false,
+    "UsableInOverworld": true,
+    "Image": "rbxassetid://87726456247355"
+  },
+  {
+    "Id": "Max Focus Spray",
+    "Slug": "max-focus-spray",
+    "Name": "Max Focus Spray",
+    "Stats": {
+      "HP": 0,
+      "Attack": 0,
+      "Defense": 0,
+      "Speed": 0
+    },
+    "Description": "The longest-lasting Focus Spray.",
+    "Category": "Items",
+    "UsableInBattle": false,
+    "UsableInOverworld": true,
+    "Image": "rbxassetid://119631326721437"
+  },
+  {
+    "Id": "ML - Tackle",
+    "Slug": "ml-tackle",
+    "Name": "ML - Tackle",
+    "Stats": {
+      "HP": 0,
+      "Attack": 0,
+      "Defense": 0,
+      "Speed": 0
+    },
+    "Description": "Teaches Tackle to a creature.",
+    "Category": "MoveLearners",
+    "UsableInBattle": false,
+    "UsableInOverworld": true,
+    "Image": "rbxassetid://131215110444098"
+  },
+  {
+    "Id": "ML - Scratch",
+    "Slug": "ml-scratch",
+    "Name": "ML - Scratch",
+    "Stats": {
+      "HP": 0,
+      "Attack": 0,
+      "Defense": 0,
+      "Speed": 0
+    },
+    "Description": "Teaches Scratch to a creature.",
+    "Category": "MoveLearners",
+    "UsableInBattle": false,
+    "UsableInOverworld": true,
+    "Image": "rbxassetid://131215110444098"
+  },
+  {
+    "Id": "ML - Bite",
+    "Slug": "ml-bite",
+    "Name": "ML - Bite",
+    "Stats": {
+      "HP": 0,
+      "Attack": 0,
+      "Defense": 0,
+      "Speed": 0
+    },
+    "Description": "Teaches Bite to a creature.",
+    "Category": "MoveLearners",
+    "UsableInBattle": false,
+    "UsableInOverworld": true,
+    "Image": "rbxassetid://131215110444098"
+  },
+  {
+    "Id": "ML - Crunch",
+    "Slug": "ml-crunch",
+    "Name": "ML - Crunch",
+    "Stats": {
+      "HP": 0,
+      "Attack": 0,
+      "Defense": 0,
+      "Speed": 0
+    },
+    "Description": "Teaches Crunch to a creature.",
+    "Category": "MoveLearners",
+    "UsableInBattle": false,
+    "UsableInOverworld": true,
+    "Image": "rbxassetid://131215110444098"
+  },
+  {
+    "Id": "ML - Earthquake",
+    "Slug": "ml-earthquake",
+    "Name": "ML - Earthquake",
+    "Stats": {
+      "HP": 0,
+      "Attack": 0,
+      "Defense": 0,
+      "Speed": 0
+    },
+    "Description": "Teaches Earthquake to a creature.",
+    "Category": "MoveLearners",
+    "UsableInBattle": false,
+    "UsableInOverworld": true,
+    "Image": "rbxassetid://131215110444098"
+  },
+  {
+    "Id": "ML - Fast Attack",
+    "Slug": "ml-fast-attack",
+    "Name": "ML - Fast Attack",
+    "Stats": {
+      "HP": 0,
+      "Attack": 0,
+      "Defense": 0,
+      "Speed": 0
+    },
+    "Description": "Teaches Fast Attack to a creature.",
+    "Category": "MoveLearners",
+    "UsableInBattle": false,
+    "UsableInOverworld": true,
+    "Image": "rbxassetid://131215110444098"
+  },
+  {
+    "Id": "ML - Double-Edge",
+    "Slug": "ml-double-edge",
+    "Name": "ML - Double-Edge",
+    "Stats": {
+      "HP": 0,
+      "Attack": 0,
+      "Defense": 0,
+      "Speed": 0
+    },
+    "Description": "Teaches Double-Edge to a creature.",
+    "Category": "MoveLearners",
+    "UsableInBattle": false,
+    "UsableInOverworld": true,
+    "Image": "rbxassetid://131215110444098"
+  },
+  {
+    "Id": "ML - Flare Blitz",
+    "Slug": "ml-flare-blitz",
+    "Name": "ML - Flare Blitz",
+    "Stats": {
+      "HP": 0,
+      "Attack": 0,
+      "Defense": 0,
+      "Speed": 0
+    },
+    "Description": "Teaches Flare Blitz to a creature.",
+    "Category": "MoveLearners",
+    "UsableInBattle": false,
+    "UsableInOverworld": true,
+    "Image": "rbxassetid://131215110444098"
+  }
+]

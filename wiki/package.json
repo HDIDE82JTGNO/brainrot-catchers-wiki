@@ -1,0 +1,41 @@
+{
+  "name": "wiki",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "npm run extract && next build",
+    "start": "next start",
+    "lint": "eslint",
+    "extract": "tsx scripts/extract.ts",
+    "sync-game-data": "cp ../src/ReplicatedStorage/Shared/Creatures.lua wiki/game-data/ReplicatedStorage/Shared/ && cp ../src/ReplicatedStorage/Shared/Items.lua wiki/game-data/ReplicatedStorage/Shared/ && cp ../src/ReplicatedStorage/Shared/Moves.lua wiki/game-data/ReplicatedStorage/Shared/ && cp ../src/ReplicatedStorage/Shared/TypeChart.lua wiki/game-data/ReplicatedStorage/Shared/ && cp ../src/ReplicatedStorage/Shared/Abilities.lua wiki/game-data/ReplicatedStorage/Shared/ && cp ../src/ReplicatedStorage/Shared/SpeciesAbilities.lua wiki/game-data/ReplicatedStorage/Shared/ && cp ../src/ServerScriptService/Server/GameData/ChunkList.lua wiki/game-data/ServerScriptService/Server/GameData/"
+  },
+  "dependencies": {
+    "@react-spring/web": "^9.7.3",
+    "@tabler/icons-react": "^3.36.1",
+    "@types/three": "^0.182.0",
+    "@use-gesture/react": "^10.3.1",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "gsap": "^3.14.2",
+    "motion": "^12.25.0",
+    "next": "16.1.1",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "tailwind-merge": "^3.4.0",
+    "three": "^0.182.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20.19.27",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.1.1",
+    "luaparse": "^0.3.1",
+    "sharp": "^0.34.5",
+    "tailwindcss": "^4",
+    "tsx": "^4.21.0",
+    "typescript": "^5"
+  }
+}

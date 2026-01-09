@@ -1,0 +1,5153 @@
+[
+  {
+    "Id": "Kitung",
+    "Slug": "kitung",
+    "DexNumber": 1,
+    "Name": "Kitung",
+    "Sprite": "rbxassetid://122057835034579",
+    "ShinySprite": "rbxassetid://130838050112224",
+    "Description": "A small enthusiastic fighter with a wooden stick. Its determination far exceeds its tiny frame.",
+    "Types": [
+      "Fighting"
+    ],
+    "BaseStats": {
+      "HP": 45,
+      "Attack": 60,
+      "Defense": 40,
+      "SpecialAttack": 35,
+      "SpecialDefense": 40,
+      "Speed": 65
+    },
+    "Learnset": {
+      "1": [
+        "Scratch",
+        "Tackle"
+      ],
+      "5": [
+        "Double Kick"
+      ],
+      "9": [
+        "Fast Attack"
+      ],
+      "14": [
+        "Uppercut"
+      ]
+    },
+    "EvolutionLevel": 16,
+    "EvolvesInto": "Sir Tung",
+    "BaseWeightKg": 8.5,
+    "ShinyColors": {
+      "HumanoidRootPart": {
+        "r": 0.639,
+        "g": 0.635,
+        "b": 0.647
+      },
+      "UpperArmL": {
+        "r": 0.937,
+        "g": 0.722,
+        "b": 0.22
+      },
+      "ForeArmL": {
+        "r": 0.937,
+        "g": 0.722,
+        "b": 0.22
+      },
+      "Torso": {
+        "r": 0.937,
+        "g": 0.722,
+        "b": 0.22
+      },
+      "UpperArmR": {
+        "r": 0.937,
+        "g": 0.722,
+        "b": 0.22
+      },
+      "ForeArmR": {
+        "r": 0.937,
+        "g": 0.722,
+        "b": 0.22
+      },
+      "ThighR": {
+        "r": 0.937,
+        "g": 0.722,
+        "b": 0.22
+      },
+      "ThighL": {
+        "r": 0.937,
+        "g": 0.722,
+        "b": 0.22
+      },
+      "CalfL": {
+        "r": 0.937,
+        "g": 0.722,
+        "b": 0.22
+      },
+      "CalfR": {
+        "r": 0.937,
+        "g": 0.722,
+        "b": 0.22
+      },
+      "EyesBack": {
+        "r": 0.91,
+        "g": 0.776,
+        "b": 0.584
+      },
+      "Eyes_Black": {
+        "r": 0.035,
+        "g": 0.537,
+        "b": 0.812
+      },
+      "Eyes_White": {
+        "r": 0.929,
+        "g": 0.918,
+        "b": 0.918
+      },
+      "FootL": {
+        "r": 0.937,
+        "g": 0.722,
+        "b": 0.22
+      },
+      "FootR": {
+        "r": 0.937,
+        "g": 0.722,
+        "b": 0.22
+      },
+      "HandL": {
+        "r": 0.937,
+        "g": 0.722,
+        "b": 0.22
+      },
+      "HandR": {
+        "r": 0.937,
+        "g": 0.722,
+        "b": 0.22
+      },
+      "Neck": {
+        "r": 0.937,
+        "g": 0.722,
+        "b": 0.22
+      },
+      "Stick_One": {
+        "r": 1,
+        "g": 0,
+        "b": 0
+      },
+      "Stick_Two": {
+        "r": 1,
+        "g": 0.314,
+        "b": 0.043
+      },
+      "HeadMesh": {
+        "r": 0.937,
+        "g": 0.722,
+        "b": 0.22
+      }
+    },
+    "Class": "Basic",
+    "CatchRateScalar": 45,
+    "FemaleChance": 20,
+    "Abilities": [
+      {
+        "Name": "Steadfast",
+        "Chance": 50
+      },
+      {
+        "Name": "Absolute Focus",
+        "Chance": 50
+      }
+    ]
+  },
+  {
+    "Id": "Sir Tung",
+    "Slug": "sir-tung",
+    "DexNumber": 2,
+    "Name": "Sir Tung",
+    "Sprite": "rbxassetid://117004729912755",
+    "ShinySprite": "rbxassetid://80170237167870",
+    "Description": "A refined Kitung that has adopted a gentleman's demeanor. Its wand channels focused fighting spirit.",
+    "Types": [
+      "Fighting"
+    ],
+    "BaseStats": {
+      "HP": 60,
+      "Attack": 80,
+      "Defense": 55,
+      "SpecialAttack": 50,
+      "SpecialDefense": 55,
+      "Speed": 100
+    },
+    "Learnset": {
+      "1": [
+        "Scratch",
+        "Tackle",
+        "Double Kick"
+      ],
+      "16": [
+        "Fast Attack"
+      ],
+      "20": [
+        "Uppercut"
+      ],
+      "26": [
+        "Grand Slam"
+      ],
+      "32": [
+        "Shield Bash"
+      ]
+    },
+    "EvolutionLevel": 36,
+    "EvolvesInto": "Magi-Tung",
+    "BaseWeightKg": 28,
+    "ShinyColors": {
+      "CalfL": {
+        "r": 0.937,
+        "g": 0.722,
+        "b": 0.22
+      },
+      "CalfR": {
+        "r": 0.937,
+        "g": 0.722,
+        "b": 0.22
+      },
+      "Eyebrows": {
+        "r": 0.937,
+        "g": 0.722,
+        "b": 0.22
+      },
+      "Eyelids": {
+        "r": 0.937,
+        "g": 0.722,
+        "b": 0.22
+      },
+      "EyesBlack": {
+        "r": 0.035,
+        "g": 0.537,
+        "b": 0.812
+      },
+      "EyesWhite": {
+        "r": 1,
+        "g": 1,
+        "b": 1
+      },
+      "FootL": {
+        "r": 0.937,
+        "g": 0.722,
+        "b": 0.22
+      },
+      "FootR": {
+        "r": 0.937,
+        "g": 0.722,
+        "b": 0.22
+      },
+      "ForeArmL": {
+        "r": 0.937,
+        "g": 0.722,
+        "b": 0.22
+      },
+      "ForeArmR": {
+        "r": 0.937,
+        "g": 0.722,
+        "b": 0.22
+      },
+      "HandL": {
+        "r": 0.937,
+        "g": 0.722,
+        "b": 0.22
+      },
+      "HandR": {
+        "r": 0.937,
+        "g": 0.722,
+        "b": 0.22
+      },
+      "HeadMesh": {
+        "r": 0.937,
+        "g": 0.722,
+        "b": 0.22
+      },
+      "Iris": {
+        "r": 0.973,
+        "g": 0.973,
+        "b": 0.973
+      },
+      "Mouth": {
+        "r": 0.973,
+        "g": 0.973,
+        "b": 0.973
+      },
+      "Nose": {
+        "r": 0.937,
+        "g": 0.722,
+        "b": 0.22
+      },
+      "ThighL": {
+        "r": 0.937,
+        "g": 0.722,
+        "b": 0.22
+      },
+      "ThighR": {
+        "r": 0.937,
+        "g": 0.722,
+        "b": 0.22
+      },
+      "Tie": {
+        "r": 0.769,
+        "g": 0.157,
+        "b": 0.11
+      },
+      "TopHat": {
+        "r": 0.973,
+        "g": 0.973,
+        "b": 0.973
+      },
+      "TopHatWhite": {
+        "r": 0.051,
+        "g": 0.412,
+        "b": 0.675
+      },
+      "Torso": {
+        "r": 0.937,
+        "g": 0.722,
+        "b": 0.22
+      },
+      "UpperArmL": {
+        "r": 0.937,
+        "g": 0.722,
+        "b": 0.22
+      },
+      "UpperArmR": {
+        "r": 0.937,
+        "g": 0.722,
+        "b": 0.22
+      },
+      "WandExt": {
+        "r": 1,
+        "g": 0.314,
+        "b": 0.043
+      },
+      "WandHandle": {
+        "r": 1,
+        "g": 0,
+        "b": 0
+      },
+      "HumanoidRootPart": {
+        "r": 0.639,
+        "g": 0.635,
+        "b": 0.647
+      }
+    },
+    "Class": "Advanced",
+    "CatchRateScalar": 45,
+    "FemaleChance": 20,
+    "Abilities": [
+      {
+        "Name": "Steadspeed",
+        "Chance": 68
+      },
+      {
+        "Name": "Magic Mirror",
+        "Chance": 30
+      },
+      {
+        "Name": "Magic Eyes",
+        "Chance": 2
+      }
+    ]
+  },
+  {
+    "Id": "Magi-Tung",
+    "Slug": "magi-tung",
+    "DexNumber": 3,
+    "Name": "Magi-Tung",
+    "Sprite": "rbxassetid://79578637985806",
+    "ShinySprite": "rbxassetid://123561772385659",
+    "Description": "A master of both martial arts and mental prowess. Its psychic wand can bend reality itself.",
+    "Types": [
+      "Fighting",
+      "Psychic"
+    ],
+    "BaseStats": {
+      "HP": 75,
+      "Attack": 100,
+      "Defense": 70,
+      "SpecialAttack": 110,
+      "SpecialDefense": 80,
+      "Speed": 120
+    },
+    "Learnset": {
+      "1": [
+        "Scratch",
+        "Double Kick",
+        "Fast Attack"
+      ],
+      "20": [
+        "Uppercut"
+      ],
+      "28": [
+        "Grand Slam"
+      ],
+      "36": [
+        "Mind Slam"
+      ],
+      "42": [
+        "Shield Bash"
+      ],
+      "50": [
+        "Knockout"
+      ]
+    },
+    "EvolutionLevel": null,
+    "EvolvesInto": null,
+    "BaseWeightKg": 52,
+    "ShinyColors": {
+      "CalfL": {
+        "r": 0.973,
+        "g": 0.973,
+        "b": 0.973
+      },
+      "CalfR": {
+        "r": 0.973,
+        "g": 0.973,
+        "b": 0.973
+      },
+      "Eyebrows": {
+        "r": 0.357,
+        "g": 0.365,
+        "b": 0.412
+      },
+      "Eyelids": {
+        "r": 0.357,
+        "g": 0.365,
+        "b": 0.412
+      },
+      "EyesBlack": {
+        "r": 0.459,
+        "g": 0,
+        "b": 0
+      },
+      "EyesWhite": {
+        "r": 1,
+        "g": 1,
+        "b": 1
+      },
+      "FootL": {
+        "r": 0.067,
+        "g": 0.067,
+        "b": 0.067
+      },
+      "FootR": {
+        "r": 0.067,
+        "g": 0.067,
+        "b": 0.067
+      },
+      "ForeArmL": {
+        "r": 0.973,
+        "g": 0.973,
+        "b": 0.973
+      },
+      "ForeArmR": {
+        "r": 0.973,
+        "g": 0.973,
+        "b": 0.973
+      },
+      "HandL": {
+        "r": 0.067,
+        "g": 0.067,
+        "b": 0.067
+      },
+      "HandR": {
+        "r": 0.067,
+        "g": 0.067,
+        "b": 0.067
+      },
+      "HeadMesh": {
+        "r": 0.357,
+        "g": 0.365,
+        "b": 0.412
+      },
+      "Inner": {
+        "r": 0.106,
+        "g": 0.165,
+        "b": 0.208
+      },
+      "Iris": {
+        "r": 1,
+        "g": 1,
+        "b": 1
+      },
+      "Mouth": {
+        "r": 1,
+        "g": 1,
+        "b": 1
+      },
+      "Nose": {
+        "r": 0.357,
+        "g": 0.365,
+        "b": 0.412
+      },
+      "Outer": {
+        "r": 0.973,
+        "g": 0.973,
+        "b": 0.973
+      },
+      "ThighL": {
+        "r": 0.973,
+        "g": 0.973,
+        "b": 0.973
+      },
+      "ThighR": {
+        "r": 0.973,
+        "g": 0.973,
+        "b": 0.973
+      },
+      "Tie": {
+        "r": 0.769,
+        "g": 0.157,
+        "b": 0.11
+      },
+      "TopHat": {
+        "r": 0.973,
+        "g": 0.973,
+        "b": 0.973
+      },
+      "TopHatRibbon": {
+        "r": 0.051,
+        "g": 0.412,
+        "b": 0.675
+      },
+      "Torso": {
+        "r": 0.624,
+        "g": 0.631,
+        "b": 0.675
+      },
+      "UpperArmL": {
+        "r": 0.973,
+        "g": 0.973,
+        "b": 0.973
+      },
+      "UpperArmR": {
+        "r": 0.973,
+        "g": 0.973,
+        "b": 0.973
+      },
+      "WandExt": {
+        "r": 1,
+        "g": 0.314,
+        "b": 0.043
+      },
+      "WandHandle": {
+        "r": 1,
+        "g": 0,
+        "b": 0
+      },
+      "HumanoidRootPart": {
+        "r": 0.639,
+        "g": 0.635,
+        "b": 0.647
+      }
+    },
+    "Class": "Advanced",
+    "CatchRateScalar": 45,
+    "FemaleChance": 20,
+    "Abilities": [
+      {
+        "Name": "Steadspeed",
+        "Chance": 68
+      },
+      {
+        "Name": "Synchronize",
+        "Chance": 30
+      },
+      {
+        "Name": "Magic Eyes",
+        "Chance": 2
+      }
+    ]
+  },
+  {
+    "Id": "Frigo Camelo",
+    "Slug": "frigo-camelo",
+    "DexNumber": 4,
+    "Name": "Frigo Camelo",
+    "Sprite": "rbxassetid://114863676276555",
+    "ShinySprite": "rbxassetid://79220464709099",
+    "Description": "A fridge-bodied camel who wanders aimlessly, embodying surreal melancholy and cursed Italian energy.",
+    "Types": [
+      "Ground"
+    ],
+    "BaseStats": {
+      "HP": 55,
+      "Attack": 55,
+      "Defense": 50,
+      "SpecialAttack": 40,
+      "SpecialDefense": 45,
+      "Speed": 45
+    },
+    "Learnset": {
+      "1": [
+        "Tackle",
+        "Scratch"
+      ],
+      "5": [
+        "Sand Storm"
+      ],
+      "9": [
+        "Bite"
+      ],
+      "14": [
+        "Fast Attack"
+      ]
+    },
+    "EvolutionLevel": 16,
+    "EvolvesInto": "Refricamel",
+    "BaseWeightKg": 45,
+    "ShinyColors": {
+      "Ears": {
+        "r": 0.541,
+        "g": 0.392,
+        "b": 0.188
+      },
+      "EyesWhite": {
+        "r": 1,
+        "g": 1,
+        "b": 1
+      },
+      "FridgeMain": {
+        "r": 0.737,
+        "g": 0.718,
+        "b": 0.808
+      },
+      "FootL": {
+        "r": 0.541,
+        "g": 0.392,
+        "b": 0.188
+      },
+      "LegL": {
+        "r": 0.541,
+        "g": 0.392,
+        "b": 0.188
+      },
+      "FootR": {
+        "r": 0.541,
+        "g": 0.392,
+        "b": 0.188
+      },
+      "LegR": {
+        "r": 0.541,
+        "g": 0.392,
+        "b": 0.188
+      },
+      "HeadMesh": {
+        "r": 0.541,
+        "g": 0.392,
+        "b": 0.188
+      },
+      "HeadBlack": {
+        "r": 0.067,
+        "g": 0.067,
+        "b": 0.067
+      },
+      "Neck1": {
+        "r": 0.541,
+        "g": 0.392,
+        "b": 0.188
+      },
+      "Neck2": {
+        "r": 0.541,
+        "g": 0.392,
+        "b": 0.188
+      },
+      "Neck3": {
+        "r": 0.541,
+        "g": 0.392,
+        "b": 0.188
+      },
+      "Neck4": {
+        "r": 0.541,
+        "g": 0.392,
+        "b": 0.188
+      },
+      "HumanoidRootPart": {
+        "r": 0.639,
+        "g": 0.635,
+        "b": 0.647
+      }
+    },
+    "Class": "Basic",
+    "CatchRateScalar": 45,
+    "FemaleChance": 40,
+    "Abilities": [
+      {
+        "Name": "Hard Head",
+        "Chance": 50
+      },
+      {
+        "Name": "Sand Speed",
+        "Chance": 50
+      }
+    ]
+  },
+  {
+    "Id": "Refricamel",
+    "Slug": "refricamel",
+    "DexNumber": 5,
+    "Name": "Refricamel",
+    "Sprite": "rbxassetid://87061586813050",
+    "ShinySprite": "rbxassetid://121958256639798",
+    "Description": "Now with proper refrigeration coils, it keeps its cool in deserts and stores snacks for later.",
+    "Types": [
+      "Ground"
+    ],
+    "BaseStats": {
+      "HP": 75,
+      "Attack": 75,
+      "Defense": 70,
+      "SpecialAttack": 60,
+      "SpecialDefense": 65,
+      "Speed": 70
+    },
+    "Learnset": {
+      "1": [
+        "Tackle",
+        "Scratch",
+        "Sand Storm"
+      ],
+      "16": [
+        "Bite"
+      ],
+      "20": [
+        "Fast Attack"
+      ],
+      "26": [
+        "Crunch"
+      ],
+      "32": [
+        "Earthquake"
+      ]
+    },
+    "EvolutionLevel": 36,
+    "EvolvesInto": "Glacimel",
+    "BaseWeightKg": 95,
+    "ShinyColors": {
+      "BackLeftFoot": {
+        "r": 0.471,
+        "g": 0.278,
+        "b": 0.761
+      },
+      "BackLeftLeg": {
+        "r": 0.541,
+        "g": 0.392,
+        "b": 0.188
+      },
+      "BackRightFoot": {
+        "r": 0.471,
+        "g": 0.278,
+        "b": 0.761
+      },
+      "BackRightLeg": {
+        "r": 0.541,
+        "g": 0.392,
+        "b": 0.188
+      },
+      "Body": {
+        "r": 0.737,
+        "g": 0.718,
+        "b": 0.808
+      },
+      "Ears": {
+        "r": 0.541,
+        "g": 0.392,
+        "b": 0.188
+      },
+      "EyesWhite": {
+        "r": 0.973,
+        "g": 0.973,
+        "b": 0.973
+      },
+      "FridgeHandles": {
+        "r": 0.373,
+        "g": 0.373,
+        "b": 0.373
+      },
+      "FrontLeftFoot": {
+        "r": 0.471,
+        "g": 0.278,
+        "b": 0.761
+      },
+      "FrontLeftLeg": {
+        "r": 0.541,
+        "g": 0.392,
+        "b": 0.188
+      },
+      "FrontRightFoot": {
+        "r": 0.471,
+        "g": 0.278,
+        "b": 0.761
+      },
+      "FrontRightLeg": {
+        "r": 0.541,
+        "g": 0.392,
+        "b": 0.188
+      },
+      "HeadMesh": {
+        "r": 0.541,
+        "g": 0.392,
+        "b": 0.188
+      },
+      "Head_Black": {
+        "r": 0,
+        "g": 0,
+        "b": 0
+      },
+      "Neck1": {
+        "r": 0.541,
+        "g": 0.392,
+        "b": 0.188
+      },
+      "Neck2": {
+        "r": 0.541,
+        "g": 0.392,
+        "b": 0.188
+      },
+      "CubeTop": {
+        "r": 0.678,
+        "g": 0.451,
+        "b": 1
+      },
+      "Neck3": {
+        "r": 0.541,
+        "g": 0.392,
+        "b": 0.188
+      },
+      "HumanoidRootPart": {
+        "r": 0.639,
+        "g": 0.635,
+        "b": 0.647
+      }
+    },
+    "Class": "Advanced",
+    "CatchRateScalar": 45,
+    "FemaleChance": 40,
+    "Abilities": [
+      {
+        "Name": "Hard Head",
+        "Chance": 50
+      },
+      {
+        "Name": "Refrigerate",
+        "Chance": 50
+      }
+    ]
+  },
+  {
+    "Id": "Glacimel",
+    "Slug": "glacimel",
+    "DexNumber": 6,
+    "Name": "Glacimel",
+    "Sprite": "rbxassetid://140155612806063",
+    "ShinySprite": "rbxassetid://nil",
+    "Description": "Its freezer core turned cryogenic. It sculpts dune-ice into elegant ridges as it roams.",
+    "Types": [
+      "Ground",
+      "Ice"
+    ],
+    "BaseStats": {
+      "HP": 95,
+      "Attack": 95,
+      "Defense": 90,
+      "SpecialAttack": 85,
+      "SpecialDefense": 85,
+      "Speed": 80
+    },
+    "Learnset": {
+      "1": [
+        "Sand Storm",
+        "Bite",
+        "Fast Attack"
+      ],
+      "20": [
+        "Crunch"
+      ],
+      "28": [
+        "Earthquake"
+      ],
+      "36": [
+        "Dive Bomb"
+      ]
+    },
+    "EvolutionLevel": null,
+    "EvolvesInto": null,
+    "BaseWeightKg": 180,
+    "ShinyColors": {
+      "BackLeftFoot": {
+        "r": 0.471,
+        "g": 0.278,
+        "b": 0.761
+      },
+      "BackLeftLeg": {
+        "r": 0.471,
+        "g": 0.278,
+        "b": 0.761
+      },
+      "BackRightFoot": {
+        "r": 0.471,
+        "g": 0.278,
+        "b": 0.761
+      },
+      "BackRightLeg": {
+        "r": 0.471,
+        "g": 0.278,
+        "b": 0.761
+      },
+      "Body": {
+        "r": 0.639,
+        "g": 0.635,
+        "b": 0.647
+      },
+      "CubeTop": {
+        "r": 0.678,
+        "g": 0.451,
+        "b": 1
+      },
+      "Ears": {
+        "r": 0.541,
+        "g": 0.392,
+        "b": 0.188
+      },
+      "EyesWhite": {
+        "r": 1,
+        "g": 1,
+        "b": 1
+      },
+      "FrontLeftFoot": {
+        "r": 0.471,
+        "g": 0.278,
+        "b": 0.761
+      },
+      "FrontLeftLeg": {
+        "r": 0.471,
+        "g": 0.278,
+        "b": 0.761
+      },
+      "FrontRightFoot": {
+        "r": 0.471,
+        "g": 0.278,
+        "b": 0.761
+      },
+      "FrontRightLeg": {
+        "r": 0.471,
+        "g": 0.278,
+        "b": 0.761
+      },
+      "HeadMesh": {
+        "r": 0.541,
+        "g": 0.392,
+        "b": 0.188
+      },
+      "Head_Black": {
+        "r": 0.067,
+        "g": 0.067,
+        "b": 0.067
+      },
+      "IceHead": {
+        "r": 0.678,
+        "g": 0.451,
+        "b": 1
+      },
+      "Inside": {
+        "r": 0.639,
+        "g": 0.635,
+        "b": 0.647
+      },
+      "NeckIce": {
+        "r": 0.545,
+        "g": 0.365,
+        "b": 0.812
+      },
+      "NeckNormal": {
+        "r": 0.541,
+        "g": 0.392,
+        "b": 0.188
+      },
+      "Tail": {
+        "r": 0.541,
+        "g": 0.271,
+        "b": 0
+      },
+      "HumanoidRootPart": {
+        "r": 0.639,
+        "g": 0.635,
+        "b": 0.647
+      }
+    },
+    "Class": "Advanced",
+    "CatchRateScalar": 45,
+    "FemaleChance": 40,
+    "Abilities": [
+      {
+        "Name": "Hard Head",
+        "Chance": 68
+      },
+      {
+        "Name": "Refrigerate",
+        "Chance": 30
+      },
+      {
+        "Name": "Thickness",
+        "Chance": 2
+      }
+    ]
+  },
+  {
+    "Id": "Twirlina",
+    "Slug": "twirlina",
+    "DexNumber": 7,
+    "Name": "Twirlina",
+    "Sprite": "rbxassetid://91063591914096",
+    "ShinySprite": "rbxassetid://100838791633365",
+    "Description": "A tiny cup dancer who practices spins until she's dizzy with delight. Her grace belies her power.",
+    "Types": [
+      "Fairy"
+    ],
+    "BaseStats": {
+      "HP": 45,
+      "Attack": 50,
+      "Defense": 45,
+      "SpecialAttack": 60,
+      "SpecialDefense": 50,
+      "Speed": 65
+    },
+    "Learnset": {
+      "1": [
+        "Tackle",
+        "Dance Strike"
+      ],
+      "5": [
+        "Fast Attack"
+      ],
+      "9": [
+        "Dazzle Beam"
+      ],
+      "14": [
+        "Fairy Strike"
+      ]
+    },
+    "EvolutionLevel": 16,
+    "EvolvesInto": "Ballerina Cappuccina",
+    "BaseWeightKg": 6.5,
+    "ShinyColors": {
+      "ArmL": {
+        "r": 0.976,
+        "g": 0.765,
+        "b": 0.576
+      },
+      "ArmR": {
+        "r": 0.976,
+        "g": 0.765,
+        "b": 0.576
+      },
+      "EyesBlack": {
+        "r": 0.067,
+        "g": 0.067,
+        "b": 0.067
+      },
+      "EyesWhite": {
+        "r": 0.973,
+        "g": 0.973,
+        "b": 0.973
+      },
+      "FaceParts": {
+        "r": 0.016,
+        "g": 0.686,
+        "b": 0.925
+      },
+      "FootL": {
+        "r": 0.529,
+        "g": 0.812,
+        "b": 1
+      },
+      "FootR": {
+        "r": 0.529,
+        "g": 0.812,
+        "b": 1
+      },
+      "HandL": {
+        "r": 0.016,
+        "g": 0.686,
+        "b": 0.925
+      },
+      "HandR": {
+        "r": 0.016,
+        "g": 0.686,
+        "b": 0.925
+      },
+      "HeadMesh": {
+        "r": 0.871,
+        "g": 0.945,
+        "b": 1
+      },
+      "Hips": {
+        "r": 0.42,
+        "g": 0.757,
+        "b": 1
+      },
+      "LegL": {
+        "r": 0.773,
+        "g": 0.875,
+        "b": 1
+      },
+      "LegR": {
+        "r": 0.773,
+        "g": 0.875,
+        "b": 1
+      },
+      "Skirt": {
+        "r": 0.29,
+        "g": 0.557,
+        "b": 0.847
+      },
+      "Torso": {
+        "r": 0.239,
+        "g": 0.463,
+        "b": 0.702
+      },
+      "HumanoidRootPart": {
+        "r": 0.639,
+        "g": 0.635,
+        "b": 0.647
+      }
+    },
+    "Class": "Basic",
+    "CatchRateScalar": 45,
+    "FemaleChance": 95,
+    "Abilities": [
+      {
+        "Name": "Fairy Sense",
+        "Chance": 98
+      },
+      {
+        "Name": "Pixelate",
+        "Chance": 2
+      }
+    ]
+  },
+  {
+    "Id": "Ballerina Cappuccina",
+    "Slug": "ballerina-cappuccina",
+    "DexNumber": 8,
+    "Name": "Ballerina Cappuccina",
+    "Sprite": "rbxassetid://88795634363100",
+    "ShinySprite": "rbxassetid://116535707779582",
+    "Description": "A poised ballerina with a swirling coffee cup for a head. She pirouettes into battle with elegance.",
+    "Types": [
+      "Fairy"
+    ],
+    "BaseStats": {
+      "HP": 65,
+      "Attack": 70,
+      "Defense": 60,
+      "SpecialAttack": 85,
+      "SpecialDefense": 70,
+      "Speed": 100
+    },
+    "Learnset": {
+      "1": [
+        "Dance Strike",
+        "Fast Attack",
+        "Dazzle Beam"
+      ],
+      "16": [
+        "Fairy Strike"
+      ],
+      "22": [
+        "Sunbeam"
+      ],
+      "30": [
+        "Mind Slam"
+      ]
+    },
+    "EvolutionLevel": 36,
+    "EvolvesInto": "Primarina Ballerina",
+    "BaseWeightKg": 14,
+    "ShinyColors": {
+      "ArmL": {
+        "r": 0.976,
+        "g": 0.765,
+        "b": 0.576
+      },
+      "ArmR": {
+        "r": 0.976,
+        "g": 0.765,
+        "b": 0.576
+      },
+      "CupHandle": {
+        "r": 0.871,
+        "g": 0.945,
+        "b": 1
+      },
+      "EyesBlack": {
+        "r": 0.067,
+        "g": 0.067,
+        "b": 0.067
+      },
+      "EyesBrown": {
+        "r": 0.482,
+        "g": 0.592,
+        "b": 0.635
+      },
+      "EyesWhite": {
+        "r": 0.973,
+        "g": 0.973,
+        "b": 0.973
+      },
+      "FootL": {
+        "r": 0.529,
+        "g": 0.812,
+        "b": 1
+      },
+      "FootR": {
+        "r": 0.529,
+        "g": 0.812,
+        "b": 1
+      },
+      "HandL": {
+        "r": 0.016,
+        "g": 0.686,
+        "b": 0.925
+      },
+      "HandR": {
+        "r": 0.016,
+        "g": 0.686,
+        "b": 0.925
+      },
+      "HeadMesh": {
+        "r": 0.871,
+        "g": 0.945,
+        "b": 1
+      },
+      "Hips": {
+        "r": 0.42,
+        "g": 0.757,
+        "b": 1
+      },
+      "LegL": {
+        "r": 0.773,
+        "g": 0.875,
+        "b": 1
+      },
+      "LegR": {
+        "r": 0.773,
+        "g": 0.875,
+        "b": 1
+      },
+      "MouthWhite": {
+        "r": 0.973,
+        "g": 0.973,
+        "b": 0.973
+      },
+      "NoseMouth": {
+        "r": 0.016,
+        "g": 0.686,
+        "b": 0.925
+      },
+      "Skirt": {
+        "r": 0.29,
+        "g": 0.557,
+        "b": 0.847
+      },
+      "Torso": {
+        "r": 0.239,
+        "g": 0.463,
+        "b": 0.702
+      },
+      "HumanoidRootPart": {
+        "r": 0.639,
+        "g": 0.635,
+        "b": 0.647
+      }
+    },
+    "Class": "Advanced",
+    "CatchRateScalar": 45,
+    "FemaleChance": 95,
+    "Abilities": [
+      {
+        "Name": "Fairy Sense",
+        "Chance": 98
+      },
+      {
+        "Name": "Ball Room",
+        "Chance": 2
+      }
+    ]
+  },
+  {
+    "Id": "Primarina Ballerina",
+    "Slug": "primarina-ballerina",
+    "DexNumber": 9,
+    "Name": "Primarina Ballerina",
+    "Sprite": "rbxassetid://131374577373923",
+    "ShinySprite": "rbxassetid://91194678993432",
+    "Description": "The cup now forged into steel trim, her grand jeté leaves shimmering trails. A master of dance and defense.",
+    "Types": [
+      "Fairy",
+      "Steel"
+    ],
+    "BaseStats": {
+      "HP": 80,
+      "Attack": 90,
+      "Defense": 85,
+      "SpecialAttack": 110,
+      "SpecialDefense": 95,
+      "Speed": 110
+    },
+    "Learnset": {
+      "1": [
+        "Dance Strike",
+        "Dazzle Beam",
+        "Fairy Strike"
+      ],
+      "22": [
+        "Sunbeam"
+      ],
+      "30": [
+        "Shield Bash"
+      ],
+      "38": [
+        "Mind Slam"
+      ],
+      "46": [
+        "Grand Slam"
+      ]
+    },
+    "EvolutionLevel": null,
+    "EvolvesInto": null,
+    "BaseWeightKg": 24,
+    "ShinyColors": {
+      "Crown": {
+        "r": 0.988,
+        "g": 0.98,
+        "b": 1
+      },
+      "CupHandle": {
+        "r": 0.988,
+        "g": 0.98,
+        "b": 1
+      },
+      "EyesBlack": {
+        "r": 0.067,
+        "g": 0.067,
+        "b": 0.067
+      },
+      "EyesBrown": {
+        "r": 0.482,
+        "g": 0.592,
+        "b": 0.635
+      },
+      "EyesWhite": {
+        "r": 1,
+        "g": 1,
+        "b": 1
+      },
+      "FootL": {
+        "r": 0.675,
+        "g": 0.831,
+        "b": 0.886
+      },
+      "FootR": {
+        "r": 0.675,
+        "g": 0.831,
+        "b": 0.886
+      },
+      "ForeArmL": {
+        "r": 0.976,
+        "g": 0.765,
+        "b": 0.576
+      },
+      "ForeArmR": {
+        "r": 0.976,
+        "g": 0.765,
+        "b": 0.576
+      },
+      "HandL": {
+        "r": 0.988,
+        "g": 0.98,
+        "b": 1
+      },
+      "HandR": {
+        "r": 0.988,
+        "g": 0.98,
+        "b": 1
+      },
+      "HeadMesh": {
+        "r": 1,
+        "g": 0.91,
+        "b": 0.89
+      },
+      "LegL": {
+        "r": 0.988,
+        "g": 0.98,
+        "b": 1
+      },
+      "LegR": {
+        "r": 0.988,
+        "g": 0.98,
+        "b": 1
+      },
+      "MouthWhite": {
+        "r": 0.973,
+        "g": 0.973,
+        "b": 0.973
+      },
+      "Neck": {
+        "r": 0.988,
+        "g": 0.98,
+        "b": 1
+      },
+      "NoseMouth": {
+        "r": 0.016,
+        "g": 0.686,
+        "b": 0.925
+      },
+      "Seperator": {
+        "r": 0.639,
+        "g": 0.635,
+        "b": 0.647
+      },
+      "SkirtPink": {
+        "r": 0.722,
+        "g": 0.89,
+        "b": 1
+      },
+      "SkirtWhite": {
+        "r": 0.988,
+        "g": 0.98,
+        "b": 1
+      },
+      "HumanoidRootPart": {
+        "r": 0.639,
+        "g": 0.635,
+        "b": 0.647
+      },
+      "UpperArmL": {
+        "r": 0.988,
+        "g": 0.98,
+        "b": 1
+      },
+      "UpperArmR": {
+        "r": 0.988,
+        "g": 0.98,
+        "b": 1
+      },
+      "Torso": {
+        "r": 0.988,
+        "g": 0.98,
+        "b": 1
+      }
+    },
+    "Class": "Advanced",
+    "CatchRateScalar": 45,
+    "FemaleChance": 95,
+    "Abilities": [
+      {
+        "Name": "Fairy Sense",
+        "Chance": 98
+      },
+      {
+        "Name": "Ball Room",
+        "Chance": 2
+      }
+    ]
+  },
+  {
+    "Id": "Frulli Frulla",
+    "Slug": "frulli-frulla",
+    "DexNumber": 10,
+    "Name": "Frulli Frulla",
+    "Sprite": "rbxassetid://96032956018193",
+    "ShinySprite": "rbxassetid://91862509821498",
+    "Description": "A jittery coffee-fueled bird with orange glasses. Its caffeine-enhanced reflexes make it hard to catch.",
+    "Types": [
+      "Flying"
+    ],
+    "BaseStats": {
+      "HP": 40,
+      "Attack": 48,
+      "Defense": 37,
+      "SpecialAttack": 40,
+      "SpecialDefense": 35,
+      "Speed": 95
+    },
+    "Learnset": {
+      "1": [
+        "Tackle",
+        "Peck"
+      ],
+      "5": [
+        "Fast Attack"
+      ],
+      "9": [
+        "Perch"
+      ],
+      "12": [
+        "Static Peck"
+      ],
+      "15": [
+        "Bite"
+      ]
+    },
+    "EvolutionLevel": 16,
+    "EvolvesInto": "Frulilala",
+    "BaseWeightKg": 2.8,
+    "ShinyColors": {
+      "Bird_Beak": {
+        "r": 1,
+        "g": 0.69,
+        "b": 0
+      },
+      "Bird_Beak.001": {
+        "r": 1,
+        "g": 0.69,
+        "b": 0
+      },
+      "Bird_Beak.002": {
+        "r": 1,
+        "g": 0.69,
+        "b": 0
+      },
+      "Bird_Beak.003": {
+        "r": 1,
+        "g": 0.69,
+        "b": 0
+      },
+      "Bird_BodyBack": {
+        "r": 0.549,
+        "g": 0.506,
+        "b": 0.192
+      },
+      "Bird_BodyFront": {
+        "r": 0.769,
+        "g": 0.757,
+        "b": 0.392
+      },
+      "Bird_Glasses": {
+        "r": 0.973,
+        "g": 0.973,
+        "b": 0.973
+      },
+      "Bird_GlassesGlass": {
+        "r": 0.145,
+        "g": 0.141,
+        "b": 0.227
+      },
+      "Bird_Head": {
+        "r": 0.549,
+        "g": 0.506,
+        "b": 0.192
+      },
+      "Bird_Legs": {
+        "r": 1,
+        "g": 0.69,
+        "b": 0
+      },
+      "Bird_Wings": {
+        "r": 0.549,
+        "g": 0.506,
+        "b": 0.192
+      },
+      "HumanoidRootPart": {
+        "r": 0.639,
+        "g": 0.635,
+        "b": 0.647
+      }
+    },
+    "Class": "Basic",
+    "CatchRateScalar": 255,
+    "FemaleChance": 50,
+    "Abilities": [
+      {
+        "Name": "Big Beaks",
+        "Chance": 98
+      },
+      {
+        "Name": "Wind Wings",
+        "Chance": 2
+      }
+    ]
+  },
+  {
+    "Id": "Frulilala",
+    "Slug": "frulilala",
+    "DexNumber": 31,
+    "Name": "Frulilala",
+    "Sprite": "rbxassetid://114056605728290",
+    "ShinySprite": "rbxassetid://85886665555660",
+    "Description": "The caffeine finally focuses into static. Its wingbeats crackle as it darts between rooftops.",
+    "Types": [
+      "Flying",
+      "Electric"
+    ],
+    "BaseStats": {
+      "HP": 60,
+      "Attack": 70,
+      "Defense": 60,
+      "SpecialAttack": 65,
+      "SpecialDefense": 55,
+      "Speed": 105
+    },
+    "Learnset": {
+      "1": [
+        "Tackle",
+        "Peck",
+        "Fast Attack",
+        "Perch",
+        "Static Peck",
+        "Bite"
+      ],
+      "18": [
+        "Duststorm Dash"
+      ],
+      "22": [
+        "Dive Bomb"
+      ],
+      "28": [
+        "Thunder Burst"
+      ],
+      "32": [
+        "Crunch"
+      ]
+    },
+    "EvolutionLevel": 34,
+    "EvolvesInto": "Frulli Fruletro",
+    "BaseWeightKg": 6.5,
+    "ShinyColors": null,
+    "Class": "Advanced",
+    "CatchRateScalar": 120,
+    "FemaleChance": 50,
+    "Abilities": [
+      {
+        "Name": "Big Beaks",
+        "Chance": 98
+      },
+      {
+        "Name": "Wind Wings",
+        "Chance": 2
+      }
+    ]
+  },
+  {
+    "Id": "Frulli Fruletro",
+    "Slug": "frulli-fruletro",
+    "DexNumber": 32,
+    "Name": "Frulli Fruletro",
+    "Sprite": "rbxassetid://0",
+    "ShinySprite": "rbxassetid://0",
+    "Description": "A hypercharged flyer that channels thunderstorms through its feathers. It blitzes foes before they can react.",
+    "Types": [
+      "Flying",
+      "Electric"
+    ],
+    "BaseStats": {
+      "HP": 75,
+      "Attack": 95,
+      "Defense": 80,
+      "SpecialAttack": 105,
+      "SpecialDefense": 75,
+      "Speed": 125
+    },
+    "Learnset": {
+      "1": [
+        "Tackle",
+        "Fast Attack",
+        "Perch",
+        "Static Peck",
+        "Duststorm Dash"
+      ],
+      "22": [
+        "Dive Bomb"
+      ],
+      "28": [
+        "Thunder Burst"
+      ],
+      "36": [
+        "Shield Bash"
+      ],
+      "44": [
+        "Grand Slam"
+      ],
+      "50": [
+        "Crunch"
+      ]
+    },
+    "EvolutionLevel": null,
+    "EvolvesInto": null,
+    "BaseWeightKg": 9.5,
+    "ShinyColors": null,
+    "Class": "Advanced",
+    "CatchRateScalar": 45,
+    "FemaleChance": 50,
+    "Abilities": [
+      {
+        "Name": "Big Beaks",
+        "Chance": 98
+      },
+      {
+        "Name": "Wind Wings",
+        "Chance": 2
+      }
+    ]
+  },
+  {
+    "Id": "Timmy Cheddar",
+    "Slug": "timmy-cheddar",
+    "DexNumber": 11,
+    "Name": "Timmy Cheddar",
+    "Sprite": "rbxassetid://133982229544496",
+    "ShinySprite": "rbxassetid://110379113786610",
+    "Description": "A young, ambitious rat with big dreams. Still learning the ropes of the underworld but shows great potential.",
+    "Types": [
+      "Normal"
+    ],
+    "BaseStats": {
+      "HP": 40,
+      "Attack": 45,
+      "Defense": 35,
+      "SpecialAttack": 35,
+      "SpecialDefense": 35,
+      "Speed": 55
+    },
+    "Learnset": {
+      "1": [
+        "Scratch",
+        "Tackle"
+      ],
+      "5": [
+        "Fast Attack"
+      ],
+      "9": [
+        "Bite"
+      ],
+      "14": [
+        "Crunch"
+      ]
+    },
+    "EvolutionLevel": 18,
+    "EvolvesInto": "Tim Cheese",
+    "BaseWeightKg": 3.5,
+    "ShinyColors": {
+      "ArmL": {
+        "r": 0.937,
+        "g": 0.722,
+        "b": 0.22
+      },
+      "ArmR": {
+        "r": 0.937,
+        "g": 0.722,
+        "b": 0.22
+      },
+      "EarLInner": {
+        "r": 0.843,
+        "g": 0.773,
+        "b": 0.604
+      },
+      "EarLOuter": {
+        "r": 0.486,
+        "g": 0.612,
+        "b": 0.42
+      },
+      "HumanoidRootPart": {
+        "r": 0.639,
+        "g": 0.635,
+        "b": 0.647
+      },
+      "EarROuter": {
+        "r": 0.486,
+        "g": 0.612,
+        "b": 0.42
+      },
+      "FootL": {
+        "r": 0.486,
+        "g": 0.612,
+        "b": 0.42
+      },
+      "FootR": {
+        "r": 0.486,
+        "g": 0.612,
+        "b": 0.42
+      },
+      "GlassesFrame": {
+        "r": 0.973,
+        "g": 0.973,
+        "b": 0.973
+      },
+      "GlassesLens": {
+        "r": 0.384,
+        "g": 0.145,
+        "b": 0.82
+      },
+      "HandL": {
+        "r": 0.486,
+        "g": 0.612,
+        "b": 0.42
+      },
+      "HandR": {
+        "r": 0.486,
+        "g": 0.612,
+        "b": 0.42
+      },
+      "HeadPart": {
+        "r": 0.486,
+        "g": 0.612,
+        "b": 0.42
+      },
+      "LegL": {
+        "r": 0.937,
+        "g": 0.722,
+        "b": 0.22
+      },
+      "LegR": {
+        "r": 0.937,
+        "g": 0.722,
+        "b": 0.22
+      },
+      "Nose": {
+        "r": 0.906,
+        "g": 0.584,
+        "b": 0.573
+      },
+      "Shirt": {
+        "r": 0.827,
+        "g": 0.827,
+        "b": 0.827
+      },
+      "Tie": {
+        "r": 0.906,
+        "g": 0.396,
+        "b": 0.565
+      },
+      "Torso": {
+        "r": 0.937,
+        "g": 0.722,
+        "b": 0.22
+      },
+      "Whiskers": {
+        "r": 0.827,
+        "g": 0.827,
+        "b": 0.827
+      },
+      "HR2": {
+        "r": 0.639,
+        "g": 0.635,
+        "b": 0.647
+      },
+      "EarRInner": {
+        "r": 0.843,
+        "g": 0.773,
+        "b": 0.604
+      }
+    },
+    "Class": "Basic",
+    "CatchRateScalar": 255,
+    "FemaleChance": 50,
+    "Abilities": [
+      {
+        "Name": "Run Away",
+        "Chance": 68
+      },
+      {
+        "Name": "Scrapper",
+        "Chance": 30
+      },
+      {
+        "Name": "Dispirit",
+        "Chance": 2
+      }
+    ]
+  },
+  {
+    "Id": "Tim Cheese",
+    "Slug": "tim-cheese",
+    "DexNumber": 12,
+    "Name": "Tim Cheese",
+    "Sprite": "rbxassetid://94327505972766",
+    "ShinySprite": "rbxassetid://89991911558326",
+    "Description": "A sharp-dressed humanoid rat who oozes confidence and cunning. Said to run the city's underworld.",
+    "Types": [
+      "Normal",
+      "Dark"
+    ],
+    "BaseStats": {
+      "HP": 60,
+      "Attack": 75,
+      "Defense": 50,
+      "SpecialAttack": 45,
+      "SpecialDefense": 50,
+      "Speed": 95
+    },
+    "Learnset": {
+      "1": [
+        "Scratch",
+        "Tackle",
+        "Fast Attack",
+        "Bite"
+      ],
+      "18": [
+        "Crunch"
+      ],
+      "26": [
+        "Double Kick"
+      ],
+      "34": [
+        "Grand Slam"
+      ]
+    },
+    "EvolutionLevel": null,
+    "EvolvesInto": null,
+    "BaseWeightKg": 8.5,
+    "ShinyColors": {
+      "ArmL": {
+        "r": 0.533,
+        "g": 0.243,
+        "b": 0.243
+      },
+      "ArmR": {
+        "r": 0.533,
+        "g": 0.243,
+        "b": 0.243
+      },
+      "EarLInner": {
+        "r": 0.8,
+        "g": 0.557,
+        "b": 0.412
+      },
+      "EarLOuter": {
+        "r": 0.835,
+        "g": 0.353,
+        "b": 0.161
+      },
+      "EarRInner": {
+        "r": 0.8,
+        "g": 0.557,
+        "b": 0.412
+      },
+      "EarROuter": {
+        "r": 0.835,
+        "g": 0.353,
+        "b": 0.161
+      },
+      "FootL": {
+        "r": 0.533,
+        "g": 0.243,
+        "b": 0.243
+      },
+      "FootR": {
+        "r": 0.533,
+        "g": 0.243,
+        "b": 0.243
+      },
+      "GlassesFrame": {
+        "r": 0.973,
+        "g": 0.973,
+        "b": 0.973
+      },
+      "GlassesLens": {
+        "r": 0.067,
+        "g": 0.067,
+        "b": 0.067
+      },
+      "HandL": {
+        "r": 0.533,
+        "g": 0.243,
+        "b": 0.243
+      },
+      "HandR": {
+        "r": 0.533,
+        "g": 0.243,
+        "b": 0.243
+      },
+      "HeadPart": {
+        "r": 0.835,
+        "g": 0.353,
+        "b": 0.161
+      },
+      "LegL": {
+        "r": 0.533,
+        "g": 0.243,
+        "b": 0.243
+      },
+      "LegR": {
+        "r": 0.533,
+        "g": 0.243,
+        "b": 0.243
+      },
+      "Nose": {
+        "r": 0.631,
+        "g": 0.769,
+        "b": 0.549
+      },
+      "Shirt": {
+        "r": 0.639,
+        "g": 0.635,
+        "b": 0.647
+      },
+      "Tie": {
+        "r": 0.647,
+        "g": 0.188,
+        "b": 0.188
+      },
+      "Torso": {
+        "r": 0.533,
+        "g": 0.243,
+        "b": 0.243
+      },
+      "Whiskers": {
+        "r": 0.58,
+        "g": 0.745,
+        "b": 0.506
+      },
+      "HumanoidRootPart": {
+        "r": 0.639,
+        "g": 0.635,
+        "b": 0.647
+      },
+      "HR2": {
+        "r": 0.639,
+        "g": 0.635,
+        "b": 0.647
+      }
+    },
+    "Class": "Advanced",
+    "CatchRateScalar": 127,
+    "FemaleChance": 50,
+    "Abilities": [
+      {
+        "Name": "Dispirit",
+        "Chance": 68
+      },
+      {
+        "Name": "Scrapper",
+        "Chance": 30
+      },
+      {
+        "Name": "Lithe",
+        "Chance": 2
+      }
+    ]
+  },
+  {
+    "Id": "Burbaloni Lulliloli",
+    "Slug": "burbaloni-lulliloli",
+    "DexNumber": 13,
+    "Name": "Burbaloni Lulliloli",
+    "Sprite": "rbxassetid://77803433335556",
+    "ShinySprite": "rbxassetid://100237176694463",
+    "Description": "A divine capybara within a coconut, worshipped for its calm yet immense power. Extremely rare.",
+    "Types": [
+      "Ground",
+      "Normal"
+    ],
+    "BaseStats": {
+      "HP": 100,
+      "Attack": 80,
+      "Defense": 85,
+      "SpecialAttack": 60,
+      "SpecialDefense": 80,
+      "Speed": 55
+    },
+    "Learnset": {
+      "1": [
+        "Tackle",
+        "Scratch"
+      ],
+      "8": [
+        "Sand Storm"
+      ],
+      "14": [
+        "Bite"
+      ],
+      "20": [
+        "Fast Attack"
+      ],
+      "28": [
+        "Earthquake"
+      ],
+      "36": [
+        "Crunch"
+      ]
+    },
+    "EvolutionLevel": null,
+    "EvolvesInto": null,
+    "BaseWeightKg": 85,
+    "ShinyColors": {
+      "HumanoidRootPart": {
+        "r": 0.639,
+        "g": 0.635,
+        "b": 0.647
+      },
+      "Ears": {
+        "r": 0.322,
+        "g": 0.486,
+        "b": 0.682
+      },
+      "Coconut": {
+        "r": 0.706,
+        "g": 0.824,
+        "b": 0.894
+      },
+      "Back_left_leg": {
+        "r": 0.035,
+        "g": 0.537,
+        "b": 0.812
+      },
+      "Back_right_leg": {
+        "r": 0.035,
+        "g": 0.537,
+        "b": 0.812
+      },
+      "Body": {
+        "r": 0.129,
+        "g": 0.329,
+        "b": 0.725
+      },
+      "Eyes": {
+        "r": 0.067,
+        "g": 0.067,
+        "b": 0.067
+      },
+      "Front_left_leg": {
+        "r": 0.035,
+        "g": 0.537,
+        "b": 0.812
+      },
+      "Front_right_leg": {
+        "r": 0.035,
+        "g": 0.537,
+        "b": 0.812
+      },
+      "Head": {
+        "r": 0.035,
+        "g": 0.537,
+        "b": 0.812
+      },
+      "Teeth": {
+        "r": 1,
+        "g": 1,
+        "b": 1
+      },
+      "Nose": {
+        "r": 0.067,
+        "g": 0.067,
+        "b": 0.067
+      }
+    },
+    "Class": "Rare",
+    "CatchRateScalar": 45,
+    "FemaleChance": 50,
+    "Abilities": [
+      {
+        "Name": "Sand Cover",
+        "Chance": 68
+      },
+      {
+        "Name": "Water Press",
+        "Chance": 30
+      },
+      {
+        "Name": "Matrix Breaker",
+        "Chance": 2
+      }
+    ]
+  },
+  {
+    "Id": "Chimpanini",
+    "Slug": "chimpanini",
+    "DexNumber": 14,
+    "Name": "Chimpanini",
+    "Sprite": "rbxassetid://nil",
+    "ShinySprite": null,
+    "Description": "A hyperactive jungle prankster that flings seeds and swings through trees with reckless abandon.",
+    "Types": [
+      "Grass"
+    ],
+    "BaseStats": {
+      "HP": 45,
+      "Attack": 50,
+      "Defense": 40,
+      "SpecialAttack": 45,
+      "SpecialDefense": 40,
+      "Speed": 60
+    },
+    "Learnset": {
+      "1": [
+        "Scratch",
+        "Tackle"
+      ],
+      "5": [
+        "Vine Whip"
+      ],
+      "9": [
+        "Fast Attack"
+      ],
+      "14": [
+        "Seed Toss"
+      ]
+    },
+    "EvolutionLevel": 20,
+    "EvolvesInto": "Chimpanzini Bananini",
+    "BaseWeightKg": 12,
+    "ShinyColors": {
+      "HeadWhite": {
+        "r": 0.973,
+        "g": 0.973,
+        "b": 0.973
+      },
+      "ArmL": {
+        "r": 0.961,
+        "g": 0.804,
+        "b": 0.188
+      },
+      "Tail1": {
+        "r": 0.416,
+        "g": 0.224,
+        "b": 0.035
+      },
+      "Tail2": {
+        "r": 0.416,
+        "g": 0.224,
+        "b": 0.035
+      },
+      "Tail3": {
+        "r": 0.416,
+        "g": 0.224,
+        "b": 0.035
+      },
+      "Tail4": {
+        "r": 0.416,
+        "g": 0.224,
+        "b": 0.035
+      },
+      "LegL": {
+        "r": 0.961,
+        "g": 0.804,
+        "b": 0.188
+      },
+      "Torso": {
+        "r": 0.992,
+        "g": 0.918,
+        "b": 0.553
+      },
+      "LegR": {
+        "r": 0.961,
+        "g": 0.804,
+        "b": 0.188
+      },
+      "ArmR": {
+        "r": 0.961,
+        "g": 0.804,
+        "b": 0.188
+      },
+      "Tail5": {
+        "r": 0.416,
+        "g": 0.224,
+        "b": 0.035
+      },
+      "HandL": {
+        "r": 0.416,
+        "g": 0.224,
+        "b": 0.035
+      },
+      "HandR": {
+        "r": 0.416,
+        "g": 0.224,
+        "b": 0.035
+      },
+      "HeadPastel": {
+        "r": 1,
+        "g": 0.675,
+        "b": 0.565
+      },
+      "FootL": {
+        "r": 0.416,
+        "g": 0.224,
+        "b": 0.035
+      },
+      "FootR": {
+        "r": 0.416,
+        "g": 0.224,
+        "b": 0.035
+      },
+      "HR2": {
+        "r": 0.639,
+        "g": 0.635,
+        "b": 0.647
+      },
+      "HumanoidRootPart": {
+        "r": 0.639,
+        "g": 0.635,
+        "b": 0.647
+      },
+      "HeadBlack": {
+        "r": 0.067,
+        "g": 0.067,
+        "b": 0.067
+      },
+      "HeadGreen": {
+        "r": 0.416,
+        "g": 0.224,
+        "b": 0.035
+      }
+    },
+    "Class": "Basic",
+    "CatchRateScalar": 190,
+    "FemaleChance": 50,
+    "Abilities": [
+      {
+        "Name": "Sun Bounty",
+        "Chance": 68
+      },
+      {
+        "Name": "Permeate",
+        "Chance": 30
+      },
+      {
+        "Name": "Sap Siphon",
+        "Chance": 2
+      }
+    ]
+  },
+  {
+    "Id": "Chimpanzini Bananini",
+    "Slug": "chimpanzini-bananini",
+    "DexNumber": 15,
+    "Name": "Chimpanzini Bananini",
+    "Sprite": "rbxassetid://nil",
+    "ShinySprite": null,
+    "Description": "Though armless, it hops and rolls through the jungle with surprising speed. Its banana body stores energy from sunlight.",
+    "Types": [
+      "Grass"
+    ],
+    "BaseStats": {
+      "HP": 65,
+      "Attack": 75,
+      "Defense": 55,
+      "SpecialAttack": 65,
+      "SpecialDefense": 55,
+      "Speed": 90
+    },
+    "Learnset": {
+      "1": [
+        "Scratch",
+        "Vine Whip",
+        "Fast Attack"
+      ],
+      "20": [
+        "Seed Toss"
+      ],
+      "26": [
+        "Leaf Slash"
+      ],
+      "34": [
+        "Grand Slam"
+      ]
+    },
+    "EvolutionLevel": null,
+    "EvolvesInto": null,
+    "BaseWeightKg": 22,
+    "ShinyColors": {
+      "HeadWhite": {
+        "r": 0.973,
+        "g": 0.973,
+        "b": 0.973
+      },
+      "ArmL": {
+        "r": 0.961,
+        "g": 0.804,
+        "b": 0.188
+      },
+      "Tail1": {
+        "r": 0.204,
+        "g": 0.557,
+        "b": 0.251
+      },
+      "HeadGreen": {
+        "r": 0.533,
+        "g": 0.325,
+        "b": 0.204
+      },
+      "Tail2": {
+        "r": 0.204,
+        "g": 0.557,
+        "b": 0.251
+      },
+      "Tail3": {
+        "r": 0.204,
+        "g": 0.557,
+        "b": 0.251
+      },
+      "Tail4": {
+        "r": 0.204,
+        "g": 0.557,
+        "b": 0.251
+      },
+      "LegL": {
+        "r": 0.961,
+        "g": 0.804,
+        "b": 0.188
+      },
+      "Torso": {
+        "r": 0.992,
+        "g": 0.918,
+        "b": 0.553
+      },
+      "LegR": {
+        "r": 0.961,
+        "g": 0.804,
+        "b": 0.188
+      },
+      "ArmR": {
+        "r": 0.961,
+        "g": 0.804,
+        "b": 0.188
+      },
+      "Tail5": {
+        "r": 0.416,
+        "g": 0.224,
+        "b": 0.035
+      },
+      "HandL": {
+        "r": 0.416,
+        "g": 0.224,
+        "b": 0.035
+      },
+      "HandR": {
+        "r": 0.416,
+        "g": 0.224,
+        "b": 0.035
+      },
+      "HeadPastel": {
+        "r": 1,
+        "g": 0.675,
+        "b": 0.514
+      },
+      "FootL": {
+        "r": 0.416,
+        "g": 0.224,
+        "b": 0.035
+      },
+      "FootR": {
+        "r": 0.416,
+        "g": 0.224,
+        "b": 0.035
+      },
+      "HR2": {
+        "r": 0.639,
+        "g": 0.635,
+        "b": 0.647
+      },
+      "HumanoidRootPart": {
+        "r": 0.639,
+        "g": 0.635,
+        "b": 0.647
+      },
+      "HeadBlack": {
+        "r": 0.067,
+        "g": 0.067,
+        "b": 0.067
+      }
+    },
+    "Class": "Advanced",
+    "CatchRateScalar": 90,
+    "FemaleChance": 50,
+    "Abilities": [
+      {
+        "Name": "Sun Bounty",
+        "Chance": 68
+      },
+      {
+        "Name": "Permeate",
+        "Chance": 30
+      },
+      {
+        "Name": "Sap Siphon",
+        "Chance": 2
+      }
+    ]
+  },
+  {
+    "Id": "Duckaroo",
+    "Slug": "duckaroo",
+    "DexNumber": 16,
+    "Name": "Duckaroo",
+    "Sprite": "rbxassetid://nil",
+    "ShinySprite": null,
+    "Description": "A cowboy duck that patrols dry plains and dusty canyons, kicking up sand as it chases bandits.",
+    "Types": [
+      "Flying",
+      "Ground"
+    ],
+    "BaseStats": {
+      "HP": 65,
+      "Attack": 90,
+      "Defense": 60,
+      "SpecialAttack": 55,
+      "SpecialDefense": 60,
+      "Speed": 95
+    },
+    "Learnset": {
+      "1": [
+        "Peck",
+        "Tackle"
+      ],
+      "6": [
+        "Fast Attack"
+      ],
+      "10": [
+        "Sand Storm"
+      ],
+      "16": [
+        "Bite"
+      ],
+      "22": [
+        "Duststorm Dash"
+      ],
+      "30": [
+        "Earthquake"
+      ],
+      "38": [
+        "Dive Bomb"
+      ],
+      "46": [
+        "Crunch"
+      ]
+    },
+    "EvolutionLevel": null,
+    "EvolvesInto": null,
+    "BaseWeightKg": 18,
+    "ShinyColors": {
+      "Beak": {
+        "r": 1,
+        "g": 0.647,
+        "b": 0
+      },
+      "Body": {
+        "r": 0.824,
+        "g": 0.706,
+        "b": 0.549
+      },
+      "BootL": {
+        "r": 0.333,
+        "g": 0.42,
+        "b": 0.184
+      },
+      "BootR": {
+        "r": 0.333,
+        "g": 0.42,
+        "b": 0.184
+      },
+      "EyeL": {
+        "r": 0.294,
+        "g": 0.18,
+        "b": 0.02
+      },
+      "EyeR": {
+        "r": 0.294,
+        "g": 0.18,
+        "b": 0.02
+      },
+      "FootBackL": {
+        "r": 0.761,
+        "g": 0.698,
+        "b": 0.502
+      },
+      "FootBackR": {
+        "r": 0.761,
+        "g": 0.698,
+        "b": 0.502
+      },
+      "FootBuckleL": {
+        "r": 0.149,
+        "g": 0.149,
+        "b": 0.153
+      },
+      "FootBuckleR": {
+        "r": 0.149,
+        "g": 0.149,
+        "b": 0.153
+      },
+      "FootStudL": {
+        "r": 0.722,
+        "g": 0.525,
+        "b": 0.043
+      },
+      "FootStudR": {
+        "r": 0.722,
+        "g": 0.525,
+        "b": 0.043
+      },
+      "Hat": {
+        "r": 0.333,
+        "g": 0.42,
+        "b": 0.184
+      },
+      "HatBack": {
+        "r": 0.333,
+        "g": 0.42,
+        "b": 0.184
+      },
+      "Head": {
+        "r": 0.937,
+        "g": 0.902,
+        "b": 0.839
+      },
+      "HeelL": {
+        "r": 0.169,
+        "g": 0.212,
+        "b": 0.094
+      },
+      "HeelR": {
+        "r": 0.169,
+        "g": 0.212,
+        "b": 0.094
+      },
+      "LowerLegL": {
+        "r": 1,
+        "g": 0.647,
+        "b": 0
+      },
+      "LowerLegR": {
+        "r": 1,
+        "g": 0.647,
+        "b": 0
+      },
+      "Neck": {
+        "r": 0.937,
+        "g": 0.902,
+        "b": 0.839
+      },
+      "StudL": {
+        "r": 0.722,
+        "g": 0.525,
+        "b": 0.043
+      },
+      "StudL_L": {
+        "r": 0.722,
+        "g": 0.525,
+        "b": 0.043
+      },
+      "StudMiddle": {
+        "r": 0.722,
+        "g": 0.525,
+        "b": 0.043
+      },
+      "StudR": {
+        "r": 0.722,
+        "g": 0.525,
+        "b": 0.043
+      },
+      "StudR_R": {
+        "r": 0.722,
+        "g": 0.525,
+        "b": 0.043
+      },
+      "Tail": {
+        "r": 0.824,
+        "g": 0.706,
+        "b": 0.549
+      },
+      "UpperLegL": {
+        "r": 0.824,
+        "g": 0.706,
+        "b": 0.549
+      },
+      "UpperLegR": {
+        "r": 0.824,
+        "g": 0.706,
+        "b": 0.549
+      },
+      "WingL": {
+        "r": 0.824,
+        "g": 0.706,
+        "b": 0.549
+      },
+      "WingR": {
+        "r": 0.824,
+        "g": 0.706,
+        "b": 0.549
+      },
+      "HumanoidRootPart": {
+        "r": 0.639,
+        "g": 0.635,
+        "b": 0.647
+      }
+    },
+    "Class": "Rare",
+    "CatchRateScalar": 60,
+    "FemaleChance": 40,
+    "Abilities": [
+      {
+        "Name": "Sand Cover",
+        "Chance": 68
+      },
+      {
+        "Name": "Great Fortune",
+        "Chance": 30
+      },
+      {
+        "Name": "Wind Wings",
+        "Chance": 2
+      }
+    ]
+  },
+  {
+    "Id": "Doggolino",
+    "Slug": "doggolino",
+    "DexNumber": 18,
+    "Name": "Doggolino",
+    "Sprite": "rbxassetid://93010466071138",
+    "ShinySprite": "rbxassetid://88110777970394",
+    "Description": "A furious hot-dog spirit. It barks in sizzles and pops, leaving scorch marks where it walks.",
+    "Types": [
+      "Fire"
+    ],
+    "BaseStats": {
+      "HP": 60,
+      "Attack": 75,
+      "Defense": 50,
+      "SpecialAttack": 70,
+      "SpecialDefense": 50,
+      "Speed": 80
+    },
+    "Learnset": {
+      "1": [
+        "Tackle",
+        "Scratch"
+      ],
+      "6": [
+        "Fast Attack"
+      ],
+      "12": [
+        "Bite"
+      ],
+      "18": [
+        "Crunch"
+      ],
+      "26": [
+        "Grand Slam"
+      ]
+    },
+    "EvolutionLevel": null,
+    "EvolvesInto": null,
+    "BaseWeightKg": 12,
+    "ShinyColors": {
+      "BottomTeeth": {
+        "r": 0.973,
+        "g": 0.973,
+        "b": 0.973
+      },
+      "Bun": {
+        "r": 0.639,
+        "g": 0.294,
+        "b": 0.294
+      },
+      "Eyes": {
+        "r": 0.067,
+        "g": 0.067,
+        "b": 0.067
+      },
+      "Ketchup": {
+        "r": 0.639,
+        "g": 0.294,
+        "b": 0.294
+      },
+      "Nose": {
+        "r": 0.067,
+        "g": 0.067,
+        "b": 0.067
+      },
+      "Red": {
+        "r": 0.996,
+        "g": 0.953,
+        "b": 0.733
+      },
+      "Tongue": {
+        "r": 0.769,
+        "g": 0.157,
+        "b": 0.11
+      },
+      "TopTeeth": {
+        "r": 0.973,
+        "g": 0.973,
+        "b": 0.973
+      },
+      "HumanoidRootPart": {
+        "r": 0.639,
+        "g": 0.635,
+        "b": 0.647
+      }
+    },
+    "Class": "Basic",
+    "CatchRateScalar": 150,
+    "FemaleChance": 50,
+    "Abilities": [
+      {
+        "Name": "Fireup",
+        "Chance": 98
+      },
+      {
+        "Name": "Menace",
+        "Chance": 2
+      }
+    ]
+  },
+  {
+    "Id": "Tadbalabu",
+    "Slug": "tadbalabu",
+    "DexNumber": 19,
+    "Name": "Tadbalabu",
+    "Sprite": "rbxassetid://73449852108494",
+    "ShinySprite": "rbxassetid://99593933734854",
+    "Description": "A little frog-tad that drums on puddles with its tail. Its rhythm attracts other creatures.",
+    "Types": [
+      "Grass"
+    ],
+    "BaseStats": {
+      "HP": 50,
+      "Attack": 45,
+      "Defense": 45,
+      "SpecialAttack": 55,
+      "SpecialDefense": 50,
+      "Speed": 55
+    },
+    "Learnset": {
+      "1": [
+        "Tackle",
+        "Scratch"
+      ],
+      "5": [
+        "Vine Whip"
+      ],
+      "9": [
+        "Fast Attack"
+      ],
+      "14": [
+        "Seed Toss"
+      ]
+    },
+    "EvolutionLevel": 16,
+    "EvolvesInto": "Boneca Ambalabu",
+    "BaseWeightKg": 6,
+    "ShinyColors": {
+      "LToeNails": {
+        "r": 0.973,
+        "g": 0.973,
+        "b": 0.973
+      },
+      "RightLeg": {
+        "r": 0.769,
+        "g": 0.157,
+        "b": 0.11
+      },
+      "RToeNails": {
+        "r": 0.973,
+        "g": 0.973,
+        "b": 0.973
+      },
+      "RightLegTop": {
+        "r": 0.2,
+        "g": 0.345,
+        "b": 0.51
+      },
+      "Torso": {
+        "r": 0.686,
+        "g": 0.867,
+        "b": 1
+      },
+      "BottomHead": {
+        "r": 0.937,
+        "g": 0.722,
+        "b": 0.22
+      },
+      "Nose": {
+        "r": 0.067,
+        "g": 0.067,
+        "b": 0.067
+      },
+      "TopHead": {
+        "r": 0.769,
+        "g": 0.157,
+        "b": 0.11
+      },
+      "HumanoidRootPart": {
+        "r": 0.639,
+        "g": 0.635,
+        "b": 0.647
+      },
+      "HR2": {
+        "r": 0.639,
+        "g": 0.635,
+        "b": 0.647
+      },
+      "Eyes": {
+        "r": 0.106,
+        "g": 0.165,
+        "b": 0.208
+      },
+      "LeftLeg": {
+        "r": 0.769,
+        "g": 0.157,
+        "b": 0.11
+      },
+      "LeftLegTop": {
+        "r": 0.2,
+        "g": 0.345,
+        "b": 0.51
+      }
+    },
+    "Class": "Basic",
+    "CatchRateScalar": 190,
+    "FemaleChance": 50,
+    "Abilities": [
+      {
+        "Name": "Permeate",
+        "Chance": 68
+      },
+      {
+        "Name": "Grass Veil",
+        "Chance": 30
+      },
+      {
+        "Name": "Sap Siphon",
+        "Chance": 2
+      }
+    ]
+  },
+  {
+    "Id": "Boneca Ambalabu",
+    "Slug": "boneca-ambalabu",
+    "DexNumber": 20,
+    "Name": "Boneca Ambalabu",
+    "Sprite": "rbxassetid://75248703568577",
+    "ShinySprite": "rbxassetid://111827317838725",
+    "Description": "It grows longer limbs like a doll, keeping a steady jungle rhythm that boosts nearby plants.",
+    "Types": [
+      "Grass"
+    ],
+    "BaseStats": {
+      "HP": 70,
+      "Attack": 65,
+      "Defense": 60,
+      "SpecialAttack": 75,
+      "SpecialDefense": 65,
+      "Speed": 85
+    },
+    "Learnset": {
+      "1": [
+        "Vine Whip",
+        "Seed Toss",
+        "Fast Attack"
+      ],
+      "18": [
+        "Leaf Slash"
+      ],
+      "26": [
+        "Double Kick"
+      ]
+    },
+    "EvolutionLevel": 36,
+    "EvolvesInto": "Ambalabu Ton-Ton",
+    "BaseWeightKg": 15,
+    "ShinyColors": {
+      "Nose": {
+        "r": 0.067,
+        "g": 0.067,
+        "b": 0.067
+      },
+      "Eyes": {
+        "r": 0.973,
+        "g": 0.851,
+        "b": 0.427
+      },
+      "TopHead": {
+        "r": 1,
+        "g": 0,
+        "b": 0
+      },
+      "Torso": {
+        "r": 0.051,
+        "g": 0.412,
+        "b": 0.675
+      },
+      "BottomHead": {
+        "r": 0.937,
+        "g": 0.722,
+        "b": 0.22
+      },
+      "LeftLeg": {
+        "r": 1,
+        "g": 0,
+        "b": 0
+      },
+      "RightLeg": {
+        "r": 1,
+        "g": 0,
+        "b": 0
+      },
+      "RToeNails": {
+        "r": 0.973,
+        "g": 0.973,
+        "b": 0.973
+      },
+      "LToeNails": {
+        "r": 0.973,
+        "g": 0.973,
+        "b": 0.973
+      },
+      "HR2": {
+        "r": 0.639,
+        "g": 0.635,
+        "b": 0.647
+      },
+      "HumanoidRootPart": {
+        "r": 0.639,
+        "g": 0.635,
+        "b": 0.647
+      }
+    },
+    "Class": "Advanced",
+    "CatchRateScalar": 90,
+    "FemaleChance": 50,
+    "Abilities": [
+      {
+        "Name": "Permeate",
+        "Chance": 68
+      },
+      {
+        "Name": "Grass Veil",
+        "Chance": 30
+      },
+      {
+        "Name": "Sap Siphon",
+        "Chance": 2
+      }
+    ]
+  },
+  {
+    "Id": "Ambalabu Ton-Ton",
+    "Slug": "ambalabu-ton-ton",
+    "DexNumber": 21,
+    "Name": "Ambalabu Ton-Ton",
+    "Sprite": "rbxassetid://nil",
+    "ShinySprite": null,
+    "Description": "Stacked like drums, it pounds a beat that spurs seedlings to sprout. Its rhythm can shake the earth.",
+    "Types": [
+      "Grass",
+      "Fighting"
+    ],
+    "BaseStats": {
+      "HP": 90,
+      "Attack": 90,
+      "Defense": 75,
+      "SpecialAttack": 85,
+      "SpecialDefense": 80,
+      "Speed": 95
+    },
+    "Learnset": {
+      "1": [
+        "Vine Whip",
+        "Seed Toss",
+        "Leaf Slash"
+      ],
+      "28": [
+        "Double Kick"
+      ],
+      "36": [
+        "Grand Slam"
+      ],
+      "44": [
+        "Earthquake"
+      ]
+    },
+    "EvolutionLevel": null,
+    "EvolvesInto": null,
+    "BaseWeightKg": 32,
+    "ShinyColors": {
+      "Nose": {
+        "r": 0.067,
+        "g": 0.067,
+        "b": 0.067
+      },
+      "Eyes": {
+        "r": 0.067,
+        "g": 0.067,
+        "b": 0.067
+      },
+      "FaceMarks": {
+        "r": 1,
+        "g": 0,
+        "b": 0
+      },
+      "TopHead": {
+        "r": 1,
+        "g": 0,
+        "b": 0
+      },
+      "BottomHead": {
+        "r": 0.937,
+        "g": 0.722,
+        "b": 0.22
+      },
+      "TopHat": {
+        "r": 0.973,
+        "g": 0.973,
+        "b": 0.973
+      },
+      "Tire1": {
+        "r": 0.624,
+        "g": 0.678,
+        "b": 0.753
+      },
+      "Tire2": {
+        "r": 0.035,
+        "g": 0.537,
+        "b": 0.812
+      },
+      "Torso": {
+        "r": 1,
+        "g": 0,
+        "b": 0
+      },
+      "Tire3": {
+        "r": 0,
+        "g": 0.063,
+        "b": 0.69
+      },
+      "RightLeg": {
+        "r": 1,
+        "g": 0,
+        "b": 0
+      },
+      "LeftLeg": {
+        "r": 1,
+        "g": 0,
+        "b": 0
+      },
+      "RToeNail": {
+        "r": 0.973,
+        "g": 0.973,
+        "b": 0.973
+      },
+      "LToeNail": {
+        "r": 0.973,
+        "g": 0.973,
+        "b": 0.973
+      },
+      "HR2": {
+        "r": 0.639,
+        "g": 0.635,
+        "b": 0.647
+      },
+      "HumanoidRootPart": {
+        "r": 0.639,
+        "g": 0.635,
+        "b": 0.647
+      }
+    },
+    "Class": "Advanced",
+    "CatchRateScalar": 45,
+    "FemaleChance": 50
+  },
+  {
+    "Id": "Abrazard",
+    "Slug": "abrazard",
+    "DexNumber": 22,
+    "Name": "Abrazard",
+    "Sprite": "rbxassetid://nil",
+    "ShinySprite": null,
+    "Description": "A small wizard who loves playful mischief. Its spells are mostly harmless, but its psychic power is no joke.",
+    "Types": [
+      "Psychic"
+    ],
+    "BaseStats": {
+      "HP": 50,
+      "Attack": 45,
+      "Defense": 45,
+      "SpecialAttack": 95,
+      "SpecialDefense": 55,
+      "Speed": 75
+    },
+    "Learnset": {
+      "1": [
+        "Scratch",
+        "Tackle"
+      ],
+      "6": [
+        "Fast Attack"
+      ],
+      "12": [
+        "Mind Slam"
+      ],
+      "18": [
+        "Dazzle Beam"
+      ],
+      "26": [
+        "Sunbeam"
+      ]
+    },
+    "EvolutionLevel": null,
+    "EvolvesInto": null,
+    "BaseWeightKg": 8,
+    "ShinyColors": {
+      "ArmL": {
+        "r": 0.369,
+        "g": 0.271,
+        "b": 0.22
+      },
+      "ArmR": {
+        "r": 0.369,
+        "g": 0.271,
+        "b": 0.22
+      },
+      "Beard": {
+        "r": 1,
+        "g": 1,
+        "b": 1
+      },
+      "Candy": {
+        "r": 1,
+        "g": 0.698,
+        "b": 0.094
+      },
+      "EyesBlue": {
+        "r": 1,
+        "g": 0.698,
+        "b": 0.094
+      },
+      "EyesWhite": {
+        "r": 0.973,
+        "g": 0.973,
+        "b": 0.973
+      },
+      "FootL": {
+        "r": 1,
+        "g": 0.698,
+        "b": 0.094
+      },
+      "FootR": {
+        "r": 1,
+        "g": 0.698,
+        "b": 0.094
+      },
+      "Gold": {
+        "r": 1,
+        "g": 0.698,
+        "b": 0.094
+      },
+      "HandL": {
+        "r": 1,
+        "g": 0.808,
+        "b": 0.576
+      },
+      "HandR": {
+        "r": 1,
+        "g": 0.808,
+        "b": 0.576
+      },
+      "HatBottom": {
+        "r": 1,
+        "g": 0.698,
+        "b": 0.094
+      },
+      "HatTop": {
+        "r": 0.369,
+        "g": 0.271,
+        "b": 0.22
+      },
+      "HeadTop": {
+        "r": 1,
+        "g": 0.808,
+        "b": 0.576
+      },
+      "Torso": {
+        "r": 0.369,
+        "g": 0.271,
+        "b": 0.22
+      },
+      "Stars": {
+        "r": 1,
+        "g": 0.698,
+        "b": 0.094
+      },
+      "Wood": {
+        "r": 0.412,
+        "g": 0.251,
+        "b": 0.157
+      },
+      "HumanoidRootPart": {
+        "r": 0.639,
+        "g": 0.635,
+        "b": 0.647
+      }
+    },
+    "Class": "Basic",
+    "CatchRateScalar": 120,
+    "FemaleChance": 40,
+    "Abilities": [
+      {
+        "Name": "Trickster",
+        "Chance": 68
+      },
+      {
+        "Name": "Magic Mirror",
+        "Chance": 30
+      },
+      {
+        "Name": "Arcane Veil",
+        "Chance": 2
+      }
+    ]
+  },
+  {
+    "Id": "Bolasaeg Selluaim",
+    "Slug": "bolasaeg-selluaim",
+    "DexNumber": 23,
+    "Name": "Bolasaeg Selluaim",
+    "Sprite": "rbxassetid://75020717494654",
+    "ShinySprite": "rbxassetid://98225384445928",
+    "Description": "A creature made entirely of gelatinous ooze. It slowly devours anything in its path with corrosive acid.",
+    "Types": [
+      "Poison"
+    ],
+    "BaseStats": {
+      "HP": 95,
+      "Attack": 70,
+      "Defense": 80,
+      "SpecialAttack": 75,
+      "SpecialDefense": 85,
+      "Speed": 40
+    },
+    "Learnset": {
+      "1": [
+        "Tackle",
+        "Ooze Shot"
+      ],
+      "6": [
+        "Scratch"
+      ],
+      "10": [
+        "Sludge Puff"
+      ],
+      "16": [
+        "Toxic Wave"
+      ],
+      "24": [
+        "Corrosive Grasp"
+      ],
+      "32": [
+        "Acidic Deluge"
+      ]
+    },
+    "EvolutionLevel": null,
+    "EvolvesInto": null,
+    "BaseWeightKg": 35,
+    "ShinyColors": {
+      "jSE": {
+        "r": 0.51,
+        "g": 0.604,
+        "b": 0.173
+      },
+      "HumanoidRootPart": {
+        "r": 0.067,
+        "g": 0.067,
+        "b": 0.067
+      },
+      "rSu": {
+        "r": 0.553,
+        "g": 0.749,
+        "b": 0.125
+      },
+      "TYp": {
+        "r": 0.51,
+        "g": 0.604,
+        "b": 0.173
+      },
+      "Head": {
+        "r": 0.553,
+        "g": 0.749,
+        "b": 0.125
+      },
+      "zuB": {
+        "r": 0.553,
+        "g": 0.749,
+        "b": 0.125
+      },
+      "vhM": {
+        "r": 0.553,
+        "g": 0.749,
+        "b": 0.125
+      },
+      "Orx": {
+        "r": 0.553,
+        "g": 0.749,
+        "b": 0.125
+      },
+      "qVd": {
+        "r": 0.553,
+        "g": 0.749,
+        "b": 0.125
+      },
+      "Main": {
+        "r": 0.553,
+        "g": 0.749,
+        "b": 0.125
+      },
+      "IKv": {
+        "r": 0.51,
+        "g": 0.604,
+        "b": 0.173
+      },
+      "BuV": {
+        "r": 0.51,
+        "g": 0.604,
+        "b": 0.173
+      },
+      "TUQ": {
+        "r": 0.51,
+        "g": 0.604,
+        "b": 0.173
+      },
+      "nHd": {
+        "r": 0.51,
+        "g": 0.604,
+        "b": 0.173
+      },
+      "pwZ": {
+        "r": 0.553,
+        "g": 0.749,
+        "b": 0.125
+      },
+      "Ndd": {
+        "r": 0.553,
+        "g": 0.749,
+        "b": 0.125
+      },
+      "EyeL": {
+        "r": 0.067,
+        "g": 0.067,
+        "b": 0.067
+      },
+      "EyeR": {
+        "r": 0.067,
+        "g": 0.067,
+        "b": 0.067
+      },
+      "eUG": {
+        "r": 0.553,
+        "g": 0.749,
+        "b": 0.125
+      }
+    },
+    "Class": "Basic",
+    "CatchRateScalar": 100,
+    "FemaleChance": 50,
+    "Abilities": [
+      {
+        "Name": "Sticky Goo",
+        "Chance": 68
+      },
+      {
+        "Name": "Corrosive Skin",
+        "Chance": 30
+      },
+      {
+        "Name": "Sludge Shield",
+        "Chance": 2
+      }
+    ]
+  },
+  {
+    "Id": "Trippi Troppi",
+    "Slug": "trippi-troppi",
+    "DexNumber": 24,
+    "Name": "Trippi Troppi",
+    "Sprite": "rbxassetid://nil",
+    "ShinySprite": "rbxassetid://nil",
+    "Description": "A fish that adapted to land but never let go of its aquatic nature. Despite its dopey look, it becomes fierce if provoked.",
+    "Types": [
+      "Water",
+      "Normal"
+    ],
+    "BaseStats": {
+      "HP": 85,
+      "Attack": 60,
+      "Defense": 70,
+      "SpecialAttack": 65,
+      "SpecialDefense": 75,
+      "Speed": 55
+    },
+    "Learnset": {
+      "1": [
+        "Tackle",
+        "Water Jet"
+      ],
+      "6": [
+        "Bite"
+      ],
+      "12": [
+        "Fast Attack"
+      ],
+      "18": [
+        "Aqua Slash"
+      ],
+      "26": [
+        "Crunch"
+      ],
+      "34": [
+        "Hydro Burst"
+      ]
+    },
+    "EvolutionLevel": null,
+    "EvolvesInto": null,
+    "BaseWeightKg": 28,
+    "ShinyColors": {
+      "TopFin": {
+        "r": 0.624,
+        "g": 0.631,
+        "b": 0.675
+      },
+      "BottomFin": {
+        "r": 0.8,
+        "g": 0.557,
+        "b": 0.412
+      },
+      "HeadMesh": {
+        "r": 0.792,
+        "g": 0.796,
+        "b": 0.82
+      },
+      "BackFin": {
+        "r": 0.624,
+        "g": 0.631,
+        "b": 0.675
+      },
+      "Body": {
+        "r": 0.8,
+        "g": 1,
+        "b": 0.8
+      },
+      "ArmR": {
+        "r": 0.388,
+        "g": 0.373,
+        "b": 0.384
+      },
+      "ArmL": {
+        "r": 0.388,
+        "g": 0.373,
+        "b": 0.384
+      },
+      "LegR": {
+        "r": 0.388,
+        "g": 0.373,
+        "b": 0.384
+      },
+      "LegL": {
+        "r": 0.388,
+        "g": 0.373,
+        "b": 0.384
+      },
+      "BlackEyeR": {
+        "r": 0.067,
+        "g": 0.067,
+        "b": 0.067
+      },
+      "BlackEyeL": {
+        "r": 0.067,
+        "g": 0.067,
+        "b": 0.067
+      },
+      "Eyes": {
+        "r": 0.58,
+        "g": 0.745,
+        "b": 0.506
+      },
+      "HumanoidRootPart": {
+        "r": 0.639,
+        "g": 0.635,
+        "b": 0.647
+      }
+    },
+    "Class": "Basic",
+    "CatchRateScalar": 150,
+    "FemaleChance": 50,
+    "Abilities": [
+      {
+        "Name": "Amphibious",
+        "Chance": 68
+      },
+      {
+        "Name": "Stubborn Waddle",
+        "Chance": 30
+      },
+      {
+        "Name": "Mudslide",
+        "Chance": 2
+      }
+    ]
+  },
+  {
+    "Id": "Il Cacto Hipopotamo",
+    "Slug": "il-cacto-hipopotamo",
+    "DexNumber": 25,
+    "Name": "Il Cacto Hipopotamo",
+    "Sprite": "rbxassetid://nil",
+    "ShinySprite": "rbxassetid://nil",
+    "Description": "A mysterious fusion of flora and fauna. It thrives in deserts, absorbing sunlight and storing water. Fiercely territorial.",
+    "Types": [
+      "Grass",
+      "Ground"
+    ],
+    "BaseStats": {
+      "HP": 90,
+      "Attack": 70,
+      "Defense": 85,
+      "SpecialAttack": 75,
+      "SpecialDefense": 80,
+      "Speed": 55
+    },
+    "Learnset": {
+      "1": [
+        "Tackle",
+        "Scratch"
+      ],
+      "6": [
+        "Vine Whip"
+      ],
+      "12": [
+        "Sand Storm"
+      ],
+      "18": [
+        "Seed Toss"
+      ],
+      "26": [
+        "Leaf Slash"
+      ],
+      "34": [
+        "Earthquake"
+      ]
+    },
+    "EvolutionLevel": null,
+    "EvolvesInto": null,
+    "BaseWeightKg": 145,
+    "ShinyColors": {
+      "BodyMain": {
+        "r": 0.549,
+        "g": 0.357,
+        "b": 0.624
+      },
+      "Ears": {
+        "r": 1,
+        "g": 0.596,
+        "b": 0.863
+      },
+      "FootL": {
+        "r": 0.627,
+        "g": 0.518,
+        "b": 0.31
+      },
+      "FootR": {
+        "r": 0.627,
+        "g": 0.518,
+        "b": 0.31
+      },
+      "HeadMesh": {
+        "r": 0.612,
+        "g": 0.627,
+        "b": 0.706
+      },
+      "EyePartR": {
+        "r": 1,
+        "g": 0.596,
+        "b": 0.863
+      },
+      "EyePartL": {
+        "r": 1,
+        "g": 0.596,
+        "b": 0.863
+      },
+      "EyeR": {
+        "r": 0.973,
+        "g": 0.973,
+        "b": 0.973
+      },
+      "EyeL": {
+        "r": 0.067,
+        "g": 0.067,
+        "b": 0.067
+      },
+      "Dark": {
+        "r": 0.408,
+        "g": 0.231,
+        "b": 0.38
+      },
+      "HeadParts": {
+        "r": 0.243,
+        "g": 0.239,
+        "b": 0.227
+      },
+      "HumanoidRootPart": {
+        "r": 0.639,
+        "g": 0.635,
+        "b": 0.647
+      }
+    },
+    "Class": "Rare",
+    "CatchRateScalar": 60,
+    "FemaleChance": 50,
+    "Abilities": [
+      {
+        "Name": "Sun Bounty",
+        "Chance": 68
+      },
+      {
+        "Name": "Needle Guard",
+        "Chance": 30
+      },
+      {
+        "Name": "Desert Reservoir",
+        "Chance": 2
+      }
+    ]
+  },
+  {
+    "Id": "Chicleteira",
+    "Slug": "chicleteira",
+    "DexNumber": 26,
+    "Name": "Chicleteira",
+    "Sprite": "rbxassetid://nil",
+    "ShinySprite": "rbxassetid://nil",
+    "Description": "A humanoid gumball machine that fires sticky gum to trap prey. Its laughter echoes in alleys long after it's gone.",
+    "Types": [
+      "Steel"
+    ],
+    "BaseStats": {
+      "HP": 75,
+      "Attack": 55,
+      "Defense": 90,
+      "SpecialAttack": 65,
+      "SpecialDefense": 85,
+      "Speed": 55
+    },
+    "Learnset": {
+      "1": [
+        "Tackle",
+        "Scratch"
+      ],
+      "6": [
+        "Fast Attack"
+      ],
+      "12": [
+        "Shield Bash"
+      ],
+      "18": [
+        "Bite"
+      ],
+      "26": [
+        "Grand Slam"
+      ]
+    },
+    "EvolutionLevel": null,
+    "EvolvesInto": null,
+    "BaseWeightKg": 42,
+    "ShinyColors": {
+      "Main_Body": {
+        "r": 0.035,
+        "g": 0.537,
+        "b": 0.812
+      },
+      "Cap": {
+        "r": 0.035,
+        "g": 0.537,
+        "b": 0.812
+      },
+      "Glass_Container": {
+        "r": 0.388,
+        "g": 0.373,
+        "b": 0.384
+      },
+      "CoinMain": {
+        "r": 0.388,
+        "g": 0.373,
+        "b": 0.384
+      },
+      "Coin": {
+        "r": 0.275,
+        "g": 0.263,
+        "b": 0.271
+      },
+      "Arm_Right": {
+        "r": 0.051,
+        "g": 0.412,
+        "b": 0.675
+      },
+      "Arm_left": {
+        "r": 0.051,
+        "g": 0.412,
+        "b": 0.675
+      },
+      "Leg_Right": {
+        "r": 0.035,
+        "g": 0.537,
+        "b": 0.812
+      },
+      "Leg_Left": {
+        "r": 0.035,
+        "g": 0.537,
+        "b": 0.812
+      },
+      "Gumballs": {
+        "r": 0.035,
+        "g": 0.537,
+        "b": 0.812
+      },
+      "Smile": {
+        "r": 0.906,
+        "g": 0.906,
+        "b": 0.925
+      },
+      "Face_Piece": {
+        "r": 0.427,
+        "g": 0.522,
+        "b": 0.584
+      },
+      "Eyebrow_Left": {
+        "r": 0.067,
+        "g": 0.067,
+        "b": 0.067
+      },
+      "Eyebrow_Right": {
+        "r": 0.067,
+        "g": 0.067,
+        "b": 0.067
+      },
+      "Eyeball_Right": {
+        "r": 0.875,
+        "g": 0.875,
+        "b": 0.871
+      },
+      "Eyeball_Left": {
+        "r": 0.875,
+        "g": 0.875,
+        "b": 0.871
+      },
+      "Iris_Left": {
+        "r": 0.067,
+        "g": 0.067,
+        "b": 0.067
+      },
+      "Iris_Right": {
+        "r": 0.067,
+        "g": 0.067,
+        "b": 0.067
+      },
+      "HumanoidRootPart": {
+        "r": 0.639,
+        "g": 0.635,
+        "b": 0.647
+      }
+    },
+    "Class": "Basic",
+    "CatchRateScalar": 120,
+    "FemaleChance": 50,
+    "Abilities": [
+      {
+        "Name": "Bubble Trap",
+        "Chance": 68
+      },
+      {
+        "Name": "Steel Jaw",
+        "Chance": 30
+      },
+      {
+        "Name": "Elastic Trap",
+        "Chance": 2
+      }
+    ]
+  },
+  {
+    "Id": "Špijuniro Golubiro",
+    "Slug": "pijuniro-golubiro",
+    "DexNumber": 27,
+    "Name": "Špijuniro Golubiro",
+    "Sprite": "rbxassetid://nil",
+    "ShinySprite": "rbxassetid://nil",
+    "Description": "A mechanical pigeon that acts as a covert agent. Its lens-like eyes record everything. It vanishes the moment it's spotted.",
+    "Types": [
+      "Flying",
+      "Steel"
+    ],
+    "BaseStats": {
+      "HP": 60,
+      "Attack": 70,
+      "Defense": 75,
+      "SpecialAttack": 65,
+      "SpecialDefense": 70,
+      "Speed": 90
+    },
+    "Learnset": {
+      "1": [
+        "Peck",
+        "Tackle"
+      ],
+      "6": [
+        "Fast Attack"
+      ],
+      "12": [
+        "Dive Bomb"
+      ],
+      "18": [
+        "Shield Bash"
+      ],
+      "26": [
+        "Duststorm Dash"
+      ],
+      "34": [
+        "Grand Slam"
+      ]
+    },
+    "EvolutionLevel": null,
+    "EvolvesInto": null,
+    "BaseWeightKg": 8.5,
+    "ShinyColors": {
+      "AntennaOne": {
+        "r": 0.208,
+        "g": 0.208,
+        "b": 0.208
+      },
+      "Armour": {
+        "r": 0.412,
+        "g": 0.4,
+        "b": 0.361
+      },
+      "AtnennaTwo": {
+        "r": 0.208,
+        "g": 0.208,
+        "b": 0.208
+      },
+      "Beak": {
+        "r": 0.106,
+        "g": 0.165,
+        "b": 0.208
+      },
+      "BodyMain": {
+        "r": 0.486,
+        "g": 0.361,
+        "b": 0.275
+      },
+      "Box": {
+        "r": 0.388,
+        "g": 0.373,
+        "b": 0.384
+      },
+      "Camera": {
+        "r": 0.208,
+        "g": 0.208,
+        "b": 0.208
+      },
+      "Communication": {
+        "r": 0.208,
+        "g": 0.208,
+        "b": 0.208
+      },
+      "Connector": {
+        "r": 0.208,
+        "g": 0.208,
+        "b": 0.208
+      },
+      "DeviceL": {
+        "r": 0.208,
+        "g": 0.208,
+        "b": 0.208
+      },
+      "DeviceR": {
+        "r": 0.208,
+        "g": 0.208,
+        "b": 0.208
+      },
+      "EyesWhite": {
+        "r": 1,
+        "g": 0.69,
+        "b": 0
+      },
+      "FootL": {
+        "r": 0.745,
+        "g": 0.675,
+        "b": 0.529
+      },
+      "FootR": {
+        "r": 0.745,
+        "g": 0.675,
+        "b": 0.529
+      },
+      "Iris": {
+        "r": 0.588,
+        "g": 0.404,
+        "b": 0
+      },
+      "WingL": {
+        "r": 0.486,
+        "g": 0.361,
+        "b": 0.275
+      },
+      "WingR": {
+        "r": 0.486,
+        "g": 0.361,
+        "b": 0.275
+      },
+      "HumanoidRootPart": {
+        "r": 0.639,
+        "g": 0.635,
+        "b": 0.647
+      }
+    },
+    "Class": "Rare",
+    "CatchRateScalar": 75,
+    "FemaleChance": 50,
+    "Abilities": [
+      {
+        "Name": "Recon Flight",
+        "Chance": 68
+      },
+      {
+        "Name": "Stealth Feathers",
+        "Chance": 30
+      },
+      {
+        "Name": "Spy Lens",
+        "Chance": 2
+      }
+    ]
+  },
+  {
+    "Id": "Avocadini Guffo",
+    "Slug": "avocadini-guffo",
+    "DexNumber": 28,
+    "Name": "Avocadini Guffo",
+    "Sprite": "rbxassetid://nil",
+    "ShinySprite": "rbxassetid://nil",
+    "Description": "A plump owl with the body of an avocado. Its wings are too small to fly, so it waddles instead. Rich in nutrients.",
+    "Types": [
+      "Grass"
+    ],
+    "BaseStats": {
+      "HP": 80,
+      "Attack": 60,
+      "Defense": 70,
+      "SpecialAttack": 65,
+      "SpecialDefense": 75,
+      "Speed": 50
+    },
+    "Learnset": {
+      "1": [
+        "Tackle",
+        "Peck"
+      ],
+      "6": [
+        "Vine Whip"
+      ],
+      "12": [
+        "Seed Toss"
+      ],
+      "18": [
+        "Perch"
+      ],
+      "26": [
+        "Leaf Slash"
+      ]
+    },
+    "EvolutionLevel": null,
+    "EvolvesInto": null,
+    "BaseWeightKg": 18,
+    "ShinyColors": {
+      "Body": {
+        "r": 0.514,
+        "g": 0.365,
+        "b": 0.694
+      },
+      "Crest": {
+        "r": 0.518,
+        "g": 0.216,
+        "b": 0.502
+      },
+      "Eye_Ring_Thing": {
+        "r": 0.792,
+        "g": 0.749,
+        "b": 0.639
+      },
+      "PulpTwo": {
+        "r": 0.412,
+        "g": 0.251,
+        "b": 0.157
+      },
+      "Right_Leg": {
+        "r": 0.337,
+        "g": 0.259,
+        "b": 0.212
+      },
+      "Left_Leg": {
+        "r": 0.337,
+        "g": 0.259,
+        "b": 0.212
+      },
+      "Right_Eye": {
+        "r": 0.396,
+        "g": 0.165,
+        "b": 0.384
+      },
+      "Left_Eye": {
+        "r": 0.396,
+        "g": 0.165,
+        "b": 0.384
+      },
+      "Right_Wing": {
+        "r": 0.396,
+        "g": 0.165,
+        "b": 0.384
+      },
+      "Left_Wing": {
+        "r": 0.396,
+        "g": 0.165,
+        "b": 0.384
+      },
+      "Black_Right": {
+        "r": 0.067,
+        "g": 0.067,
+        "b": 0.067
+      },
+      "Pulp": {
+        "r": 0.412,
+        "g": 0.251,
+        "b": 0.157
+      },
+      "White_Right": {
+        "r": 0.973,
+        "g": 0.973,
+        "b": 0.973
+      },
+      "Black_Left": {
+        "r": 0.067,
+        "g": 0.067,
+        "b": 0.067
+      },
+      "White_Left": {
+        "r": 0.973,
+        "g": 0.973,
+        "b": 0.973
+      },
+      "HumanoidRootPart": {
+        "r": 0.639,
+        "g": 0.635,
+        "b": 0.647
+      }
+    },
+    "Class": "Basic",
+    "CatchRateScalar": 150,
+    "FemaleChance": 50,
+    "Abilities": [
+      {
+        "Name": "Seed Shield",
+        "Chance": 68
+      },
+      {
+        "Name": "Waddle Stomp",
+        "Chance": 30
+      },
+      {
+        "Name": "Solar Wrath",
+        "Chance": 2
+      }
+    ]
+  },
+  {
+    "Id": "Bombombini Gusini",
+    "Slug": "bombombini-gusini",
+    "DexNumber": 29,
+    "Name": "Bombombini Gusini",
+    "Sprite": "rbxassetid://nil",
+    "ShinySprite": "rbxassetid://nil",
+    "Description": "A fusion of goose and fighter jet, known for breaking the sound barrier while honking furiously. Extremely aggressive.",
+    "Types": [
+      "Flying",
+      "Steel"
+    ],
+    "BaseStats": {
+      "HP": 70,
+      "Attack": 85,
+      "Defense": 65,
+      "SpecialAttack": 75,
+      "SpecialDefense": 65,
+      "Speed": 100
+    },
+    "Learnset": {
+      "1": [
+        "Peck",
+        "Tackle"
+      ],
+      "6": [
+        "Fast Attack"
+      ],
+      "12": [
+        "Shield Bash"
+      ],
+      "18": [
+        "Dive Bomb"
+      ],
+      "26": [
+        "Duststorm Dash"
+      ],
+      "34": [
+        "Grand Slam"
+      ],
+      "42": [
+        "Earthquake"
+      ]
+    },
+    "EvolutionLevel": null,
+    "EvolvesInto": null,
+    "BaseWeightKg": 35,
+    "ShinyColors": {
+      "Beak": {
+        "r": 0.855,
+        "g": 0.522,
+        "b": 0.255
+      },
+      "BlackNose": {
+        "r": 0.067,
+        "g": 0.067,
+        "b": 0.067
+      },
+      "Torso": {
+        "r": 0.961,
+        "g": 0.804,
+        "b": 0.188
+      },
+      "WingR": {
+        "r": 0.973,
+        "g": 0.973,
+        "b": 0.973
+      },
+      "Eye": {
+        "r": 0.067,
+        "g": 0.067,
+        "b": 0.067
+      },
+      "EyeWhite": {
+        "r": 0.973,
+        "g": 0.973,
+        "b": 0.973
+      },
+      "FootL": {
+        "r": 0.886,
+        "g": 0.608,
+        "b": 0.251
+      },
+      "FootR": {
+        "r": 0.886,
+        "g": 0.608,
+        "b": 0.251
+      },
+      "Head": {
+        "r": 0.961,
+        "g": 0.804,
+        "b": 0.188
+      },
+      "LegL": {
+        "r": 0.886,
+        "g": 0.608,
+        "b": 0.251
+      },
+      "Middle": {
+        "r": 0.973,
+        "g": 0.973,
+        "b": 0.973
+      },
+      "ThighL": {
+        "r": 0.961,
+        "g": 0.804,
+        "b": 0.188
+      },
+      "ThighR": {
+        "r": 0.961,
+        "g": 0.804,
+        "b": 0.188
+      },
+      "C_R": {
+        "r": 0.035,
+        "g": 0.537,
+        "b": 0.812
+      },
+      "WingL": {
+        "r": 0.973,
+        "g": 0.973,
+        "b": 0.973
+      },
+      "WingBack": {
+        "r": 0.973,
+        "g": 0.973,
+        "b": 0.973
+      },
+      "WingBackBottom": {
+        "r": 0.973,
+        "g": 0.973,
+        "b": 0.973
+      },
+      "C_L": {
+        "r": 0.035,
+        "g": 0.537,
+        "b": 0.812
+      },
+      "HumanoidRootPart": {
+        "r": 0.639,
+        "g": 0.635,
+        "b": 0.647
+      },
+      "LegR": {
+        "r": 0.886,
+        "g": 0.608,
+        "b": 0.251
+      }
+    },
+    "Class": "Rare",
+    "CatchRateScalar": 45,
+    "FemaleChance": 50,
+    "Abilities": [
+      {
+        "Name": "Jetstream",
+        "Chance": 68
+      },
+      {
+        "Name": "Metallic Glide",
+        "Chance": 30
+      },
+      {
+        "Name": "Overdrive",
+        "Chance": 2
+      }
+    ]
+  },
+  {
+    "Id": "Brr Brr Patapim",
+    "Slug": "brr-brr-patapim",
+    "DexNumber": 30,
+    "Name": "Brr Brr Patapim",
+    "Sprite": "rbxassetid://nil",
+    "ShinySprite": "rbxassetid://nil",
+    "Description": "A peculiar grass creature with extremely thick bark. It moves slowly but can take enormous punishment.",
+    "Types": [
+      "Grass"
+    ],
+    "BaseStats": {
+      "HP": 90,
+      "Attack": 50,
+      "Defense": 80,
+      "SpecialAttack": 55,
+      "SpecialDefense": 85,
+      "Speed": 30
+    },
+    "Learnset": {
+      "1": [
+        "Tackle",
+        "Scratch"
+      ],
+      "6": [
+        "Vine Whip"
+      ],
+      "12": [
+        "Seed Toss"
+      ],
+      "18": [
+        "Leaf Slash"
+      ],
+      "26": [
+        "Grand Slam"
+      ]
+    },
+    "EvolutionLevel": null,
+    "EvolvesInto": null,
+    "BaseWeightKg": 55,
+    "ShinyColors": {
+      "rightmiddlefinger2": {
+        "r": 0.918,
+        "g": 0.722,
+        "b": 0.573
+      },
+      "rightindex2": {
+        "r": 0.918,
+        "g": 0.722,
+        "b": 0.573
+      },
+      "rightringfinger2": {
+        "r": 0.918,
+        "g": 0.722,
+        "b": 0.573
+      },
+      "rightindex1": {
+        "r": 0.918,
+        "g": 0.722,
+        "b": 0.573
+      },
+      "rightmiddlefinger1": {
+        "r": 0.918,
+        "g": 0.722,
+        "b": 0.573
+      },
+      "rightringfinger1": {
+        "r": 0.918,
+        "g": 0.722,
+        "b": 0.573
+      },
+      "rightthumb2": {
+        "r": 0.918,
+        "g": 0.722,
+        "b": 0.573
+      },
+      "rightthumb1": {
+        "r": 0.918,
+        "g": 0.722,
+        "b": 0.573
+      },
+      "rightpalm": {
+        "r": 0.918,
+        "g": 0.722,
+        "b": 0.573
+      },
+      "rightforearm": {
+        "r": 0.667,
+        "g": 0.333,
+        "b": 0
+      },
+      "rightpinky2": {
+        "r": 0.918,
+        "g": 0.722,
+        "b": 0.573
+      },
+      "rightpinky1": {
+        "r": 0.918,
+        "g": 0.722,
+        "b": 0.573
+      },
+      "rightarm": {
+        "r": 0.667,
+        "g": 0.333,
+        "b": 0
+      },
+      "beard": {
+        "r": 0.337,
+        "g": 0.259,
+        "b": 0.212
+      },
+      "rightleg1": {
+        "r": 0.667,
+        "g": 0.333,
+        "b": 0
+      },
+      "rightleg2": {
+        "r": 0.918,
+        "g": 0.722,
+        "b": 0.573
+      },
+      "backofhead": {
+        "r": 0.667,
+        "g": 0.333,
+        "b": 0
+      },
+      "pupils": {
+        "r": 0.067,
+        "g": 0.067,
+        "b": 0.067
+      },
+      "nose": {
+        "r": 0.918,
+        "g": 0.722,
+        "b": 0.573
+      },
+      "mouth": {
+        "r": 0.067,
+        "g": 0.067,
+        "b": 0.067
+      },
+      "hat": {
+        "r": 0.667,
+        "g": 0.333,
+        "b": 0
+      },
+      "face": {
+        "r": 0.918,
+        "g": 0.722,
+        "b": 0.573
+      },
+      "eyes": {
+        "r": 0.016,
+        "g": 0.686,
+        "b": 0.925
+      },
+      "rightfoot": {
+        "r": 0.918,
+        "g": 0.722,
+        "b": 0.573
+      },
+      "leftfoot": {
+        "r": 0.918,
+        "g": 0.722,
+        "b": 0.573
+      },
+      "leftarm": {
+        "r": 0.667,
+        "g": 0.333,
+        "b": 0
+      },
+      "leftleg1": {
+        "r": 0.667,
+        "g": 0.333,
+        "b": 0
+      },
+      "leftleg2": {
+        "r": 0.918,
+        "g": 0.722,
+        "b": 0.573
+      },
+      "lefttoes": {
+        "r": 0.973,
+        "g": 0.973,
+        "b": 0.973
+      },
+      "righttoes": {
+        "r": 0.973,
+        "g": 0.973,
+        "b": 0.973
+      },
+      "leftforearm": {
+        "r": 0.667,
+        "g": 0.333,
+        "b": 0
+      },
+      "leftpalm": {
+        "r": 0.918,
+        "g": 0.722,
+        "b": 0.573
+      },
+      "leftpinky1": {
+        "r": 0.918,
+        "g": 0.722,
+        "b": 0.573
+      },
+      "leftringfinger1": {
+        "r": 0.918,
+        "g": 0.722,
+        "b": 0.573
+      },
+      "leftthumb2": {
+        "r": 0.918,
+        "g": 0.722,
+        "b": 0.573
+      },
+      "leftthumb1": {
+        "r": 0.918,
+        "g": 0.722,
+        "b": 0.573
+      },
+      "leftmiddlefinger1": {
+        "r": 0.918,
+        "g": 0.722,
+        "b": 0.573
+      },
+      "leftpinky2": {
+        "r": 0.918,
+        "g": 0.722,
+        "b": 0.573
+      },
+      "leftringfinger2": {
+        "r": 0.918,
+        "g": 0.722,
+        "b": 0.573
+      },
+      "leftindex1": {
+        "r": 0.918,
+        "g": 0.722,
+        "b": 0.573
+      },
+      "leftindex2": {
+        "r": 0.918,
+        "g": 0.722,
+        "b": 0.573
+      },
+      "HumanoidRootPart": {
+        "r": 0.639,
+        "g": 0.635,
+        "b": 0.647
+      },
+      "Torso": {
+        "r": 0.639,
+        "g": 0.635,
+        "b": 0.647
+      },
+      "leftmiddlefinger2": {
+        "r": 0.918,
+        "g": 0.722,
+        "b": 0.573
+      }
+    },
+    "Class": "Basic",
+    "CatchRateScalar": 180,
+    "FemaleChance": 50
+  },
+  {
+    "Id": "Frycito",
+    "Slug": "frycito",
+    "DexNumber": 31,
+    "Name": "Frycito",
+    "Sprite": "rbxassetid://nil",
+    "ShinySprite": "rbxassetid://nil",
+    "Description": "Born from a box of superheated fries, Frycito's body crackles with oily flames. It charges into battle with sizzling punches, splattering sparks and crumbs everywhere.",
+    "Types": [
+      "Fire",
+      "Fighting"
+    ],
+    "BaseStats": {
+      "HP": 75,
+      "Attack": 95,
+      "Defense": 70,
+      "SpecialAttack": 65,
+      "SpecialDefense": 65,
+      "Speed": 85
+    },
+    "Learnset": {
+      "1": [
+        "Scratch",
+        "Grease Jab"
+      ],
+      "6": [
+        "Double Kick"
+      ],
+      "12": [
+        "Fast Attack"
+      ],
+      "18": [
+        "Uppercut"
+      ],
+      "26": [
+        "Searing Splat"
+      ],
+      "34": [
+        "Grand Slam"
+      ]
+    },
+    "EvolutionLevel": null,
+    "EvolvesInto": null,
+    "BaseWeightKg": 32.5,
+    "ShinyColors": {
+      "Frycito_LeftArm": {
+        "r": 0.561,
+        "g": 0.298,
+        "b": 0.165
+      },
+      "Frycito_LeftHand": {
+        "r": 0.561,
+        "g": 0.298,
+        "b": 0.165
+      },
+      "Frycito_Pupil": {
+        "r": 0.067,
+        "g": 0.067,
+        "b": 0.067
+      },
+      "Frycito_Bucket": {
+        "r": 0.937,
+        "g": 0.722,
+        "b": 0.22
+      },
+      "Frycito_Eyebrows": {
+        "r": 0.067,
+        "g": 0.067,
+        "b": 0.067
+      },
+      "Frycito_Fries": {
+        "r": 0.561,
+        "g": 0.298,
+        "b": 0.165
+      },
+      "Frycito_RightArm": {
+        "r": 0.561,
+        "g": 0.298,
+        "b": 0.165
+      },
+      "Frycito_RightFoot": {
+        "r": 0.561,
+        "g": 0.298,
+        "b": 0.165
+      },
+      "Frycito_Eyes": {
+        "r": 0.973,
+        "g": 0.973,
+        "b": 0.973
+      },
+      "Frycito_LeftFoot": {
+        "r": 0.561,
+        "g": 0.298,
+        "b": 0.165
+      },
+      "Frycito_Mouth": {
+        "r": 0.067,
+        "g": 0.067,
+        "b": 0.067
+      },
+      "Frycito_RightHand": {
+        "r": 0.561,
+        "g": 0.298,
+        "b": 0.165
+      },
+      "Frycito_FryBat": {
+        "r": 0.561,
+        "g": 0.298,
+        "b": 0.165
+      },
+      "HR2": {
+        "r": 0.639,
+        "g": 0.635,
+        "b": 0.647
+      },
+      "HumanoidRootPart": {
+        "r": 0.639,
+        "g": 0.635,
+        "b": 0.647
+      },
+      "Frycito_Torso": {
+        "r": 0.459,
+        "g": 0,
+        "b": 0
+      }
+    },
+    "Class": "Rare",
+    "CatchRateScalar": 90,
+    "FemaleChance": 50,
+    "Abilities": [
+      {
+        "Name": "Fireup",
+        "Chance": 80
+      },
+      {
+        "Name": "Menace",
+        "Chance": 20
+      }
+    ]
+  },
+  {
+    "Id": "Yoyoi Shaur",
+    "Slug": "yoyoi-shaur",
+    "DexNumber": 32,
+    "Name": "Yoyoi Shaur",
+    "Sprite": "rbxassetid://nil",
+    "ShinySprite": "rbxassetid://nil",
+    "Description": "A playful yoyo creature that moves by spinning, bouncing, and snapping back into position. Its sunglasses hide faint psychic glows it uses to sense movement around it. When it spins rapidly, it can send out short psychic pulses that disorient opponents.",
+    "Types": [
+      "Normal",
+      "Psychic"
+    ],
+    "BaseStats": {
+      "HP": 60,
+      "Attack": 55,
+      "Defense": 55,
+      "SpecialAttack": 55,
+      "SpecialDefense": 55,
+      "Speed": 50
+    },
+    "Learnset": {
+      "1": [
+        "Tackle",
+        "Fast Attack"
+      ],
+      "6": [
+        "Scratch"
+      ],
+      "12": [
+        "Psychic Pulse"
+      ],
+      "18": [
+        "Mind Slam"
+      ],
+      "24": [
+        "Grand Slam"
+      ]
+    },
+    "EvolutionLevel": 18,
+    "EvolvesInto": "Yoyoya Shaur",
+    "BaseWeightKg": 7.2,
+    "ShinyColors": {
+      "Yoyo_RightFoot": {
+        "r": 0.067,
+        "g": 0.067,
+        "b": 0.067
+      },
+      "Yoyo_RightFootString": {
+        "r": 0.973,
+        "g": 0.973,
+        "b": 0.973
+      },
+      "Yoyo_LeftFoot": {
+        "r": 0.067,
+        "g": 0.067,
+        "b": 0.067
+      },
+      "Yoyo_RightLowerLeg": {
+        "r": 0.067,
+        "g": 0.067,
+        "b": 0.067
+      },
+      "Yoyo_LeftLowerLeg": {
+        "r": 0.067,
+        "g": 0.067,
+        "b": 0.067
+      },
+      "Yoyo_RightHand": {
+        "r": 0.973,
+        "g": 0.973,
+        "b": 0.973
+      },
+      "Yoyo_RightUpperLeg": {
+        "r": 0.067,
+        "g": 0.067,
+        "b": 0.067
+      },
+      "Yoyo_LeftUpperLeg": {
+        "r": 0.067,
+        "g": 0.067,
+        "b": 0.067
+      },
+      "Yoyo_RightLowerArm": {
+        "r": 0.067,
+        "g": 0.067,
+        "b": 0.067
+      },
+      "Yoyo_Circle": {
+        "r": 0.106,
+        "g": 0.165,
+        "b": 0.208
+      },
+      "Yoyo_RightUpperArm": {
+        "r": 0.067,
+        "g": 0.067,
+        "b": 0.067
+      },
+      "Yoyo_Head": {
+        "r": 0.067,
+        "g": 0.067,
+        "b": 0.067
+      },
+      "Yoyo_Glasses": {
+        "r": 0.067,
+        "g": 0.067,
+        "b": 0.067
+      },
+      "Yoyo_GlassesGlass": {
+        "r": 0.067,
+        "g": 0.067,
+        "b": 0.067
+      },
+      "Yoyo_Torso": {
+        "r": 0.937,
+        "g": 0.722,
+        "b": 0.22
+      },
+      "Yoyo_LeftHand": {
+        "r": 0.973,
+        "g": 0.973,
+        "b": 0.973
+      },
+      "Yoyo_LeftLowerArm": {
+        "r": 0.067,
+        "g": 0.067,
+        "b": 0.067
+      },
+      "Yoyo_LeftUpperArm": {
+        "r": 0.067,
+        "g": 0.067,
+        "b": 0.067
+      },
+      "Yoyo_String": {
+        "r": 0.973,
+        "g": 0.973,
+        "b": 0.973
+      },
+      "Yoyo_LeftFootString": {
+        "r": 0.973,
+        "g": 0.973,
+        "b": 0.973
+      },
+      "HR2": {
+        "r": 0.639,
+        "g": 0.635,
+        "b": 0.647
+      },
+      "HumanoidRootPart": {
+        "r": 0.639,
+        "g": 0.635,
+        "b": 0.647
+      },
+      "Yoyo_Head2": {
+        "r": 0.973,
+        "g": 0.973,
+        "b": 0.973
+      }
+    },
+    "Class": "Basic",
+    "CatchRateScalar": 150,
+    "FemaleChance": 50,
+    "Abilities": [
+      {
+        "Name": "Trickster",
+        "Chance": 60
+      },
+      {
+        "Name": "Magic Mirror",
+        "Chance": 30
+      },
+      {
+        "Name": "Magic Eyes",
+        "Chance": 10
+      }
+    ]
+  },
+  {
+    "Id": "Yoyoya Shaur",
+    "Slug": "yoyoya-shaur",
+    "DexNumber": 33,
+    "Name": "Yoyoya Shaur",
+    "Sprite": "rbxassetid://nil",
+    "ShinySprite": "rbxassetid://nil",
+    "Description": "After evolving, its spin becomes perfectly balanced, allowing it to move with incredible precision. It battles with controlled, whip-like motions, predicting attacks before they land. Its shades serve as psychic focus lenses, sharpening its awareness and reactions.",
+    "Types": [
+      "Normal",
+      "Psychic"
+    ],
+    "BaseStats": {
+      "HP": 80,
+      "Attack": 85,
+      "Defense": 80,
+      "SpecialAttack": 85,
+      "SpecialDefense": 80,
+      "Speed": 85
+    },
+    "Learnset": {
+      "1": [
+        "Tackle",
+        "Fast Attack",
+        "Psychic Pulse"
+      ],
+      "18": [
+        "Mind Slam"
+      ],
+      "26": [
+        "Dazzle Beam"
+      ],
+      "32": [
+        "Grand Slam"
+      ],
+      "40": [
+        "Knockout"
+      ]
+    },
+    "EvolutionLevel": null,
+    "EvolvesInto": null,
+    "BaseWeightKg": 12.8,
+    "ShinyColors": {
+      "Yoyoyo_Head2": {
+        "r": 0.973,
+        "g": 0.973,
+        "b": 0.973
+      },
+      "Yoyoyo_LeftHand": {
+        "r": 0.973,
+        "g": 0.973,
+        "b": 0.973
+      },
+      "Yoyoyo_LeftLowerArm": {
+        "r": 0.067,
+        "g": 0.067,
+        "b": 0.067
+      },
+      "Yoyoyo_LeftUpperArm": {
+        "r": 0.067,
+        "g": 0.067,
+        "b": 0.067
+      },
+      "Yoyoyo_String": {
+        "r": 0.973,
+        "g": 0.973,
+        "b": 0.973
+      },
+      "Yoyoyo_Glasses": {
+        "r": 0.067,
+        "g": 0.067,
+        "b": 0.067
+      },
+      "Yoyoyo_GlassesGlass": {
+        "r": 0.067,
+        "g": 0.067,
+        "b": 0.067
+      },
+      "Yoyoyo_LeftLowerLeg": {
+        "r": 0.067,
+        "g": 0.067,
+        "b": 0.067
+      },
+      "Yoyoyo_LeftUpperLeg": {
+        "r": 0.067,
+        "g": 0.067,
+        "b": 0.067
+      },
+      "Yoyoyo_RightLowerLeg": {
+        "r": 0.067,
+        "g": 0.067,
+        "b": 0.067
+      },
+      "Yoyoyo_RightUpperArm": {
+        "r": 0.067,
+        "g": 0.067,
+        "b": 0.067
+      },
+      "Yoyoyo_RightUpperLeg": {
+        "r": 0.067,
+        "g": 0.067,
+        "b": 0.067
+      },
+      "Yoyoyo_LeftFoot": {
+        "r": 0.067,
+        "g": 0.067,
+        "b": 0.067
+      },
+      "Yoyoyo_LeftFootString": {
+        "r": 0.973,
+        "g": 0.973,
+        "b": 0.973
+      },
+      "Yoyoyo_RightFoot": {
+        "r": 0.067,
+        "g": 0.067,
+        "b": 0.067
+      },
+      "Yoyoyo_RightFootString": {
+        "r": 0.973,
+        "g": 0.973,
+        "b": 0.973
+      },
+      "Yoyoyo_RightLowerArm": {
+        "r": 0.067,
+        "g": 0.067,
+        "b": 0.067
+      },
+      "Yoyoyo_RightHand": {
+        "r": 0.973,
+        "g": 0.973,
+        "b": 0.973
+      },
+      "HR2": {
+        "r": 0.639,
+        "g": 0.635,
+        "b": 0.647
+      },
+      "HumanoidRootPart": {
+        "r": 0.639,
+        "g": 0.635,
+        "b": 0.647
+      },
+      "Yoyoyo_Torso": {
+        "r": 0.459,
+        "g": 0,
+        "b": 0
+      },
+      "Yoyoyo_Head": {
+        "r": 0.067,
+        "g": 0.067,
+        "b": 0.067
+      }
+    },
+    "Class": "Advanced",
+    "CatchRateScalar": 75,
+    "FemaleChance": 50,
+    "Abilities": [
+      {
+        "Name": "Synchronize",
+        "Chance": 60
+      },
+      {
+        "Name": "Magic Mirror",
+        "Chance": 30
+      },
+      {
+        "Name": "Magic Eyes",
+        "Chance": 10
+      }
+    ]
+  },
+  {
+    "Id": "Tralalero Tralala",
+    "Slug": "tralalero-tralala",
+    "DexNumber": 400,
+    "Name": "Tralalero Tralala",
+    "Sprite": "rbxassetid://140328234982946",
+    "ShinySprite": "rbxassetid://nil",
+    "Description": "A mythical three-legged shark wearing fashionable shoes. Said to outswim any creature in existence.",
+    "Types": [
+      "Water"
+    ],
+    "BaseStats": {
+      "HP": 75,
+      "Attack": 95,
+      "Defense": 70,
+      "SpecialAttack": 95,
+      "SpecialDefense": 70,
+      "Speed": 160
+    },
+    "Learnset": {
+      "1": [
+        "Water Jet",
+        "Tackle"
+      ],
+      "10": [
+        "Fast Attack"
+      ],
+      "18": [
+        "Bite"
+      ],
+      "28": [
+        "Aqua Slash"
+      ],
+      "36": [
+        "Crunch"
+      ],
+      "46": [
+        "Hydro Burst"
+      ],
+      "56": [
+        "Grand Slam"
+      ]
+    },
+    "EvolutionLevel": null,
+    "EvolvesInto": null,
+    "BaseWeightKg": 180,
+    "ShinyColors": null,
+    "Class": "Legendary",
+    "CatchRateScalar": 3,
+    "FemaleChance": 50,
+    "Abilities": [
+      {
+        "Name": "Swift Current",
+        "Chance": 68
+      },
+      {
+        "Name": "Sharp Fins",
+        "Chance": 30
+      },
+      {
+        "Name": "Triple Kick",
+        "Chance": 2
+      }
+    ]
+  }
+]

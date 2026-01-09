@@ -1,0 +1,218 @@
+[
+  {
+    "Id": "Title",
+    "Slug": "title",
+    "Name": "Title",
+    "Encounters": [],
+    "Description": "The beginning of your journey. Here, trainers prepare to embark on their adventure across the region."
+  },
+  {
+    "Id": "Trade",
+    "Slug": "trade-hub",
+    "Name": "Trade Hub",
+    "Encounters": [],
+    "Description": "A bustling trading center where trainers from across the region gather to exchange their companions and share stories of their adventures."
+  },
+  {
+    "Id": "Battle",
+    "Slug": "battle-hub",
+    "Name": "Battle Hub",
+    "Encounters": [],
+    "Description": "The ultimate proving ground for trainers. Champions and challengers test their skills in epic battles that echo throughout the region."
+  },
+  {
+    "Id": "Chunk1",
+    "Slug": "cloveroot-town",
+    "Name": "Cloveroot Town",
+    "Encounters": [
+      {
+        "Creature": "Frulli Frulla",
+        "MinLevel": 3,
+        "MaxLevel": 5,
+        "Chance": 20
+      },
+      {
+        "Creature": "Timmy Cheddar",
+        "MinLevel": 3,
+        "MaxLevel": 5,
+        "Chance": 20
+      }
+    ],
+    "Description": "A peaceful starting town nestled among rolling green hills. The grand community center with its distinctive striped facade stands as a beacon for new trainers, while the ancient lighthouse tower watches over the town from the distance."
+  },
+  {
+    "Id": "Chunk2",
+    "Slug": "route-2",
+    "Name": "Route 2",
+    "Encounters": [
+      {
+        "Creature": "Frulli Frulla",
+        "MinLevel": 4,
+        "MaxLevel": 6,
+        "Chance": 35
+      },
+      {
+        "Creature": "Timmy Cheddar",
+        "MinLevel": 3,
+        "MaxLevel": 6,
+        "Chance": 35
+      },
+      {
+        "Creature": "Burbaloni Lulliloli",
+        "MinLevel": 5,
+        "MaxLevel": 7,
+        "Chance": 20
+      },
+      {
+        "Creature": "Doggolino",
+        "MinLevel": 3,
+        "MaxLevel": 6,
+        "Chance": 10
+      }
+    ],
+    "Description": "A dense forest route where ancient trees tower overhead and dappled sunlight filters through the canopy. An old stone monument stands at the heart of the woods, marking this as a place of significance for trainers and wild creatures alike."
+  },
+  {
+    "Id": "Chunk3",
+    "Slug": "cresamore-town",
+    "Name": "Cresamore Town",
+    "Encounters": [],
+    "Description": "A peaceful suburban town with well-kept homes and manicured lawns. The local CatchCare center provides essential services, while streetlamps cast a warm glow over the quiet streets where trainers rest between routes."
+  },
+  {
+    "Id": "Chunk4",
+    "Slug": "route-3",
+    "Name": "Route 3",
+    "Encounters": [
+      {
+        "Creature": "Chimpanini",
+        "MinLevel": 10,
+        "MaxLevel": 12,
+        "Chance": 10
+      },
+      {
+        "Creature": "Bolasaeg Selluaim",
+        "MinLevel": 10,
+        "MaxLevel": 12,
+        "Chance": 30
+      },
+      {
+        "Creature": "Trippi Troppi",
+        "MinLevel": 10,
+        "MaxLevel": 12,
+        "Chance": 30
+      },
+      {
+        "Creature": "Tadbalabu",
+        "MinLevel": 10,
+        "MaxLevel": 12,
+        "Chance": 30
+      }
+    ],
+    "Description": "A short but vibrant route connecting two major towns. Lush grass covers raised platforms where trainers often pause to battle, making this a popular spot for those seeking to test their skills."
+  },
+  {
+    "Id": "Chunk5",
+    "Slug": "asterden",
+    "Name": "Asterden",
+    "Encounters": [],
+    "Description": "A bustling modern city where sleek architecture meets urban energy. Colorful storefronts line the busy streets, and cars zip past buildings adorned with decorative domes and green rooftops. The city's gym leader awaits challengers in a gym that celebrates the power of nature."
+  },
+  {
+    "Id": "Chunk6",
+    "Slug": "route-4",
+    "Name": "Route 4",
+    "Encounters": [
+      {
+        "Creature": "Duckaroo",
+        "MinLevel": 16,
+        "MaxLevel": 18,
+        "Chance": 20
+      },
+      {
+        "Creature": "Bombombini Gusini",
+        "MinLevel": 15,
+        "MaxLevel": 17,
+        "Chance": 20
+      },
+      {
+        "Creature": "Il Cacto Hipopotamo",
+        "MinLevel": 15,
+        "MaxLevel": 16,
+        "Chance": 30
+      }
+    ],
+    "Description": "A harsh desert route where sparse orange trees dot the sandy landscape. Towering rock formations rise in the distance, and a natural waterfall cascades down the cliffs, providing a rare source of water in this arid wilderness."
+  },
+  {
+    "Id": "Chunk7",
+    "Slug": "dustnook-city",
+    "Name": "Dustnook City",
+    "Encounters": [],
+    "Description": "A dusty desert town where wooden buildings bake under the sun. Trainers stop at the Duckshot Diner to rest, trade rumors, and prepare for the harsh routes outside town."
+  },
+  {
+    "Id": "Chunk8",
+    "Slug": "route-5",
+    "Name": "Route 5",
+    "Encounters": [
+      {
+        "Creature": "Duckaroo",
+        "MinLevel": 16,
+        "MaxLevel": 18,
+        "Chance": 20
+      },
+      {
+        "Creature": "Bombombini Gusini",
+        "MinLevel": 15,
+        "MaxLevel": 17,
+        "Chance": 20
+      },
+      {
+        "Creature": "Il Cacto Hipopotamo",
+        "MinLevel": 15,
+        "MaxLevel": 16,
+        "Chance": 30
+      }
+    ],
+    "Description": "A continuation of the desert route beyond Dustnook City. The unforgiving landscape tests trainers' resolve as they navigate through canyons and mesas, with only hardy desert-dwelling creatures for company."
+  },
+  {
+    "Id": "CatchCare",
+    "Slug": "catchcare",
+    "Name": "CatchCare",
+    "Encounters": [],
+    "Description": "A healing center where trainers can rest their companions and receive expert care. The friendly staff ensures every creature leaves refreshed and ready for battle."
+  },
+  {
+    "Id": "House1",
+    "Slug": "house-1",
+    "Name": "House 1",
+    "Encounters": [],
+    "Description": "A friendly neighbor's home where local residents share tips and stories with passing trainers."
+  },
+  {
+    "Id": "Gym1",
+    "Slug": "asterden-gym",
+    "Name": "Asterden Gym",
+    "Encounters": [],
+    "Description": "The Grass-type Gym of Asterden, where nature and training come together. Trainers face challenging battles among lush greenery and natural obstacles.",
+    "Parent": "Asterden"
+  },
+  {
+    "Id": "Professor's Lab",
+    "Slug": "professor-s-lab",
+    "Name": "Professor's Lab",
+    "Encounters": [],
+    "Description": "A state-of-the-art research facility filled with scientific equipment and books. Here, the Professor studies the region's creatures and guides new trainers on their journey.",
+    "Parent": "Cloveroot Town"
+  },
+  {
+    "Id": "PlayersHouse",
+    "Slug": "your-house",
+    "Name": "Your House",
+    "Encounters": [],
+    "Description": "Your cozy home where your adventure began. A place of comfort and rest before heading out into the wider world.",
+    "Parent": "Cloveroot Town"
+  }
+]

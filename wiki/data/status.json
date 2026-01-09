@@ -1,0 +1,56 @@
+[
+  {
+    "Id": "BRN",
+    "Name": "BRN",
+    "Code": "BRN",
+    "Description": "Reduces Attack and deals damage each turn.",
+    "Color": null,
+    "StrokeColor": null,
+    "IsVolatile": false
+  },
+  {
+    "Id": "PAR",
+    "Name": "PAR",
+    "Code": "PAR",
+    "Description": "Reduces Speed and may prevent movement.",
+    "Color": null,
+    "StrokeColor": null,
+    "IsVolatile": false
+  },
+  {
+    "Id": "PSN",
+    "Name": "PSN",
+    "Code": "PSN",
+    "Description": "Deals damage each turn.",
+    "Color": null,
+    "StrokeColor": null,
+    "IsVolatile": false
+  },
+  {
+    "Id": "TOX",
+    "Name": "TOX",
+    "Code": "TOX",
+    "Description": "Deals increasing damage each turn.",
+    "Color": null,
+    "StrokeColor": null,
+    "IsVolatile": false
+  },
+  {
+    "Id": "SLP",
+    "Name": "SLP",
+    "Code": "SLP",
+    "Description": "Prevents action for 1-3 turns.",
+    "Color": null,
+    "StrokeColor": null,
+    "IsVolatile": false
+  },
+  {
+    "Id": "FRZ",
+    "Name": "FRZ",
+    "Code": "FRZ",
+    "Description": "Prevents action until thawed.",
+    "Color": null,
+    "StrokeColor": null,
+    "IsVolatile": false
+  }
+]

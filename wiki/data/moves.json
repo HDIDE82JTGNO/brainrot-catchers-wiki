@@ -1,0 +1,1632 @@
+[
+  {
+    "Name": "Tackle",
+    "Slug": "tackle",
+    "Id": "Tackle",
+    "BasePower": 40,
+    "Accuracy": 100,
+    "Priority": 0,
+    "Type": "Normal",
+    "Category": "Physical",
+    "Description": "A straightforward physical charge. Reliable but basic."
+  },
+  {
+    "Name": "Scratch",
+    "Slug": "scratch",
+    "Id": "Scratch",
+    "BasePower": 40,
+    "Accuracy": 100,
+    "Priority": 0,
+    "Type": "Normal",
+    "Category": "Physical",
+    "Description": "A quick claw swipe. A basic but reliable attack."
+  },
+  {
+    "Name": "Fast Attack",
+    "Slug": "fast-attack",
+    "Id": "Fast Attack",
+    "BasePower": 40,
+    "Accuracy": 100,
+    "Priority": 1,
+    "Type": "Normal",
+    "Category": "Physical",
+    "Description": "A swift strike that always hits first. Priority +1."
+  },
+  {
+    "Name": "Tail Slap",
+    "Slug": "tail-slap",
+    "Id": "Tail Slap",
+    "BasePower": 25,
+    "Accuracy": 85,
+    "Priority": 0,
+    "Type": "Normal",
+    "Category": "Physical",
+    "Description": "Strikes the foe with its tail 2-5 times.",
+    "MinHits": 2,
+    "MaxHits": 5
+  },
+  {
+    "Name": "Comet Punch",
+    "Slug": "comet-punch",
+    "Id": "Comet Punch",
+    "BasePower": 18,
+    "Accuracy": 85,
+    "Priority": 0,
+    "Type": "Normal",
+    "Category": "Physical",
+    "Description": "A flurry of punches that hits 2-5 times.",
+    "MinHits": 2,
+    "MaxHits": 5
+  },
+  {
+    "Name": "Barrage",
+    "Slug": "barrage",
+    "Id": "Barrage",
+    "BasePower": 15,
+    "Accuracy": 85,
+    "Priority": 0,
+    "Type": "Normal",
+    "Category": "Physical",
+    "Description": "Hurls round objects 2-5 times in a row.",
+    "MinHits": 2,
+    "MaxHits": 5
+  },
+  {
+    "Name": "Pin Missile",
+    "Slug": "pin-missile",
+    "Id": "Pin Missile",
+    "BasePower": 25,
+    "Accuracy": 95,
+    "Priority": 0,
+    "Type": "Normal",
+    "Category": "Physical",
+    "Description": "Sharp spikes are fired 2-5 times.",
+    "MinHits": 2,
+    "MaxHits": 5
+  },
+  {
+    "Name": "Take Down",
+    "Slug": "take-down",
+    "Id": "Take Down",
+    "BasePower": 90,
+    "Accuracy": 85,
+    "Priority": 0,
+    "Type": "Normal",
+    "Category": "Physical",
+    "Description": "A reckless full-body charge. The user takes 25% of the damage dealt.",
+    "RecoilPercent": 25
+  },
+  {
+    "Name": "Double-Edge",
+    "Slug": "double-edge",
+    "Id": "Double-Edge",
+    "BasePower": 120,
+    "Accuracy": 100,
+    "Priority": 0,
+    "Type": "Normal",
+    "Category": "Physical",
+    "Description": "A life-risking tackle with extreme power. The user takes 33% of the damage dealt.",
+    "RecoilPercent": 33
+  },
+  {
+    "Name": "Head Smash",
+    "Slug": "head-smash",
+    "Id": "Head Smash",
+    "BasePower": 150,
+    "Accuracy": 80,
+    "Priority": 0,
+    "Type": "Normal",
+    "Category": "Physical",
+    "Description": "A devastating headbutt with tremendous power. The user takes 50% of the damage dealt.",
+    "RecoilPercent": 50
+  },
+  {
+    "Name": "Grease Jab",
+    "Slug": "grease-jab",
+    "Id": "Grease Jab",
+    "BasePower": 60,
+    "Accuracy": 100,
+    "Priority": 0,
+    "Type": "Fire",
+    "Category": "Physical",
+    "Description": "A sizzling punch coated in hot oil. 20% chance to burn the target.",
+    "HealsPercent": null,
+    "StatusEffect": "BRN",
+    "StatusChance": 20
+  },
+  {
+    "Name": "Searing Splat",
+    "Slug": "searing-splat",
+    "Id": "Searing Splat",
+    "BasePower": 90,
+    "Accuracy": 95,
+    "Priority": 0,
+    "Type": "Fire",
+    "Category": "Special",
+    "Description": "Slams the foe with scalding fryer oil, leaving lingering embers.",
+    "HealsPercent": null,
+    "StatusEffect": "BRN",
+    "StatusChance": 20
+  },
+  {
+    "Name": "Flare Blitz",
+    "Slug": "flare-blitz",
+    "Id": "Flare Blitz",
+    "BasePower": 120,
+    "Accuracy": 100,
+    "Priority": 0,
+    "Type": "Fire",
+    "Category": "Physical",
+    "Description": "Cloaked in flames, charges recklessly. 10% burn chance. User takes 33% recoil.",
+    "RecoilPercent": 33,
+    "StatusEffect": "BRN",
+    "StatusChance": 10
+  },
+  {
+    "Name": "Static Peck",
+    "Slug": "static-peck",
+    "Id": "Static Peck",
+    "BasePower": 55,
+    "Accuracy": 100,
+    "Priority": 0,
+    "Type": "Electric",
+    "Category": "Physical",
+    "Description": "A quick, charged peck. 20% chance to paralyze the target.",
+    "HealsPercent": null,
+    "StatusEffect": "PAR",
+    "StatusChance": 20
+  },
+  {
+    "Name": "Thunder Burst",
+    "Slug": "thunder-burst",
+    "Id": "Thunder Burst",
+    "BasePower": 90,
+    "Accuracy": 90,
+    "Priority": 0,
+    "Type": "Electric",
+    "Category": "Special",
+    "Description": "A mid-air electrical discharge. 30% chance to paralyze.",
+    "HealsPercent": null,
+    "StatusEffect": "PAR",
+    "StatusChance": 30
+  },
+  {
+    "Name": "Wild Charge",
+    "Slug": "wild-charge",
+    "Id": "Wild Charge",
+    "BasePower": 90,
+    "Accuracy": 100,
+    "Priority": 0,
+    "Type": "Electric",
+    "Category": "Physical",
+    "Description": "An electrified tackle with reckless abandon. User takes 25% recoil.",
+    "RecoilPercent": 25
+  },
+  {
+    "Name": "Volt Tackle",
+    "Slug": "volt-tackle",
+    "Id": "Volt Tackle",
+    "BasePower": 120,
+    "Accuracy": 100,
+    "Priority": 0,
+    "Type": "Electric",
+    "Category": "Physical",
+    "Description": "Charges with overwhelming voltage. 10% paralysis chance. User takes 33% recoil.",
+    "RecoilPercent": 33,
+    "StatusEffect": "PAR",
+    "StatusChance": 10
+  },
+  {
+    "Name": "Earthquake",
+    "Slug": "earthquake",
+    "Id": "Earthquake",
+    "BasePower": 100,
+    "Accuracy": 100,
+    "Priority": 0,
+    "Type": "Ground",
+    "Category": "Physical",
+    "Description": "A massive tremor that shakes all around. One of the strongest ground moves."
+  },
+  {
+    "Name": "Sand Storm",
+    "Slug": "sand-storm",
+    "Id": "Sand Storm",
+    "BasePower": 60,
+    "Accuracy": 100,
+    "Priority": 0,
+    "Type": "Ground",
+    "Category": "Special",
+    "Description": "Blasts the foe with cutting sand. May lower accuracy."
+  },
+  {
+    "Name": "Bite",
+    "Slug": "bite",
+    "Id": "Bite",
+    "BasePower": 60,
+    "Accuracy": 100,
+    "Priority": 0,
+    "Type": "Dark",
+    "Category": "Physical",
+    "Description": "A quick, vicious bite. May cause the target to flinch.",
+    "HealsPercent": null,
+    "StatusEffect": null,
+    "StatusChance": null,
+    "CausesFlinch": true
+  },
+  {
+    "Name": "Crunch",
+    "Slug": "crunch",
+    "Id": "Crunch",
+    "BasePower": 80,
+    "Accuracy": 100,
+    "Priority": 0,
+    "Type": "Dark",
+    "Category": "Physical",
+    "Description": "Crushes the foe with sharp fangs. May cause flinching.",
+    "HealsPercent": null,
+    "StatusEffect": null,
+    "StatusChance": null,
+    "CausesFlinch": true
+  },
+  {
+    "Name": "Beat Up",
+    "Slug": "beat-up",
+    "Id": "Beat Up",
+    "BasePower": 10,
+    "Accuracy": 100,
+    "Priority": 0,
+    "Type": "Dark",
+    "Category": "Physical",
+    "Description": "Calls allies to attack. Hits 2-5 times with varying strength.",
+    "MinHits": 2,
+    "MaxHits": 5
+  },
+  {
+    "Name": "Peck",
+    "Slug": "peck",
+    "Id": "Peck",
+    "BasePower": 40,
+    "Accuracy": 100,
+    "Priority": 0,
+    "Type": "Flying",
+    "Category": "Physical",
+    "Description": "A sharp beak jab. Basic but reliable flying attack."
+  },
+  {
+    "Name": "Dive Bomb",
+    "Slug": "dive-bomb",
+    "Id": "Dive Bomb",
+    "BasePower": 90,
+    "Accuracy": 80,
+    "Priority": 0,
+    "Type": "Flying",
+    "Category": "Physical",
+    "Description": "A risky aerial plunge from great heights. High power but can miss."
+  },
+  {
+    "Name": "Duststorm Dash",
+    "Slug": "duststorm-dash",
+    "Id": "Duststorm Dash",
+    "BasePower": 70,
+    "Accuracy": 95,
+    "Priority": 1,
+    "Type": "Flying",
+    "Category": "Physical",
+    "Description": "Dashes through a duststorm with priority. Excels in sandy weather."
+  },
+  {
+    "Name": "Perch",
+    "Slug": "perch",
+    "Id": "Perch",
+    "BasePower": 0,
+    "Accuracy": 100,
+    "Priority": 0,
+    "Type": "Flying",
+    "Category": "Status",
+    "Description": "Recovers composure by briefly perching. Heals 50% of max HP.",
+    "HealsPercent": 50
+  },
+  {
+    "Name": "Brave Bird",
+    "Slug": "brave-bird",
+    "Id": "Brave Bird",
+    "BasePower": 120,
+    "Accuracy": 100,
+    "Priority": 0,
+    "Type": "Flying",
+    "Category": "Physical",
+    "Description": "A fearless dive from the sky. The user takes 33% of the damage dealt.",
+    "RecoilPercent": 33
+  },
+  {
+    "Name": "Sky Crash",
+    "Slug": "sky-crash",
+    "Id": "Sky Crash",
+    "BasePower": 100,
+    "Accuracy": 95,
+    "Priority": 0,
+    "Type": "Flying",
+    "Category": "Physical",
+    "Description": "A high-speed aerial collision. The user takes 25% of the damage dealt.",
+    "RecoilPercent": 25
+  },
+  {
+    "Name": "Water Jet",
+    "Slug": "water-jet",
+    "Id": "Water Jet",
+    "BasePower": 40,
+    "Accuracy": 100,
+    "Priority": 1,
+    "Type": "Water",
+    "Category": "Physical",
+    "Description": "A pressurized burst of water that always strikes first. Priority +1."
+  },
+  {
+    "Name": "Aqua Slash",
+    "Slug": "aqua-slash",
+    "Id": "Aqua Slash",
+    "BasePower": 75,
+    "Accuracy": 100,
+    "Priority": 0,
+    "Type": "Water",
+    "Category": "Physical",
+    "Description": "Slices the foe with a blade of pressurized water."
+  },
+  {
+    "Name": "Hydro Burst",
+    "Slug": "hydro-burst",
+    "Id": "Hydro Burst",
+    "BasePower": 110,
+    "Accuracy": 80,
+    "Priority": 0,
+    "Type": "Water",
+    "Category": "Special",
+    "Description": "Unleashes a devastating water blast. High power but can miss."
+  },
+  {
+    "Name": "Water Shuriken",
+    "Slug": "water-shuriken",
+    "Id": "Water Shuriken",
+    "BasePower": 15,
+    "Accuracy": 100,
+    "Priority": 1,
+    "Type": "Water",
+    "Category": "Special",
+    "Description": "Throws sharp shurikens of water 2-5 times. Priority +1.",
+    "MinHits": 2,
+    "MaxHits": 5
+  },
+  {
+    "Name": "Double Kick",
+    "Slug": "double-kick",
+    "Id": "Double Kick",
+    "BasePower": 30,
+    "Accuracy": 100,
+    "Priority": 0,
+    "Type": "Fighting",
+    "Category": "Physical",
+    "Description": "Rapid successive kicks. Always hits exactly twice.",
+    "MinHits": 2,
+    "MaxHits": 2,
+    "Fixed": true
+  },
+  {
+    "Name": "Uppercut",
+    "Slug": "uppercut",
+    "Id": "Uppercut",
+    "BasePower": 70,
+    "Accuracy": 100,
+    "Priority": 0,
+    "Type": "Fighting",
+    "Category": "Physical",
+    "Description": "A rising punch aimed at the chin. May cause flinching.",
+    "HealsPercent": null,
+    "StatusEffect": null,
+    "StatusChance": null,
+    "CausesFlinch": true
+  },
+  {
+    "Name": "Grand Slam",
+    "Slug": "grand-slam",
+    "Id": "Grand Slam",
+    "BasePower": 100,
+    "Accuracy": 90,
+    "Priority": 0,
+    "Type": "Fighting",
+    "Category": "Physical",
+    "Description": "A show-stopping finishing blow. Powerful but slightly inaccurate."
+  },
+  {
+    "Name": "Knockout",
+    "Slug": "knockout",
+    "Id": "Knockout",
+    "BasePower": 150,
+    "Accuracy": 50,
+    "Priority": 0,
+    "Type": "Fighting",
+    "Category": "Physical",
+    "Description": "A devastating haymaker. Extreme power but very hard to land.",
+    "HealsPercent": null,
+    "StatusEffect": null,
+    "StatusChance": null,
+    "CausesFlinch": true
+  },
+  {
+    "Name": "Submission",
+    "Slug": "submission",
+    "Id": "Submission",
+    "BasePower": 80,
+    "Accuracy": 80,
+    "Priority": 0,
+    "Type": "Fighting",
+    "Category": "Physical",
+    "Description": "A reckless body slam that pins the foe. User takes 25% recoil.",
+    "RecoilPercent": 25
+  },
+  {
+    "Name": "Triple Kick",
+    "Slug": "triple-kick",
+    "Id": "Triple Kick",
+    "BasePower": 10,
+    "Accuracy": 90,
+    "Priority": 0,
+    "Type": "Fighting",
+    "Category": "Physical",
+    "Description": "Three consecutive kicks. Each hit gains 10 power: 10, 20, 30.",
+    "MinHits": 3,
+    "MaxHits": 3,
+    "Fixed": true
+  },
+  {
+    "Name": "Fury Swipes",
+    "Slug": "fury-swipes",
+    "Id": "Fury Swipes",
+    "BasePower": 18,
+    "Accuracy": 80,
+    "Priority": 0,
+    "Type": "Normal",
+    "Category": "Physical",
+    "Description": "Rakes the foe with claws 2-5 times in a row.",
+    "MinHits": 2,
+    "MaxHits": 5
+  },
+  {
+    "Name": "Arm Thrust",
+    "Slug": "arm-thrust",
+    "Id": "Arm Thrust",
+    "BasePower": 15,
+    "Accuracy": 100,
+    "Priority": 0,
+    "Type": "Fighting",
+    "Category": "Physical",
+    "Description": "A flurry of open-palmed arm thrusts that hits 2-5 times.",
+    "MinHits": 2,
+    "MaxHits": 5
+  },
+  {
+    "Name": "Close Flurry",
+    "Slug": "close-flurry",
+    "Id": "Close Flurry",
+    "BasePower": 25,
+    "Accuracy": 90,
+    "Priority": 0,
+    "Type": "Fighting",
+    "Category": "Physical",
+    "Description": "A rapid combo of punches that hits exactly twice.",
+    "MinHits": 2,
+    "MaxHits": 2,
+    "Fixed": true
+  },
+  {
+    "Name": "Vine Whip",
+    "Slug": "vine-whip",
+    "Id": "Vine Whip",
+    "BasePower": 45,
+    "Accuracy": 100,
+    "Priority": 0,
+    "Type": "Grass",
+    "Category": "Physical",
+    "Description": "Strikes with snapping vines. A reliable grass attack."
+  },
+  {
+    "Name": "Seed Toss",
+    "Slug": "seed-toss",
+    "Id": "Seed Toss",
+    "BasePower": 60,
+    "Accuracy": 95,
+    "Priority": 0,
+    "Type": "Grass",
+    "Category": "Physical",
+    "Description": "Pelts the foe with hardened seeds."
+  },
+  {
+    "Name": "Leaf Slash",
+    "Slug": "leaf-slash",
+    "Id": "Leaf Slash",
+    "BasePower": 75,
+    "Accuracy": 100,
+    "Priority": 0,
+    "Type": "Grass",
+    "Category": "Physical",
+    "Description": "Slashes with razor-sharp leaves. Strong and reliable."
+  },
+  {
+    "Name": "Bullet Seed",
+    "Slug": "bullet-seed",
+    "Id": "Bullet Seed",
+    "BasePower": 25,
+    "Accuracy": 100,
+    "Priority": 0,
+    "Type": "Grass",
+    "Category": "Physical",
+    "Description": "Fires seeds in rapid succession. Hits 2-5 times.",
+    "MinHits": 2,
+    "MaxHits": 5
+  },
+  {
+    "Name": "Thorn Barrage",
+    "Slug": "thorn-barrage",
+    "Id": "Thorn Barrage",
+    "BasePower": 20,
+    "Accuracy": 90,
+    "Priority": 0,
+    "Type": "Grass",
+    "Category": "Physical",
+    "Description": "Launches sharp thorns 2-5 times.",
+    "MinHits": 2,
+    "MaxHits": 5
+  },
+  {
+    "Name": "Psychic Pulse",
+    "Slug": "psychic-pulse",
+    "Id": "Psychic Pulse",
+    "BasePower": 60,
+    "Accuracy": 100,
+    "Priority": 0,
+    "Type": "Psychic",
+    "Category": "Special",
+    "Description": "Emits a sharp mental pulse. 20% chance to confuse the target.",
+    "HealsPercent": null,
+    "StatusEffect": null,
+    "StatusChance": null,
+    "CausesFlinch": null,
+    "CausesConfusion": true
+  },
+  {
+    "Name": "Mind Slam",
+    "Slug": "mind-slam",
+    "Id": "Mind Slam",
+    "BasePower": 85,
+    "Accuracy": 100,
+    "Priority": 0,
+    "Type": "Psychic",
+    "Category": "Special",
+    "Description": "Throws mental force like a hammer. May cause confusion.",
+    "HealsPercent": null,
+    "StatusEffect": null,
+    "StatusChance": null,
+    "CausesFlinch": null,
+    "CausesConfusion": true
+  },
+  {
+    "Name": "Shield Bash",
+    "Slug": "shield-bash",
+    "Id": "Shield Bash",
+    "BasePower": 70,
+    "Accuracy": 100,
+    "Priority": 0,
+    "Type": "Steel",
+    "Category": "Physical",
+    "Description": "Bashes the foe with a sturdy guard. May cause flinching.",
+    "HealsPercent": null,
+    "StatusEffect": null,
+    "StatusChance": null,
+    "CausesFlinch": true
+  },
+  {
+    "Name": "Gear Grind",
+    "Slug": "gear-grind",
+    "Id": "Gear Grind",
+    "BasePower": 50,
+    "Accuracy": 85,
+    "Priority": 0,
+    "Type": "Steel",
+    "Category": "Physical",
+    "Description": "Grinds the foe with steel gears. Always hits twice.",
+    "MinHits": 2,
+    "MaxHits": 2,
+    "Fixed": true
+  },
+  {
+    "Name": "Spike Cannon",
+    "Slug": "spike-cannon",
+    "Id": "Spike Cannon",
+    "BasePower": 20,
+    "Accuracy": 100,
+    "Priority": 0,
+    "Type": "Steel",
+    "Category": "Physical",
+    "Description": "Launches steel spikes 2-5 times in succession.",
+    "MinHits": 2,
+    "MaxHits": 5
+  },
+  {
+    "Name": "Dance Strike",
+    "Slug": "dance-strike",
+    "Id": "Dance Strike",
+    "BasePower": 60,
+    "Accuracy": 100,
+    "Priority": 0,
+    "Type": "Fairy",
+    "Category": "Physical",
+    "Description": "A rhythmic strike executed mid-dance. Graceful and reliable."
+  },
+  {
+    "Name": "Dazzle Beam",
+    "Slug": "dazzle-beam",
+    "Id": "Dazzle Beam",
+    "BasePower": 75,
+    "Accuracy": 100,
+    "Priority": 0,
+    "Type": "Fairy",
+    "Category": "Special",
+    "Description": "Fires a brilliant, disorienting ray. May cause confusion.",
+    "HealsPercent": null,
+    "StatusEffect": null,
+    "StatusChance": null,
+    "CausesFlinch": null,
+    "CausesConfusion": true
+  },
+  {
+    "Name": "Fairy Strike",
+    "Slug": "fairy-strike",
+    "Id": "Fairy Strike",
+    "BasePower": 85,
+    "Accuracy": 95,
+    "Priority": 0,
+    "Type": "Fairy",
+    "Category": "Physical",
+    "Description": "A charged blow infused with fairy power. Strong fairy attack."
+  },
+  {
+    "Name": "Sunbeam",
+    "Slug": "sunbeam",
+    "Id": "Sunbeam",
+    "BasePower": 120,
+    "Accuracy": 90,
+    "Priority": 0,
+    "Type": "Fairy",
+    "Category": "Special",
+    "Description": "Concentrates radiance into a piercing beam. Extremely powerful."
+  },
+  {
+    "Name": "Ooze Shot",
+    "Slug": "ooze-shot",
+    "Id": "Ooze Shot",
+    "BasePower": 45,
+    "Accuracy": 100,
+    "Priority": 0,
+    "Type": "Poison",
+    "Category": "Special",
+    "Description": "Fires a glob of toxic ooze. 30% chance to poison.",
+    "HealsPercent": null,
+    "StatusEffect": "PSN",
+    "StatusChance": 30
+  },
+  {
+    "Name": "Sludge Puff",
+    "Slug": "sludge-puff",
+    "Id": "Sludge Puff",
+    "BasePower": 60,
+    "Accuracy": 100,
+    "Priority": 0,
+    "Type": "Poison",
+    "Category": "Special",
+    "Description": "A burst of sludge coats the foe. 30% chance to poison.",
+    "HealsPercent": null,
+    "StatusEffect": "PSN",
+    "StatusChance": 30
+  },
+  {
+    "Name": "Toxic Wave",
+    "Slug": "toxic-wave",
+    "Id": "Toxic Wave",
+    "BasePower": 70,
+    "Accuracy": 90,
+    "Priority": 0,
+    "Type": "Poison",
+    "Category": "Special",
+    "Description": "A rolling wave of toxins. Guaranteed to badly poison.",
+    "HealsPercent": null,
+    "StatusEffect": "TOX",
+    "StatusChance": 100
+  },
+  {
+    "Name": "Corrosive Grasp",
+    "Slug": "corrosive-grasp",
+    "Id": "Corrosive Grasp",
+    "BasePower": 65,
+    "Accuracy": 95,
+    "Priority": 0,
+    "Type": "Poison",
+    "Category": "Physical",
+    "Description": "Burning toxins corrode armor. 30% chance to poison.",
+    "HealsPercent": null,
+    "StatusEffect": "PSN",
+    "StatusChance": 30
+  },
+  {
+    "Name": "Acidic Deluge",
+    "Slug": "acidic-deluge",
+    "Id": "Acidic Deluge",
+    "BasePower": 90,
+    "Accuracy": 85,
+    "Priority": 0,
+    "Type": "Poison",
+    "Category": "Special",
+    "Description": "Drowns the foe in corrosive acid. 50% chance to poison.",
+    "HealsPercent": null,
+    "StatusEffect": "PSN",
+    "StatusChance": 50
+  },
+  {
+    "Name": "Power Up",
+    "Slug": "power-up",
+    "Id": "Power Up",
+    "BasePower": 0,
+    "Accuracy": 0,
+    "Priority": 0,
+    "Type": "Normal",
+    "Category": "Status",
+    "Description": "Focuses energy to sharply raise Attack.",
+    "StatChanges": [
+      {
+        "Stat": "Attack",
+        "Stages": 2,
+        "Target": "Self"
+      }
+    ]
+  },
+  {
+    "Name": "Battle Cry",
+    "Slug": "battle-cry",
+    "Id": "Battle Cry",
+    "BasePower": 0,
+    "Accuracy": 0,
+    "Priority": 0,
+    "Type": "Fighting",
+    "Category": "Status",
+    "Description": "A fierce roar that boosts Attack and Speed.",
+    "StatChanges": [
+      {
+        "Stat": "Attack",
+        "Stages": 1,
+        "Target": "Self"
+      },
+      {
+        "Stat": "Speed",
+        "Stages": 1,
+        "Target": "Self"
+      }
+    ]
+  },
+  {
+    "Name": "Rage Boost",
+    "Slug": "rage-boost",
+    "Id": "Rage Boost",
+    "BasePower": 0,
+    "Accuracy": 0,
+    "Priority": 0,
+    "Type": "Dark",
+    "Category": "Status",
+    "Description": "Channels rage to drastically raise Attack.",
+    "StatChanges": [
+      {
+        "Stat": "Attack",
+        "Stages": 3,
+        "Target": "Self"
+      }
+    ]
+  },
+  {
+    "Name": "Harden",
+    "Slug": "harden",
+    "Id": "Harden",
+    "BasePower": 0,
+    "Accuracy": 0,
+    "Priority": 0,
+    "Type": "Normal",
+    "Category": "Status",
+    "Description": "Stiffens the body to raise Defense.",
+    "StatChanges": [
+      {
+        "Stat": "Defense",
+        "Stages": 1,
+        "Target": "Self"
+      }
+    ]
+  },
+  {
+    "Name": "Iron Defense",
+    "Slug": "iron-defense",
+    "Id": "Iron Defense",
+    "BasePower": 0,
+    "Accuracy": 0,
+    "Priority": 0,
+    "Type": "Steel",
+    "Category": "Status",
+    "Description": "Hardens the body like iron to sharply raise Defense.",
+    "StatChanges": [
+      {
+        "Stat": "Defense",
+        "Stages": 2,
+        "Target": "Self"
+      }
+    ]
+  },
+  {
+    "Name": "Barrier",
+    "Slug": "barrier",
+    "Id": "Barrier",
+    "BasePower": 0,
+    "Accuracy": 0,
+    "Priority": 0,
+    "Type": "Psychic",
+    "Category": "Status",
+    "Description": "Creates a psychic barrier that sharply raises Defense.",
+    "StatChanges": [
+      {
+        "Stat": "Defense",
+        "Stages": 2,
+        "Target": "Self"
+      }
+    ]
+  },
+  {
+    "Name": "Agility",
+    "Slug": "agility",
+    "Id": "Agility",
+    "BasePower": 0,
+    "Accuracy": 0,
+    "Priority": 0,
+    "Type": "Psychic",
+    "Category": "Status",
+    "Description": "Relaxes the body to move faster. Sharply raises Speed.",
+    "StatChanges": [
+      {
+        "Stat": "Speed",
+        "Stages": 2,
+        "Target": "Self"
+      }
+    ]
+  },
+  {
+    "Name": "Quick Step",
+    "Slug": "quick-step",
+    "Id": "Quick Step",
+    "BasePower": 0,
+    "Accuracy": 0,
+    "Priority": 0,
+    "Type": "Normal",
+    "Category": "Status",
+    "Description": "Prepares for quick movements. Raises Speed.",
+    "StatChanges": [
+      {
+        "Stat": "Speed",
+        "Stages": 1,
+        "Target": "Self"
+      }
+    ]
+  },
+  {
+    "Name": "Jet Stream",
+    "Slug": "jet-stream",
+    "Id": "Jet Stream",
+    "BasePower": 0,
+    "Accuracy": 0,
+    "Priority": 0,
+    "Type": "Flying",
+    "Category": "Status",
+    "Description": "Rides air currents to drastically raise Speed.",
+    "StatChanges": [
+      {
+        "Stat": "Speed",
+        "Stages": 3,
+        "Target": "Self"
+      }
+    ]
+  },
+  {
+    "Name": "Bulk Up",
+    "Slug": "bulk-up",
+    "Id": "Bulk Up",
+    "BasePower": 0,
+    "Accuracy": 0,
+    "Priority": 0,
+    "Type": "Fighting",
+    "Category": "Status",
+    "Description": "Bulks up muscles to raise Attack and Defense.",
+    "StatChanges": [
+      {
+        "Stat": "Attack",
+        "Stages": 1,
+        "Target": "Self"
+      },
+      {
+        "Stat": "Defense",
+        "Stages": 1,
+        "Target": "Self"
+      }
+    ]
+  },
+  {
+    "Name": "Dragon Dance",
+    "Slug": "dragon-dance",
+    "Id": "Dragon Dance",
+    "BasePower": 0,
+    "Accuracy": 0,
+    "Priority": 0,
+    "Type": "Normal",
+    "Category": "Status",
+    "Description": "A mystic dance that raises Attack and Speed.",
+    "StatChanges": [
+      {
+        "Stat": "Attack",
+        "Stages": 1,
+        "Target": "Self"
+      },
+      {
+        "Stat": "Speed",
+        "Stages": 1,
+        "Target": "Self"
+      }
+    ]
+  },
+  {
+    "Name": "Calm Mind",
+    "Slug": "calm-mind",
+    "Id": "Calm Mind",
+    "BasePower": 0,
+    "Accuracy": 0,
+    "Priority": 0,
+    "Type": "Psychic",
+    "Category": "Status",
+    "Description": "Clears the mind to raise Special Attack and Special Defense.",
+    "StatChanges": [
+      {
+        "Stat": "SpecialAttack",
+        "Stages": 1,
+        "Target": "Self"
+      },
+      {
+        "Stat": "SpecialDefense",
+        "Stages": 1,
+        "Target": "Self"
+      }
+    ]
+  },
+  {
+    "Name": "Focus Energy",
+    "Slug": "focus-energy",
+    "Id": "Focus Energy",
+    "BasePower": 0,
+    "Accuracy": 0,
+    "Priority": 0,
+    "Type": "Normal",
+    "Category": "Status",
+    "Description": "Concentrates deeply to raise Accuracy.",
+    "StatChanges": [
+      {
+        "Stat": "Accuracy",
+        "Stages": 1,
+        "Target": "Self"
+      }
+    ]
+  },
+  {
+    "Name": "Double Team",
+    "Slug": "double-team",
+    "Id": "Double Team",
+    "BasePower": 0,
+    "Accuracy": 0,
+    "Priority": 0,
+    "Type": "Normal",
+    "Category": "Status",
+    "Description": "Creates illusory copies to raise Evasion.",
+    "StatChanges": [
+      {
+        "Stat": "Evasion",
+        "Stages": 1,
+        "Target": "Self"
+      }
+    ]
+  },
+  {
+    "Name": "Minimize",
+    "Slug": "minimize",
+    "Id": "Minimize",
+    "BasePower": 0,
+    "Accuracy": 0,
+    "Priority": 0,
+    "Type": "Normal",
+    "Category": "Status",
+    "Description": "Shrinks to raise Evasion sharply.",
+    "StatChanges": [
+      {
+        "Stat": "Evasion",
+        "Stages": 2,
+        "Target": "Self"
+      }
+    ]
+  },
+  {
+    "Name": "Growl",
+    "Slug": "growl",
+    "Id": "Growl",
+    "BasePower": 0,
+    "Accuracy": 100,
+    "Priority": 0,
+    "Type": "Normal",
+    "Category": "Status",
+    "Description": "A cute growl that lowers the foe's Attack.",
+    "StatChanges": [
+      {
+        "Stat": "Attack",
+        "Stages": -1,
+        "Target": "Opponent"
+      }
+    ]
+  },
+  {
+    "Name": "Leer",
+    "Slug": "leer",
+    "Id": "Leer",
+    "BasePower": 0,
+    "Accuracy": 100,
+    "Priority": 0,
+    "Type": "Normal",
+    "Category": "Status",
+    "Description": "An intimidating look that lowers the foe's Defense.",
+    "StatChanges": [
+      {
+        "Stat": "Defense",
+        "Stages": -1,
+        "Target": "Opponent"
+      }
+    ]
+  },
+  {
+    "Name": "Tail Whip",
+    "Slug": "tail-whip",
+    "Id": "Tail Whip",
+    "BasePower": 0,
+    "Accuracy": 100,
+    "Priority": 0,
+    "Type": "Normal",
+    "Category": "Status",
+    "Description": "Wags tail cutely to lower the foe's Defense.",
+    "StatChanges": [
+      {
+        "Stat": "Defense",
+        "Stages": -1,
+        "Target": "Opponent"
+      }
+    ]
+  },
+  {
+    "Name": "Screech",
+    "Slug": "screech",
+    "Id": "Screech",
+    "BasePower": 0,
+    "Accuracy": 85,
+    "Priority": 0,
+    "Type": "Normal",
+    "Category": "Status",
+    "Description": "An earsplitting screech that harshly lowers Defense.",
+    "StatChanges": [
+      {
+        "Stat": "Defense",
+        "Stages": -2,
+        "Target": "Opponent"
+      }
+    ]
+  },
+  {
+    "Name": "Scary Face",
+    "Slug": "scary-face",
+    "Id": "Scary Face",
+    "BasePower": 0,
+    "Accuracy": 100,
+    "Priority": 0,
+    "Type": "Normal",
+    "Category": "Status",
+    "Description": "A terrifying face that harshly lowers Speed.",
+    "StatChanges": [
+      {
+        "Stat": "Speed",
+        "Stages": -2,
+        "Target": "Opponent"
+      }
+    ]
+  },
+  {
+    "Name": "Charm",
+    "Slug": "charm",
+    "Id": "Charm",
+    "BasePower": 0,
+    "Accuracy": 100,
+    "Priority": 0,
+    "Type": "Fairy",
+    "Category": "Status",
+    "Description": "Charms the foe to harshly lower Attack.",
+    "StatChanges": [
+      {
+        "Stat": "Attack",
+        "Stages": -2,
+        "Target": "Opponent"
+      }
+    ]
+  },
+  {
+    "Name": "Sweet Scent",
+    "Slug": "sweet-scent",
+    "Id": "Sweet Scent",
+    "BasePower": 0,
+    "Accuracy": 100,
+    "Priority": 0,
+    "Type": "Normal",
+    "Category": "Status",
+    "Description": "A sweet aroma that lowers the foe's Evasion.",
+    "StatChanges": [
+      {
+        "Stat": "Evasion",
+        "Stages": -1,
+        "Target": "Opponent"
+      }
+    ]
+  },
+  {
+    "Name": "Sand Attack",
+    "Slug": "sand-attack",
+    "Id": "Sand Attack",
+    "BasePower": 0,
+    "Accuracy": 100,
+    "Priority": 0,
+    "Type": "Ground",
+    "Category": "Status",
+    "Description": "Throws sand to lower the foe's Accuracy.",
+    "StatChanges": [
+      {
+        "Stat": "Accuracy",
+        "Stages": -1,
+        "Target": "Opponent"
+      }
+    ]
+  },
+  {
+    "Name": "Smokescreen",
+    "Slug": "smokescreen",
+    "Id": "Smokescreen",
+    "BasePower": 0,
+    "Accuracy": 100,
+    "Priority": 0,
+    "Type": "Normal",
+    "Category": "Status",
+    "Description": "Obscures with smoke to lower the foe's Accuracy.",
+    "StatChanges": [
+      {
+        "Stat": "Accuracy",
+        "Stages": -1,
+        "Target": "Opponent"
+      }
+    ]
+  },
+  {
+    "Name": "Flash",
+    "Slug": "flash",
+    "Id": "Flash",
+    "BasePower": 0,
+    "Accuracy": 100,
+    "Priority": 0,
+    "Type": "Normal",
+    "Category": "Status",
+    "Description": "A bright flash that sharply lowers Accuracy.",
+    "StatChanges": [
+      {
+        "Stat": "Accuracy",
+        "Stages": -2,
+        "Target": "Opponent"
+      }
+    ]
+  },
+  {
+    "Name": "Crush Claw",
+    "Slug": "crush-claw",
+    "Id": "Crush Claw",
+    "BasePower": 75,
+    "Accuracy": 95,
+    "Priority": 0,
+    "Type": "Normal",
+    "Category": "Physical",
+    "Description": "A vicious claw attack. 50% chance to lower Defense.",
+    "HealsPercent": null,
+    "StatusEffect": null,
+    "StatusChance": null,
+    "CausesFlinch": null,
+    "CausesConfusion": null,
+    "StatChanges": [
+      {
+        "Stat": "Defense",
+        "Stages": -1,
+        "Target": "Opponent",
+        "Chance": 50
+      }
+    ]
+  },
+  {
+    "Name": "Metal Claw",
+    "Slug": "metal-claw",
+    "Id": "Metal Claw",
+    "BasePower": 50,
+    "Accuracy": 95,
+    "Priority": 0,
+    "Type": "Steel",
+    "Category": "Physical",
+    "Description": "A steel claw attack. 10% chance to raise Attack.",
+    "HealsPercent": null,
+    "StatusEffect": null,
+    "StatusChance": null,
+    "CausesFlinch": null,
+    "CausesConfusion": null,
+    "StatChanges": [
+      {
+        "Stat": "Attack",
+        "Stages": 1,
+        "Target": "Self",
+        "Chance": 10
+      }
+    ]
+  },
+  {
+    "Name": "Flame Charge",
+    "Slug": "flame-charge",
+    "Id": "Flame Charge",
+    "BasePower": 50,
+    "Accuracy": 100,
+    "Priority": 0,
+    "Type": "Fire",
+    "Category": "Physical",
+    "Description": "Cloaked in flame, charges the foe. Raises Speed.",
+    "HealsPercent": null,
+    "StatusEffect": null,
+    "StatusChance": null,
+    "CausesFlinch": null,
+    "CausesConfusion": null,
+    "StatChanges": [
+      {
+        "Stat": "Speed",
+        "Stages": 1,
+        "Target": "Self",
+        "Chance": 100
+      }
+    ]
+  },
+  {
+    "Name": "Rock Smash",
+    "Slug": "rock-smash",
+    "Id": "Rock Smash",
+    "BasePower": 40,
+    "Accuracy": 100,
+    "Priority": 0,
+    "Type": "Fighting",
+    "Category": "Physical",
+    "Description": "A smashing attack. 50% chance to lower Defense.",
+    "HealsPercent": null,
+    "StatusEffect": null,
+    "StatusChance": null,
+    "CausesFlinch": null,
+    "CausesConfusion": null,
+    "StatChanges": [
+      {
+        "Stat": "Defense",
+        "Stages": -1,
+        "Target": "Opponent",
+        "Chance": 50
+      }
+    ]
+  },
+  {
+    "Name": "Shadow Ball",
+    "Slug": "shadow-ball",
+    "Id": "Shadow Ball",
+    "BasePower": 80,
+    "Accuracy": 100,
+    "Priority": 0,
+    "Type": "Dark",
+    "Category": "Special",
+    "Description": "A shadowy blob of energy. 20% chance to lower Special Defense.",
+    "HealsPercent": null,
+    "StatusEffect": null,
+    "StatusChance": null,
+    "CausesFlinch": null,
+    "CausesConfusion": null,
+    "StatChanges": [
+      {
+        "Stat": "SpecialDefense",
+        "Stages": -1,
+        "Target": "Opponent",
+        "Chance": 20
+      }
+    ]
+  },
+  {
+    "Name": "Psychic Blast",
+    "Slug": "psychic-blast",
+    "Id": "Psychic Blast",
+    "BasePower": 90,
+    "Accuracy": 100,
+    "Priority": 0,
+    "Type": "Psychic",
+    "Category": "Special",
+    "Description": "A powerful psychic attack. 10% chance to lower Special Defense.",
+    "HealsPercent": null,
+    "StatusEffect": null,
+    "StatusChance": null,
+    "CausesFlinch": null,
+    "CausesConfusion": null,
+    "StatChanges": [
+      {
+        "Stat": "SpecialDefense",
+        "Stages": -1,
+        "Target": "Opponent",
+        "Chance": 10
+      }
+    ]
+  },
+  {
+    "Name": "Power-Up Punch",
+    "Slug": "power-up-punch",
+    "Id": "Power-Up Punch",
+    "BasePower": 40,
+    "Accuracy": 100,
+    "Priority": 0,
+    "Type": "Fighting",
+    "Category": "Physical",
+    "Description": "A punch that builds power. Always raises Attack.",
+    "HealsPercent": null,
+    "StatusEffect": null,
+    "StatusChance": null,
+    "CausesFlinch": null,
+    "CausesConfusion": null,
+    "StatChanges": [
+      {
+        "Stat": "Attack",
+        "Stages": 1,
+        "Target": "Self",
+        "Chance": 100
+      }
+    ]
+  },
+  {
+    "Name": "Icy Wind",
+    "Slug": "icy-wind",
+    "Id": "Icy Wind",
+    "BasePower": 55,
+    "Accuracy": 95,
+    "Priority": 0,
+    "Type": "Water",
+    "Category": "Special",
+    "Description": "A chilling gust. Always lowers the foe's Speed.",
+    "HealsPercent": null,
+    "StatusEffect": null,
+    "StatusChance": null,
+    "CausesFlinch": null,
+    "CausesConfusion": null,
+    "StatChanges": [
+      {
+        "Stat": "Speed",
+        "Stages": -1,
+        "Target": "Opponent",
+        "Chance": 100
+      }
+    ]
+  },
+  {
+    "Name": "Mud Slap",
+    "Slug": "mud-slap",
+    "Id": "Mud Slap",
+    "BasePower": 20,
+    "Accuracy": 100,
+    "Priority": 0,
+    "Type": "Ground",
+    "Category": "Special",
+    "Description": "Hurls mud at the foe. Always lowers Accuracy.",
+    "HealsPercent": null,
+    "StatusEffect": null,
+    "StatusChance": null,
+    "CausesFlinch": null,
+    "CausesConfusion": null,
+    "StatChanges": [
+      {
+        "Stat": "Accuracy",
+        "Stages": -1,
+        "Target": "Opponent",
+        "Chance": 100
+      }
+    ]
+  },
+  {
+    "Name": "Ancient Power",
+    "Slug": "ancient-power",
+    "Id": "Ancient Power",
+    "BasePower": 60,
+    "Accuracy": 100,
+    "Priority": 0,
+    "Type": "Ground",
+    "Category": "Special",
+    "Description": "An ancient power. 10% chance to raise all stats.",
+    "HealsPercent": null,
+    "StatusEffect": null,
+    "StatusChance": null,
+    "CausesFlinch": null,
+    "CausesConfusion": null,
+    "StatChanges": [
+      {
+        "Stat": "Attack",
+        "Stages": 1,
+        "Target": "Self",
+        "Chance": 10
+      },
+      {
+        "Stat": "Defense",
+        "Stages": 1,
+        "Target": "Self",
+        "Chance": 10
+      },
+      {
+        "Stat": "SpecialAttack",
+        "Stages": 1,
+        "Target": "Self",
+        "Chance": 10
+      },
+      {
+        "Stat": "SpecialDefense",
+        "Stages": 1,
+        "Target": "Self",
+        "Chance": 10
+      },
+      {
+        "Stat": "Speed",
+        "Stages": 1,
+        "Target": "Self",
+        "Chance": 10
+      }
+    ]
+  },
+  {
+    "Name": "Close Combat",
+    "Slug": "close-combat",
+    "Id": "Close Combat",
+    "BasePower": 120,
+    "Accuracy": 100,
+    "Priority": 0,
+    "Type": "Fighting",
+    "Category": "Physical",
+    "Description": "A powerful attack, but lowers your defenses.",
+    "HealsPercent": null,
+    "StatusEffect": null,
+    "StatusChance": null,
+    "CausesFlinch": null,
+    "CausesConfusion": null,
+    "StatChanges": [
+      {
+        "Stat": "Defense",
+        "Stages": -1,
+        "Target": "Self",
+        "Chance": 100
+      },
+      {
+        "Stat": "SpecialDefense",
+        "Stages": -1,
+        "Target": "Self",
+        "Chance": 100
+      }
+    ]
+  },
+  {
+    "Name": "Overheat",
+    "Slug": "overheat",
+    "Id": "Overheat",
+    "BasePower": 130,
+    "Accuracy": 90,
+    "Priority": 0,
+    "Type": "Fire",
+    "Category": "Special",
+    "Description": "Attacks with maximum heat. Sharply lowers your Special Attack.",
+    "HealsPercent": null,
+    "StatusEffect": null,
+    "StatusChance": null,
+    "CausesFlinch": null,
+    "CausesConfusion": null,
+    "StatChanges": [
+      {
+        "Stat": "SpecialAttack",
+        "Stages": -2,
+        "Target": "Self",
+        "Chance": 100
+      }
+    ]
+  },
+  {
+    "Name": "Superpower",
+    "Slug": "superpower",
+    "Id": "Superpower",
+    "BasePower": 120,
+    "Accuracy": 100,
+    "Priority": 0,
+    "Type": "Fighting",
+    "Category": "Physical",
+    "Description": "A powerful attack that lowers Attack and Defense.",
+    "HealsPercent": null,
+    "StatusEffect": null,
+    "StatusChance": null,
+    "CausesFlinch": null,
+    "CausesConfusion": null,
+    "StatChanges": [
+      {
+        "Stat": "Attack",
+        "Stages": -1,
+        "Target": "Self",
+        "Chance": 100
+      },
+      {
+        "Stat": "Defense",
+        "Stages": -1,
+        "Target": "Self",
+        "Chance": 100
+      }
+    ]
+  },
+  {
+    "Name": "Rapid Spin",
+    "Slug": "rapid-spin",
+    "Id": "Rapid Spin",
+    "BasePower": 50,
+    "Accuracy": 100,
+    "Priority": 0,
+    "Type": "Normal",
+    "Category": "Physical",
+    "Description": "Spins rapidly, damaging the foe and removing entry hazards from your side.",
+    "HealsPercent": null,
+    "StatusEffect": null,
+    "StatusChance": null,
+    "CausesFlinch": null,
+    "CausesConfusion": null,
+    "StatChanges": [
+      {
+        "Stat": "Speed",
+        "Stages": 1,
+        "Target": "Self",
+        "Chance": 100
+      }
+    ]
+  },
+  {
+    "Name": "Defog",
+    "Slug": "defog",
+    "Id": "Defog",
+    "BasePower": 0,
+    "Accuracy": 0,
+    "Priority": 0,
+    "Type": "Flying",
+    "Category": "Status",
+    "Description": "Blows away hazards from both sides of the field. Also lowers foe's evasion.",
+    "StatChanges": [
+      {
+        "Stat": "Evasion",
+        "Stages": -1,
+        "Target": "Opponent"
+      }
+    ]
+  }
+]
