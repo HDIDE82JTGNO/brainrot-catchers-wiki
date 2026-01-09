@@ -1,16 +1,22 @@
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { TeamAnalyzer } from '@/components/TeamAnalyzer';
+import { TeamMemberEditor } from '@/components/TeamMemberEditor';
 import creaturesData from '../../data/creatures.json';
 import movesData from '../../data/moves.json';
 import { Creature, Move } from '@/types';
+import { TeamMember, createDefaultTeamMember } from '@/lib/teamTypes';
 import { getSpringConfig } from '@/lib/springConfigs';
 import { useSpring, animated } from '@react-spring/web';
 import Image from 'next/image';
 import Link from 'next/link';
 import { getSpritePath } from '@/lib/spriteUtils';
 import { TypeBadge } from '@/components/TypeBadge';
+import { parseTeamFromUrl, shareTeam } from '@/lib/shareUtils';
+import { ShareButton } from '@/components/ShareButton';
+import { CopyTeamButton } from '@/components/CopyDataButton';
+import { IconEdit } from '@tabler/icons-react';
 
 const creatures = creaturesData as unknown as Creature[];
 const moves = movesData as unknown as Move[];
@@ -19,9 +25,21 @@ const AnimatedDiv = animated.div as any;
 const MAX_TEAM_SIZE = 6;
 
 export default function TeamBuilderPage() {
-  const [team, setTeam] = useState<Creature[]>([]);
+  const [team, setTeam] = useState<TeamMember[]>([]);
   const [shinyCreatures, setShinyCreatures] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [teamLoadedFromUrl, setTeamLoadedFromUrl] = useState(false);
+
+  // Load team from URL on mount
+  useEffect(() => {
+    const urlTeam = parseTeamFromUrl(creatures);
+    if (urlTeam && urlTeam.length > 0) {
+      setTeam(urlTeam);
+      setTeamLoadedFromUrl(true);
+      setTimeout(() => setTeamLoadedFromUrl(false), 3000);
+    }
+  }, []);
 
   // Filter creatures for selection
   const filteredCreatures = useMemo(() => {
@@ -38,7 +56,7 @@ export default function TeamBuilderPage() {
   const addToTeam = (creature: Creature) => {
     if (team.length >= MAX_TEAM_SIZE) return;
     if (team.some(c => c.Id === creature.Id)) return;
-    setTeam([...team, creature]);
+    setTeam([...team, createDefaultTeamMember(creature)]);
   };
 
   const removeFromTeam = (index: number) => {
@@ -47,6 +65,13 @@ export default function TeamBuilderPage() {
 
   const clearTeam = () => {
     setTeam([]);
+  };
+
+  const updateTeamMember = (index: number, member: TeamMember) => {
+    const newTeam = [...team];
+    newTeam[index] = member;
+    setTeam(newTeam);
+    setEditingIndex(null);
   };
 
   const toggleShiny = (creatureName: string) => {
@@ -78,70 +103,109 @@ export default function TeamBuilderPage() {
       </div>
 
       <AnimatedDiv style={fadeIn} className="space-y-6">
+        {/* Team Loaded Notification */}
+        {teamLoadedFromUrl && (
+          <div className="bg-green-100 dark:bg-green-900/30 border-2 border-green-300 dark:border-green-700 rounded-lg p-4 text-green-700 dark:text-green-300 text-center">
+            Team loaded from URL!
+          </div>
+        )}
+
         {/* Team Slots */}
-        <div className="bg-white rounded-2xl border-2 border-slate-200 shadow-xl p-6">
+        <div className="bg-white dark:bg-slate-800 rounded-2xl border-2 border-slate-200 dark:border-slate-700 shadow-xl p-6">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
-            <h2 className="text-xl font-bold text-slate-900">
+            <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">
               Team ({team.length}/{MAX_TEAM_SIZE})
             </h2>
-            {team.length > 0 && (
-              <button
-                onClick={clearTeam}
-                className="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors font-medium text-sm"
-              >
-                Clear Team
-              </button>
-            )}
+            <div className="flex gap-2">
+              {team.length > 0 && (
+                <>
+                  <CopyTeamButton team={team} />
+                  <ShareButton
+                    url={shareTeam(team)}
+                    title="Share Team - Brainrot Catchers Wiki"
+                    text={`Check out my team of ${team.length} creatures!`}
+                  />
+                  <button
+                    onClick={clearTeam}
+                    className="px-4 py-2 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-lg hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors font-medium text-sm"
+                  >
+                    Clear Team
+                  </button>
+                </>
+              )}
+            </div>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4">
             {Array.from({ length: MAX_TEAM_SIZE }).map((_, idx) => {
-              const creature = team[idx];
+              const member = team[idx];
               return (
                 <div
                   key={idx}
-                  className={`aspect-square border-2 rounded-xl flex flex-col items-center justify-center p-2 ${
-                    creature
-                      ? 'border-blue-400 bg-blue-50'
-                      : 'border-slate-200 bg-slate-50 border-dashed'
+                  className={`relative aspect-square border-2 rounded-xl flex flex-col items-center justify-center p-2 ${
+                    member
+                      ? 'border-blue-400 dark:border-blue-500 bg-blue-50 dark:bg-blue-900/30'
+                      : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-700/50 border-dashed'
                   }`}
                 >
-                  {creature ? (
+                  {member ? (
                     <>
                       <button
                         onClick={() => removeFromTeam(idx)}
-                        className="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-xs font-bold hover:bg-red-600 transition-colors"
+                        className="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-xs font-bold hover:bg-red-600 transition-colors z-10"
                       >
                         ×
                       </button>
-                      <Link href={`/creatures/${encodeURIComponent(creature.Name)}`}>
+                      <button
+                        onClick={() => setEditingIndex(idx)}
+                        className="absolute top-1 left-1 w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center hover:bg-blue-600 transition-colors z-10"
+                        title="Edit"
+                      >
+                        <IconEdit className="w-3 h-3" />
+                      </button>
+                      <Link href={`/creatures/${encodeURIComponent(member.Name)}`}>
                         <div className="w-full h-full flex flex-col items-center justify-center cursor-pointer hover:opacity-80 transition-opacity">
-                          <div className="w-16 h-16 mb-1 bg-white rounded-full flex items-center justify-center border-2 border-slate-200">
+                          <div className="w-16 h-16 mb-1 bg-white dark:bg-slate-800 rounded-full flex items-center justify-center border-2 border-slate-200 dark:border-slate-600">
                             <Image
-                              src={getSpritePath(creature.Name, shinyCreatures.has(creature.Name))}
-                              alt={creature.Name}
+                              src={getSpritePath(member.Name, shinyCreatures.has(member.Name))}
+                              alt={member.Name}
                               width={64}
                               height={64}
                               className="w-full h-full object-contain p-1"
                               style={{ imageRendering: 'pixelated' }}
                             />
                           </div>
-                          <div className="text-xs font-bold text-slate-900 text-center mb-1">{creature.Name}</div>
+                          <div className="text-xs font-bold text-slate-900 dark:text-slate-100 text-center mb-1">{member.Name}</div>
                           <div className="flex gap-0.5">
-                            {creature.Types?.map(t => (
+                            {member.Types?.map(t => (
                               <TypeBadge key={t} type={t} className="scale-75" />
                             ))}
                           </div>
+                          {member.moves.length > 0 && (
+                            <div className="text-[10px] text-slate-600 dark:text-slate-400 mt-1">
+                              {member.moves.length} move{member.moves.length !== 1 ? 's' : ''}
+                            </div>
+                          )}
                         </div>
                       </Link>
                     </>
                   ) : (
-                    <div className="text-slate-400 text-xs text-center">Empty Slot</div>
+                    <div className="text-slate-400 dark:text-slate-500 text-xs text-center">Empty Slot</div>
                   )}
                 </div>
               );
             })}
           </div>
         </div>
+
+        {/* Team Member Editor Modal */}
+        {editingIndex !== null && team[editingIndex] && (
+          <TeamMemberEditor
+            member={team[editingIndex]}
+            moves={moves}
+            onSave={(member) => updateTeamMember(editingIndex, member)}
+            onCancel={() => setEditingIndex(null)}
+          />
+        )}
 
         {/* Team Analysis */}
         {team.length > 0 && (
@@ -153,8 +217,8 @@ export default function TeamBuilderPage() {
         )}
 
         {/* Creature Selection */}
-        <div className="bg-white rounded-2xl border-2 border-slate-200 shadow-xl p-6">
-          <h2 className="text-xl font-bold text-slate-900 mb-4">Add Creatures to Team</h2>
+        <div className="bg-white dark:bg-slate-800 rounded-2xl border-2 border-slate-200 dark:border-slate-700 shadow-xl p-6">
+          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-4">Add Creatures to Team</h2>
           
           {/* Search */}
           <div className="relative mb-4">
@@ -166,7 +230,7 @@ export default function TeamBuilderPage() {
             <input
               type="text"
               placeholder="Search creatures..."
-              className="w-full pl-10 pr-4 py-2 border-2 border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+              className="w-full pl-10 pr-4 py-2 border-2 border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -184,13 +248,13 @@ export default function TeamBuilderPage() {
                   disabled={isInTeam || team.length >= MAX_TEAM_SIZE}
                   className={`p-3 border-2 rounded-lg transition-all text-left flex flex-col items-center ${
                     isInTeam
-                      ? 'border-blue-500 bg-blue-50 opacity-50 cursor-not-allowed'
+                      ? 'border-blue-500 dark:border-blue-400 bg-blue-50 dark:bg-blue-900/30 opacity-50 cursor-not-allowed'
                       : team.length >= MAX_TEAM_SIZE
-                      ? 'border-slate-200 opacity-50 cursor-not-allowed'
-                      : 'border-slate-200 hover:border-blue-400 hover:shadow-md'
+                      ? 'border-slate-200 dark:border-slate-700 opacity-50 cursor-not-allowed'
+                      : 'border-slate-200 dark:border-slate-700 hover:border-blue-400 dark:hover:border-blue-500 hover:shadow-md dark:bg-slate-700/50'
                   }`}
                 >
-                  <div className="w-12 h-12 mb-2 bg-white rounded-full flex items-center justify-center border-2 border-slate-200 flex-shrink-0">
+                  <div className="w-12 h-12 mb-2 bg-white dark:bg-slate-800 rounded-full flex items-center justify-center border-2 border-slate-200 dark:border-slate-600 flex-shrink-0">
                     <Image
                       src={getSpritePath(creature.Name, shinyCreatures.has(creature.Name))}
                       alt={creature.Name}
@@ -203,12 +267,12 @@ export default function TeamBuilderPage() {
                   <div className="text-xs font-medium text-slate-600 mb-1">
                     #{String(creature.DexNumber).padStart(3, '0')}
                   </div>
-                  <div className="font-bold text-slate-900 text-sm mb-1 text-center">{creature.Name}</div>
+                  <div className="font-bold text-slate-900 dark:text-slate-100 text-sm mb-1 text-center">{creature.Name}</div>
                   <div className="flex gap-1 flex-wrap justify-center">
                     {creature.Types?.map(t => (
                       <span
                         key={t}
-                        className="text-[8px] px-1 py-0.5 bg-slate-200 text-slate-700 rounded"
+                        className="text-[8px] px-1 py-0.5 bg-slate-200 dark:bg-slate-600 text-slate-700 dark:text-slate-300 rounded"
                       >
                         {t}
                       </span>
@@ -221,9 +285,9 @@ export default function TeamBuilderPage() {
         </div>
 
         {team.length === 0 && (
-          <div className="bg-white rounded-2xl border-2 border-slate-200 shadow-xl p-12 text-center">
-            <p className="text-slate-500 mb-4">No creatures in team</p>
-            <p className="text-sm text-slate-400">Search and add creatures above to build your team</p>
+          <div className="bg-white dark:bg-slate-800 rounded-2xl border-2 border-slate-200 dark:border-slate-700 shadow-xl p-12 text-center">
+            <p className="text-slate-500 dark:text-slate-400 mb-4">No creatures in team</p>
+            <p className="text-sm text-slate-400 dark:text-slate-500">Search and add creatures above to build your team</p>
           </div>
         )}
       </AnimatedDiv>

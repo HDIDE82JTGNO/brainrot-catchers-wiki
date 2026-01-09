@@ -1,34 +1,42 @@
 "use client";
 
 import React, { useMemo } from 'react';
-import { Creature, Move } from '@/types';
+import { Move } from '@/types';
+import { TeamMember } from '@/lib/teamTypes';
 import { TypeBadge } from './TypeBadge';
 import { analyzeTeamCoverage } from '@/lib/coverageAnalysis';
 import { getWeaknesses, getResistances, getImmunities } from '@/lib/typeEffectiveness';
 import { getSpritePath } from '@/lib/spriteUtils';
+import { calculateStats } from '@/lib/statCalculator';
 import Image from 'next/image';
 import Link from 'next/link';
 
 interface TeamAnalyzerProps {
-  team: Creature[];
+  team: TeamMember[];
   moves: Move[];
   shinyCreatures?: Set<string>;
   className?: string;
 }
 
 export function TeamAnalyzer({ team, moves, shinyCreatures = new Set(), className = '' }: TeamAnalyzerProps) {
-  // Get movesets for each creature
+  // Get movesets for each creature (use custom moves if set, otherwise full learnset)
   const creatureMovesets = useMemo(() => {
-    return team.map(creature => {
-      const moveNames: string[] = [];
-      if (creature.Learnset) {
-        Object.values(creature.Learnset).forEach(moveList => {
-          if (Array.isArray(moveList)) {
-            moveNames.push(...moveList);
-          }
-        });
+    return team.map(member => {
+      if (member.moves.length > 0) {
+        // Use custom moveset
+        return moves.filter(m => member.moves.includes(m.Name));
+      } else {
+        // Fallback to full learnset
+        const moveNames: string[] = [];
+        if (member.Learnset) {
+          Object.values(member.Learnset).forEach(moveList => {
+            if (Array.isArray(moveList)) {
+              moveNames.push(...moveList);
+            }
+          });
+        }
+        return moves.filter(m => moveNames.includes(m.Name));
       }
-      return moves.filter(m => moveNames.includes(m.Name));
     });
   }, [team, moves]);
 
@@ -80,10 +88,11 @@ export function TeamAnalyzer({ team, moves, shinyCreatures = new Set(), classNam
     return Array.from(allImmunities);
   }, [team]);
 
-  // Calculate stat totals
+  // Calculate stat totals (using calculated stats if IVs/EVs/level are set)
   const statTotals = useMemo(() => {
-    return team.reduce((acc, creature) => {
-      const stats = creature.BaseStats;
+    return team.reduce((acc, member) => {
+      // Calculate actual stats if IVs/EVs are set
+      const stats = calculateStats(member.BaseStats, member.level, member.ivs, member.evs);
       return {
         hp: acc.hp + stats.HP,
         attack: acc.attack + stats.Attack,
@@ -97,8 +106,8 @@ export function TeamAnalyzer({ team, moves, shinyCreatures = new Set(), classNam
 
   if (team.length === 0) {
     return (
-      <div className={`bg-white rounded-2xl border-2 border-slate-200 shadow-xl p-12 text-center ${className}`}>
-        <p className="text-slate-500">Add creatures to your team to see analysis</p>
+      <div className={`bg-white dark:bg-slate-800 rounded-2xl border-2 border-slate-200 dark:border-slate-700 shadow-xl p-12 text-center ${className}`}>
+        <p className="text-slate-500 dark:text-slate-400">Add creatures to your team to see analysis</p>
       </div>
     );
   }
@@ -106,28 +115,28 @@ export function TeamAnalyzer({ team, moves, shinyCreatures = new Set(), classNam
   return (
     <div className={`space-y-6 ${className}`}>
       {/* Team Overview */}
-      <div className="bg-white rounded-2xl border-2 border-slate-200 shadow-xl p-6">
-        <h3 className="text-xl font-bold text-slate-900 mb-4">Team Overview</h3>
+      <div className="bg-white dark:bg-slate-800 rounded-2xl border-2 border-slate-200 dark:border-slate-700 shadow-xl p-6">
+        <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-4">Team Overview</h3>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4">
-          {team.map((creature, idx) => (
+          {team.map((member, idx) => (
             <Link
-              key={creature.Id}
-              href={`/creatures/${encodeURIComponent(creature.Name)}`}
+              key={member.Id}
+              href={`/creatures/${encodeURIComponent(member.Name)}`}
               className="text-center hover:opacity-80 transition-opacity"
             >
-              <div className="w-20 h-20 mx-auto mb-2 bg-gradient-to-br from-slate-50 to-slate-100 rounded-full flex items-center justify-center border-2 border-slate-200">
+              <div className="w-20 h-20 mx-auto mb-2 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-700 dark:to-slate-800 rounded-full flex items-center justify-center border-2 border-slate-200 dark:border-slate-600">
                 <Image
-                  src={getSpritePath(creature.Name, shinyCreatures.has(creature.Name))}
-                  alt={creature.Name}
+                  src={getSpritePath(member.Name, shinyCreatures.has(member.Name))}
+                  alt={member.Name}
                   width={80}
                   height={80}
                   className="w-full h-full object-contain p-1"
                   style={{ imageRendering: 'pixelated' }}
                 />
               </div>
-              <div className="text-xs font-bold text-slate-900">{creature.Name}</div>
+              <div className="text-xs font-bold text-slate-900 dark:text-slate-100">{member.Name}</div>
               <div className="flex justify-center gap-0.5 mt-1">
-                {creature.Types?.map(t => (
+                {member.Types?.map(t => (
                   <TypeBadge key={t} type={t} className="scale-75" />
                 ))}
               </div>
@@ -138,12 +147,12 @@ export function TeamAnalyzer({ team, moves, shinyCreatures = new Set(), classNam
 
       {/* Coverage Analysis */}
       {coverageAnalysis && (
-        <div className="bg-white rounded-2xl border-2 border-slate-200 shadow-xl p-6">
-          <h3 className="text-xl font-bold text-slate-900 mb-4">Team Move Coverage</h3>
-          <div className="p-4 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg border-2 border-blue-200 mb-4">
+        <div className="bg-white dark:bg-slate-800 rounded-2xl border-2 border-slate-200 dark:border-slate-700 shadow-xl p-6">
+          <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-4">Team Move Coverage</h3>
+          <div className="p-4 bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/30 rounded-lg border-2 border-blue-200 dark:border-blue-700 mb-4">
             <div className="flex items-center justify-between">
-              <span className="font-semibold text-slate-900">Coverage:</span>
-              <span className="text-2xl font-black text-blue-600">
+              <span className="font-semibold text-slate-900 dark:text-slate-100">Coverage:</span>
+              <span className="text-2xl font-black text-blue-600 dark:text-blue-400">
                 {coverageAnalysis.coveragePercentage.toFixed(1)}%
               </span>
             </div>
@@ -177,8 +186,8 @@ export function TeamAnalyzer({ team, moves, shinyCreatures = new Set(), classNam
 
       {/* Team Weaknesses */}
       {teamWeaknesses.length > 0 && (
-        <div className="bg-white rounded-2xl border-2 border-slate-200 shadow-xl p-6">
-          <h3 className="text-xl font-bold text-slate-900 mb-4">Team Weaknesses</h3>
+        <div className="bg-white dark:bg-slate-800 rounded-2xl border-2 border-slate-200 dark:border-slate-700 shadow-xl p-6">
+          <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-4">Team Weaknesses</h3>
           <div className="flex flex-wrap gap-2">
             {teamWeaknesses.map(({ type, count }) => (
               <div
@@ -197,8 +206,8 @@ export function TeamAnalyzer({ team, moves, shinyCreatures = new Set(), classNam
 
       {/* Team Resistances */}
       {teamResistances.length > 0 && (
-        <div className="bg-white rounded-2xl border-2 border-slate-200 shadow-xl p-6">
-          <h3 className="text-xl font-bold text-slate-900 mb-4">Team Resistances</h3>
+        <div className="bg-white dark:bg-slate-800 rounded-2xl border-2 border-slate-200 dark:border-slate-700 shadow-xl p-6">
+          <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-4">Team Resistances</h3>
           <div className="flex flex-wrap gap-2">
             {teamResistances.map(({ type, count }) => (
               <div
@@ -217,8 +226,8 @@ export function TeamAnalyzer({ team, moves, shinyCreatures = new Set(), classNam
 
       {/* Team Immunities */}
       {teamImmunities.length > 0 && (
-        <div className="bg-white rounded-2xl border-2 border-slate-200 shadow-xl p-6">
-          <h3 className="text-xl font-bold text-slate-900 mb-4">Team Immunities</h3>
+        <div className="bg-white dark:bg-slate-800 rounded-2xl border-2 border-slate-200 dark:border-slate-700 shadow-xl p-6">
+          <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-4">Team Immunities</h3>
           <div className="flex flex-wrap gap-2">
             {teamImmunities.map(type => (
               <TypeBadge key={type} type={type} />
@@ -228,37 +237,37 @@ export function TeamAnalyzer({ team, moves, shinyCreatures = new Set(), classNam
       )}
 
       {/* Stat Totals */}
-      <div className="bg-white rounded-2xl border-2 border-slate-200 shadow-xl p-6">
-        <h3 className="text-xl font-bold text-slate-900 mb-4">Team Stat Totals</h3>
+      <div className="bg-white dark:bg-slate-800 rounded-2xl border-2 border-slate-200 dark:border-slate-700 shadow-xl p-6">
+        <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-4">Team Stat Totals</h3>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-          <div className="p-3 bg-slate-50 rounded-lg">
-            <div className="text-xs text-slate-600 mb-1">HP</div>
-            <div className="text-2xl font-black text-slate-900">{statTotals.hp}</div>
+          <div className="p-3 bg-slate-50 dark:bg-slate-700 rounded-lg">
+            <div className="text-xs text-slate-600 dark:text-slate-400 mb-1">HP</div>
+            <div className="text-2xl font-black text-slate-900 dark:text-slate-100">{statTotals.hp}</div>
           </div>
-          <div className="p-3 bg-slate-50 rounded-lg">
-            <div className="text-xs text-slate-600 mb-1">Attack</div>
-            <div className="text-2xl font-black text-slate-900">{statTotals.attack}</div>
+          <div className="p-3 bg-slate-50 dark:bg-slate-700 rounded-lg">
+            <div className="text-xs text-slate-600 dark:text-slate-400 mb-1">Attack</div>
+            <div className="text-2xl font-black text-slate-900 dark:text-slate-100">{statTotals.attack}</div>
           </div>
-          <div className="p-3 bg-slate-50 rounded-lg">
-            <div className="text-xs text-slate-600 mb-1">Defense</div>
-            <div className="text-2xl font-black text-slate-900">{statTotals.defense}</div>
+          <div className="p-3 bg-slate-50 dark:bg-slate-700 rounded-lg">
+            <div className="text-xs text-slate-600 dark:text-slate-400 mb-1">Defense</div>
+            <div className="text-2xl font-black text-slate-900 dark:text-slate-100">{statTotals.defense}</div>
           </div>
-          <div className="p-3 bg-slate-50 rounded-lg">
-            <div className="text-xs text-slate-600 mb-1">Special Attack</div>
-            <div className="text-2xl font-black text-slate-900">{statTotals.specialAttack}</div>
+          <div className="p-3 bg-slate-50 dark:bg-slate-700 rounded-lg">
+            <div className="text-xs text-slate-600 dark:text-slate-400 mb-1">Special Attack</div>
+            <div className="text-2xl font-black text-slate-900 dark:text-slate-100">{statTotals.specialAttack}</div>
           </div>
-          <div className="p-3 bg-slate-50 rounded-lg">
-            <div className="text-xs text-slate-600 mb-1">Special Defense</div>
-            <div className="text-2xl font-black text-slate-900">{statTotals.specialDefense}</div>
+          <div className="p-3 bg-slate-50 dark:bg-slate-700 rounded-lg">
+            <div className="text-xs text-slate-600 dark:text-slate-400 mb-1">Special Defense</div>
+            <div className="text-2xl font-black text-slate-900 dark:text-slate-100">{statTotals.specialDefense}</div>
           </div>
-          <div className="p-3 bg-slate-50 rounded-lg">
-            <div className="text-xs text-slate-600 mb-1">Speed</div>
-            <div className="text-2xl font-black text-slate-900">{statTotals.speed}</div>
+          <div className="p-3 bg-slate-50 dark:bg-slate-700 rounded-lg">
+            <div className="text-xs text-slate-600 dark:text-slate-400 mb-1">Speed</div>
+            <div className="text-2xl font-black text-slate-900 dark:text-slate-100">{statTotals.speed}</div>
           </div>
         </div>
-        <div className="mt-4 pt-4 border-t border-slate-200">
-          <div className="text-sm text-slate-600">Total BST:</div>
-          <div className="text-3xl font-black text-blue-600">
+        <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+          <div className="text-sm text-slate-600 dark:text-slate-400">Total BST:</div>
+          <div className="text-3xl font-black text-blue-600 dark:text-blue-400">
             {statTotals.hp + statTotals.attack + statTotals.defense + statTotals.specialAttack + statTotals.specialDefense + statTotals.speed}
           </div>
         </div>

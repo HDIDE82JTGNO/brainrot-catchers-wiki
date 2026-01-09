@@ -13,6 +13,7 @@ import { buildEvolutionChain } from '@/lib/evolutionUtils';
 import { Creature, Location, Ability } from '@/types';
 import { FavoriteButton } from '@/components/FavoriteButton';
 import { ShareButton } from '@/components/ShareButton';
+import { CopyCreatureButton } from '@/components/CopyDataButton';
 import { shareCreature } from '@/lib/shareUtils';
 import abilitiesData from '../../../data/abilities.json';
 
@@ -83,6 +84,7 @@ function CreatureDetailClient({ creature, moves, locations, allCreatures }: Page
               id={creature.Id}
               name={creature.Name}
             />
+            <CopyCreatureButton creature={creature} />
             <ShareButton
               url={shareCreature(creature.Name, isShiny)}
               title={`${creature.Name} - Brainrot Catchers Wiki`}
