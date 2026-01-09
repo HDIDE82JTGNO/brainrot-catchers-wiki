@@ -78,6 +78,8 @@ local ClientData = require(script.Parent.Parent:WaitForChild("Plugins"):WaitForC
 local CutsceneRegistry = require(script.Parent:WaitForChild("CutsceneRegistry"))
 
 local TweenService = game:GetService("TweenService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Events = ReplicatedStorage:WaitForChild("Events")
 local Sounds = game.ReplicatedStorage:WaitForChild("Audio"):WaitForChild("SFX")
 local NPCAnimations = require(script.Parent:WaitForChild("NPCAnimations"))
 
@@ -192,13 +194,26 @@ local AllowProceed = true
 local WasAbleToMove
 local HadTopBarOpen = nil
 
+-- Helper to check if player is currently in battle (uses ClientData.InBattle)
+local function isPlayerInBattle(): boolean
+	local pd = nil
+	pcall(function()
+		pd = ClientData:Get()
+	end)
+	return (pd and pd.InBattle == true) or false
+end
+
 -- Extended Say supports optional emotion tags per line.
 -- tbl may contain strings or { Text = string, Emotion = string } tables.
 function Say:Say(talkerstr,allowproceed,tbl,talker,hearer)
 	if Saying == true then return end
+	-- Prevent any NPC/dialogue from starting while player is in battle
+	if isPlayerInBattle() then return end
 	local SayUI = getSayUI()
 	repeat task.wait() until SayUI:FindFirstChild("Talker")
 	Saying = true
+	-- Notify server that Say message has started
+	pcall(function() Events.Request:InvokeServer({"SetSayActive", true}) end)
 	AllowProceed = allowproceed
 	
 	--[[
@@ -268,6 +283,8 @@ function Say:Say(talkerstr,allowproceed,tbl,talker,hearer)
 			CanProceed = false
 			-- Cleanup like end-of-say
 			Saying = false
+			-- Notify server that Say message has ended
+			pcall(function() Events.Request:InvokeServer({"SetSayActive", false}) end)
 			if WasAbleToMove == true then
 				CharacterFunctions:CanMove(true)
 			end
@@ -457,6 +474,8 @@ function Say:Say(talkerstr,allowproceed,tbl,talker,hearer)
 		if AllowProceed == true then
 		SayUI.Visible = false
 		Saying = false
+		-- Notify server that Say message has ended
+		pcall(function() Events.Request:InvokeServer({"SetSayActive", false}) end)
 		if WasAbleToMove == true then
 			CharacterFunctions:CanMove(true)
 		end
@@ -497,6 +516,8 @@ function Say:Exit()
 	local SayUI = getSayUI()
 	SayUI.Visible = false
 	Saying = false
+	-- Notify server that Say message has ended
+	pcall(function() Events.Request:InvokeServer({"SetSayActive", false}) end)
 	hideArrow()
 	if WasAbleToMove == true then
 		CharacterFunctions:CanMove(true)

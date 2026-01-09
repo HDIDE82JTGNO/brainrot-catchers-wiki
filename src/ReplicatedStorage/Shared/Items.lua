@@ -7,6 +7,7 @@ type Item_Type = LuaTypes.Item
 -- Heals - Items that heal or boost stats by percentage
 -- Items - General items
 -- MoveLearners - Items that teach moves to creatures (like TMs, called ML)
+-- Repels - Items that prevent wild encounters for a number of steps
 
 local function createItem(stats: {HP: number, Attack: number, Defense: number, Speed: number}, description: string, category: string, usableInBattle: boolean?, usableInOverworld: boolean?, image: string?): Item_Type
 	return {
@@ -17,6 +18,15 @@ local function createItem(stats: {HP: number, Attack: number, Defense: number, S
         UsableInOverworld = usableInOverworld,
 		Image = image or "rbxassetid://0",
 	}
+end
+
+-- Helper function to parse move name from ML item name (format: "ML - [MoveName]")
+local function parseMoveNameFromML(itemName: string): string?
+	local parts = itemName:split(" - ")
+	if #parts >= 2 then
+		return parts[2]
+	end
+	return nil
 end
 
 return {
@@ -132,4 +142,54 @@ return {
 	["Tore Stone"] = createItem({
 		HP = 0, Attack = 0, Defense = 0, Speed = 0,
 	}, "When held by a beaked creature, it is said to trigger a mystical event.", "Items", false, false, "rbxassetid://86893072345080"),
+
+
+	-- 🛡️ Repels
+	["Focus Spray"] = createItem({
+		HP = 0, Attack = 0, Defense = 0, Speed = 0,
+	}, "Keeps wild encounters away for a short time.", "Items", false, true, "rbxassetid://90607842337478"),
+
+	["Super Focus Spray"] = createItem({
+		HP = 0, Attack = 0, Defense = 0, Speed = 0,
+	}, "A stronger spray that lasts longer.", "Items", false, true, "rbxassetid://87726456247355"),
+
+	["Max Focus Spray"] = createItem({
+		HP = 0, Attack = 0, Defense = 0, Speed = 0,
+	}, "The longest-lasting Focus Spray.", "Items", false, true, "rbxassetid://119631326721437"),
+
+
+	-- 📚 Move Learners (ML)
+	-- All ML items use the same sprite sheet with type-based rect offsets
+	-- ImageRectOffset and ImageRectSize are set in UI code based on move type
+	["ML - Tackle"] = createItem({
+		HP = 0, Attack = 0, Defense = 0, Speed = 0,
+	}, "Teaches Tackle to a creature.", "MoveLearners", false, true, "rbxassetid://131215110444098"),
+	
+	["ML - Scratch"] = createItem({
+		HP = 0, Attack = 0, Defense = 0, Speed = 0,
+	}, "Teaches Scratch to a creature.", "MoveLearners", false, true, "rbxassetid://131215110444098"),
+	
+	["ML - Bite"] = createItem({
+		HP = 0, Attack = 0, Defense = 0, Speed = 0,
+	}, "Teaches Bite to a creature.", "MoveLearners", false, true, "rbxassetid://131215110444098"),
+	
+	["ML - Crunch"] = createItem({
+		HP = 0, Attack = 0, Defense = 0, Speed = 0,
+	}, "Teaches Crunch to a creature.", "MoveLearners", false, true, "rbxassetid://131215110444098"),
+	
+	["ML - Earthquake"] = createItem({
+		HP = 0, Attack = 0, Defense = 0, Speed = 0,
+	}, "Teaches Earthquake to a creature.", "MoveLearners", false, true, "rbxassetid://131215110444098"),
+	
+	["ML - Fast Attack"] = createItem({
+		HP = 0, Attack = 0, Defense = 0, Speed = 0,
+	}, "Teaches Fast Attack to a creature.", "MoveLearners", false, true, "rbxassetid://131215110444098"),
+	
+	["ML - Double-Edge"] = createItem({
+		HP = 0, Attack = 0, Defense = 0, Speed = 0,
+	}, "Teaches Double-Edge to a creature.", "MoveLearners", false, true, "rbxassetid://131215110444098"),
+	
+	["ML - Flare Blitz"] = createItem({
+		HP = 0, Attack = 0, Defense = 0, Speed = 0,
+	}, "Teaches Flare Blitz to a creature.", "MoveLearners", false, true, "rbxassetid://131215110444098"),
 }

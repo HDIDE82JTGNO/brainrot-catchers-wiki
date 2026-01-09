@@ -9,6 +9,7 @@ local selectingAction: string? = nil -- "Use" or "Give" while selecting a creatu
 local connections: {RBXScriptConnection}? = {}
 local creatureButtonConnections: {[number]: RBXScriptConnection?} = {}
 local creatureOptionsOffConn: RBXScriptConnection? = nil
+local categoryButtonConnections: {RBXScriptConnection}? = {}
 local currentCategoryName: string = "Heals"
 local _initialized = false
 local OnOpenCallback: (() -> ())? = nil
@@ -18,6 +19,9 @@ local OnCloseCallback: (() -> ())? = nil
 local ReplicatedStorage: ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ItemsModule = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Items"))
 local CreaturesModule = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Creatures"))
+local MovesModule = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Moves"))
+local TypesModule = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Types"))
+local MoveCompatibility = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("MoveCompatibility"))
 local ClientData = require(script.Parent.Parent:WaitForChild("Plugins"):WaitForChild("ClientData"))
 local Say = require(script.Parent.Parent:WaitForChild("Utilities"):WaitForChild("Say"))
 local StatCalc = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("StatCalc"))
@@ -25,10 +29,249 @@ local StatCalc = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("
 
 local refreshCreatureList -- forward declaration
 local updateItemSelection -- forward declaration
+local openMLReplaceMoveUI -- forward declaration
+
+-- Helper function to get display name for items (strips "ML - " prefix for MoveLearner items)
+local function getItemDisplayName(itemName: string, def: any): string
+	if def and def.Category == "MoveLearners" then
+		-- Strip "ML - " prefix for display in ML tab
+		local parts = itemName:split(" - ")
+		if #parts >= 2 then
+			return parts[2]
+		end
+	end
+	return itemName
+end
+
+-- Helper function to resolve type name from Types module reference
+local function getTypeNameFromRef(typeRef: any): string?
+	for typeName, typeData in pairs(TypesModule) do
+		if typeData == typeRef then
+			return typeName
+		end
+	end
+	return nil
+end
+
+-- Helper function to get type icon rect offset for ML items
+local function getTypeIconRectOffset(typeName: string): Vector2?
+	-- Type icon rect offsets (149x149 size)
+	local TYPE_OFFSETS: { [string]: Vector2 } = {
+		Normal = Vector2.new(0, 0),
+		Fire = Vector2.new(147, 0),
+		Ice = Vector2.new(293, 0),
+		Electric = Vector2.new(586, 0),
+		Grass = Vector2.new(730, 0),
+		Fighting = Vector2.new(0, 135),
+		Poison = Vector2.new(147, 135),
+		Ground = Vector2.new(438, 135),
+		Psychic = Vector2.new(585, 135),
+		Bug = Vector2.new(729, 135),
+		Rock = Vector2.new(0, 269),
+		Ghost = Vector2.new(294, 269),
+		Dragon = Vector2.new(440, 269),
+		Dark = Vector2.new(585, 269),
+		Steel = Vector2.new(730, 269),
+		Fairy = Vector2.new(880, 269),
+	}
+	return TYPE_OFFSETS[typeName]
+end
+
+-- Helper function to set ML item icon with type-based rect offset
+local function setMLItemIcon(itemIcon: ImageLabel, itemName: string, def: any)
+	if not itemIcon or not itemIcon:IsA("ImageLabel") then return end
+	
+	-- Check if this is a MoveLearner item
+	if def.Category == "MoveLearners" then
+		-- Parse move name from ML item name (format: "ML - [MoveName]")
+		local parts = itemName:split(" - ")
+		if #parts >= 2 then
+			local moveName = parts[2]
+			local moveData = MovesModule[moveName]
+			
+			if moveData and moveData.Type then
+				-- Get the first type (moves can have multiple types, but we'll use the first)
+				local moveType = nil
+				if type(moveData.Type) == "table" then
+					-- Check if it's an array of types
+					if #moveData.Type > 0 then
+						moveType = moveData.Type[1]
+					else
+						-- Single type table
+						moveType = moveData.Type
+					end
+				else
+					moveType = moveData.Type
+				end
+				
+				-- Resolve type name from Types module reference
+				local typeName = getTypeNameFromRef(moveType)
+				
+				if typeName then
+					-- Set image to sprite sheet
+					itemIcon.Image = def.Image or "rbxassetid://131215110444098"
+					
+					-- Set rect offset based on type
+					local offset = getTypeIconRectOffset(typeName)
+					if offset then
+						itemIcon.ImageRectOffset = offset
+						itemIcon.ImageRectSize = Vector2.new(149, 149)
+					else
+						-- Fallback to Normal type if type not found
+						itemIcon.ImageRectOffset = Vector2.new(0, 0)
+						itemIcon.ImageRectSize = Vector2.new(149, 149)
+					end
+					return
+				end
+			end
+		end
+	end
+	
+	-- Default: use regular image without rect offset
+	itemIcon.Image = def.Image or "rbxassetid://0"
+	itemIcon.ImageRectOffset = Vector2.new(0, 0)
+	itemIcon.ImageRectSize = Vector2.new(0, 0)
+end
 
 --// Services
 local TweenService: TweenService = game:GetService("TweenService")
 local UIFunctions = require(script.Parent:WaitForChild("UIFunctions"))
+
+-- Helper function to open ReplaceMove UI for ML items outside battle
+local function openMLReplaceMoveUI(creatureName: string, newMove: string, currentMoves: {string}, slotIndex: number, itemName: string)
+	local PlayerGui = game.Players.LocalPlayer.PlayerGui
+	local GameUI = PlayerGui:FindFirstChild("GameUI")
+	if not GameUI then
+		warn("[Bag] ReplaceMove UI - GameUI not found")
+		return
+	end
+	local ReplaceMove = GameUI:FindFirstChild("ReplaceMove")
+	if not ReplaceMove then
+		warn("[Bag] ReplaceMove UI not found")
+		return
+	end
+
+	-- Helper to populate move button
+	local function applyMoveToButton(btn: GuiObject, moveName: string)
+		local move = MovesModule[moveName]
+		if not move then return end
+		local desc = btn:FindFirstChild("Description")
+		local nameLbl = btn:FindFirstChild("MoveName")
+		local stat = btn:FindFirstChild("Stat")
+		local typeLbl = btn:FindFirstChild("Type")
+		if typeof(nameLbl) == "Instance" then (nameLbl :: TextLabel).Text = moveName end
+		if typeof(desc) == "Instance" then (desc :: TextLabel).Text = tostring(move.Description or "") end
+		if typeof(stat) == "Instance" then (stat :: TextLabel).Text = string.format("Power: %d", tonumber(move.BasePower) or 0) end
+		-- Resolve type name
+		local typeName = "Normal"
+		if move.Type then
+			for tName, tDef in pairs(TypesModule) do
+				if tDef == move.Type then
+					typeName = tName
+					break
+				end
+			end
+		end
+		if typeof(typeLbl) == "Instance" then (typeLbl :: TextLabel).Text = string.format("Type: %s", typeName) end
+		-- Color styling
+		if btn:IsA("GuiObject") and move.Type and move.Type.uicolor then
+			btn.BackgroundColor3 = move.Type.uicolor
+			local stroke = btn:FindFirstChildOfClass("UIStroke")
+			if stroke then
+				(stroke :: UIStroke).Color = Color3.new(move.Type.uicolor.R * 0.6, move.Type.uicolor.G * 0.6, move.Type.uicolor.B * 0.6)
+			end
+		end
+	end
+
+	ReplaceMove.Visible = true
+
+	-- Populate buttons
+	local buttons: {GuiButton} = {}
+	for i = 1, 4 do
+		local b = ReplaceMove:FindFirstChild("Move" .. i)
+		if b and b:IsA("GuiButton") then
+			-- Clear any existing connections before creating new ones
+			UIFunctions:ClearConnection(b)
+			-- Reset button size to original if OGSize attribute exists
+			local ogSize = b:GetAttribute("OGSize")
+			if ogSize then
+				b.Size = ogSize
+			end
+			applyMoveToButton(b, tostring(currentMoves[i] or ""))
+			buttons[i] = b
+		end
+	end
+	local replacingBtn = ReplaceMove:FindFirstChild("ReplacingMove")
+	if replacingBtn and replacingBtn:IsA("GuiButton") then
+		-- Clear any existing connections before creating new ones
+		UIFunctions:ClearConnection(replacingBtn)
+		-- Reset button size to original if OGSize attribute exists
+		local ogSize = replacingBtn:GetAttribute("OGSize")
+		if ogSize then
+			replacingBtn.Size = ogSize
+		end
+		applyMoveToButton(replacingBtn, newMove)
+	end
+
+	-- Hook buttons via UIFunctions
+	local function openConfirmReplace(index: number)
+		ReplaceMove.Visible = false
+		local oldMove = tostring(currentMoves[index])
+		local prompt = string.format("Are you sure you want to replace %s with %s?", oldMove, newMove)
+		Say:Say("", false, {prompt}, nil, nil)
+		local wantsToReplace = Say:YieldChoice()
+		Say:Exit()
+		
+		if wantsToReplace then
+			-- YES → send decision
+			local Events = ReplicatedStorage:WaitForChild("Events")
+			local ok = Events.Request:InvokeServer({"MLMoveReplaceDecision", { SlotIndex = slotIndex, ReplaceIndex = index, MoveName = newMove }})
+			if ok then
+				Say:Say("", true, {string.format("%s learned %s!", creatureName, newMove)}, nil, nil)
+				refreshCreatureList()
+				updateItemSelection()
+			else
+				Say:Say("", true, {"Failed to learn move."}, nil, nil)
+				ReplaceMove.Visible = true -- Reopen if failed
+			end
+		else
+			-- NO → reopen or cancel
+			ReplaceMove.Visible = true
+		end
+	end
+
+	for i, b in pairs(buttons) do
+		if currentMoves[i] and currentMoves[i] ~= "" then
+			UIFunctions:NewButton(b, {"Action"}, {Click = "One", HoverOn = "One", HoverOff = "One"}, 0.2, function()
+				openConfirmReplace(i)
+			end)
+		end
+	end
+
+	if replacingBtn and replacingBtn:IsA("GuiButton") then
+		UIFunctions:NewButton(replacingBtn, {"Action"}, {Click = "One", HoverOn = "One", HoverOff = "One"}, 0.2, function()
+			ReplaceMove.Visible = false
+			local prompt = string.format("Are you sure you want to give up learning %s?", newMove)
+			Say:Say("", false, {prompt}, nil, nil)
+			local wantsToGiveUp = Say:YieldChoice()
+			Say:Exit()
+			
+			if wantsToGiveUp then
+				local Events = ReplicatedStorage:WaitForChild("Events")
+				local ok = Events.Request:InvokeServer({"MLMoveReplaceDecision", { SlotIndex = slotIndex, ReplaceIndex = 0, MoveName = newMove }})
+				if ok then
+					Say:Say("", true, {"Did not learn " .. newMove .. "."}, nil, nil)
+					refreshCreatureList()
+					updateItemSelection()
+				else
+					Say:Say("", true, {"Failed to cancel learning."}, nil, nil)
+				end
+			else
+				ReplaceMove.Visible = true
+			end
+		end)
+	end
+end
 
 local Audio = script.Parent.Parent.Assets:WaitForChild("Audio")
 
@@ -38,27 +281,19 @@ local CLOSED_SIZE: UDim2 = UDim2.fromScale(0, 0)
 
 -- Module-level functions for creature list and item selection
 local function canCreatureLearnMove(creatureName: string, mlItemName: string): boolean
-	local creatureData = CreaturesModule[creatureName]
-	if not creatureData or not creatureData.Learnset then
+	-- Extract move name from ML item name (format: "ML - [MoveName]")
+	local moveName = nil
+	local parts = mlItemName:split(" - ")
+	if #parts >= 2 then
+		moveName = parts[2]
+	end
+	
+	if not moveName or moveName == "" then
 		return false
 	end
 	
-	-- Extract move name from ML item name
-	-- Try patterns like "ML: MoveName" or just assume the item name is the move name
-	local moveName = mlItemName
-	if string.find(mlItemName, "ML:") then
-		moveName = string.gsub(mlItemName, "ML:%s*", "")
-	end
-	
-	-- Check if move exists in creature's learnset at any level
-	for level, moves in pairs(creatureData.Learnset) do
-		for _, move in ipairs(moves) do
-			if move == moveName then
-				return true
-			end
-		end
-	end
-	return false
+	-- Use MoveCompatibility module for O(1) lookup
+	return MoveCompatibility.canCreatureLearnMove(creatureName, moveName)
 end
 
 local function refreshCreatureList_impl()
@@ -85,11 +320,47 @@ local function refreshCreatureList_impl()
     local function onCreatureClick(slotIndex: number)
         if not selectingCreature or not selectedItem then return end
 		
+        local action = selectingAction or "Use"
+        local creatureData = party[slotIndex]
+        
+        -- For ML items, show confirmation prompt before using
+        if action == "Use" then
+            local itemDef = ItemsModule[selectedItem]
+            if itemDef and itemDef.Category == "MoveLearners" then
+                -- Extract move name from ML item name (format: "ML - [MoveName]")
+                local moveName = nil
+                local parts = selectedItem:split(" - ")
+                if #parts >= 2 then
+                    moveName = parts[2]
+                end
+                
+                -- Get creature name
+                local creatureName = creatureData and (creatureData.Nickname or creatureData.Name) or "Creature"
+                
+                -- Show confirmation prompt
+                if moveName then
+                    local prompt = string.format("Teach %s to %s?", moveName, creatureName)
+                    Say:Say("", false, {prompt}, nil, nil)
+                    local wantsToTeach = Say:YieldChoice()
+                    Say:Exit()
+                    
+                    -- If user declined, cancel and return
+                    if not wantsToTeach then
+                        -- Exit selection mode
+                        selectingCreature = false
+                        selectingAction = nil
+                        refreshCreatureList()
+                        updateItemSelection()
+                        return
+                    end
+                end
+            end
+        end
+		
         -- Send server request with slot index
         local Events = game.ReplicatedStorage:WaitForChild("Events")
         local result = nil
         local success = false
-        local action = selectingAction or "Use"
         print("[Bag] onCreatureClick action=", action, " slot=", slotIndex, " item=", tostring(selectedItem))
         pcall(function()
             if action == "Give" then
@@ -130,6 +401,14 @@ local function refreshCreatureList_impl()
 		
 		-- Close the non-dismissable selection prompt before showing result
 		pcall(function() Say:Exit() end)
+		
+		-- Handle ML item replacement needed
+		if type(result) == "string" and result == "REPLACE_NEEDED" then
+			-- Wait for MLReplacePrompt event from server
+			-- The event handler will open the ReplaceMove UI
+			return
+		end
+		
 		-- Show message in Say; allow player to dismiss
 		Say:Say("", true, {message}, nil, nil)
 		
@@ -151,9 +430,15 @@ local function refreshCreatureList_impl()
 		-- Clear any previous connection for this slot
 		local existingConnection = creatureButtonConnections[slotIndex]
 		if existingConnection then
-			if existingConnection.Connected then
-				existingConnection:Disconnect()
+			-- Reset button size to original before disconnecting to prevent stuck animations
+			if slotButton:IsA("GuiButton") then
+				local ogSize = slotButton:GetAttribute("OGSize")
+				if ogSize then
+					slotButton.Size = ogSize
+				end
 			end
+			-- Use UIFunctions:ClearConnection to properly clean up
+			UIFunctions:ClearConnection(slotButton)
 			creatureButtonConnections[slotIndex] = nil
 		end
 
@@ -363,6 +648,9 @@ local function refreshCreatureList_impl()
 				else
 					currentHP = maxHP
 				end
+				-- Clamp currentHP to valid range (0 to maxHP) to prevent impossible values like 62/31
+				maxHP = math.max(1, maxHP) -- Ensure maxHP is at least 1
+				currentHP = math.clamp(currentHP, 0, maxHP)
 			end
 			
 			-- Update HP display
@@ -452,15 +740,42 @@ local function updateItemSelection_impl()
 	local listRoot = outer:FindFirstChild("List")
 	if not listRoot then return end
 	
-	-- Update template background colors
+	-- Update template background colors with animated selection feedback
 	for _, child in ipairs(listRoot:GetChildren()) do
 		if child:IsA("GuiObject") and child.Name ~= "Template" and child.Name ~= "Nothing" then
 			if child.Name == selectedItem then
-				-- Selected: #c79042
-				child.BackgroundColor3 = Color3.fromRGB(199, 144, 66)
+				-- Selected: animate to selection color with subtle pulse
+				local targetColor = Color3.fromRGB(199, 144, 66)
+				TweenService:Create(child, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+					BackgroundColor3 = targetColor
+				}):Play()
+				
+				-- Subtle scale pulse for selection feedback
+				if not child:GetAttribute("Pulsing") then
+					child:SetAttribute("Pulsing", true)
+					local originalSize = child:GetAttribute("OriginalSize") or child.Size
+					child:SetAttribute("OriginalSize", originalSize)
+					
+					local pulseUp = TweenService:Create(child, TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+						Size = UDim2.new(originalSize.X.Scale * 1.03, originalSize.X.Offset, originalSize.Y.Scale * 1.03, originalSize.Y.Offset)
+					})
+					local pulseDown = TweenService:Create(child, TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+						Size = originalSize
+					})
+					
+					pulseUp:Play()
+					pulseUp.Completed:Connect(function()
+						pulseDown:Play()
+						pulseDown.Completed:Connect(function()
+							child:SetAttribute("Pulsing", false)
+						end)
+					end)
+				end
 			else
-				-- Not selected: rgb(255, 185, 85)
-				child.BackgroundColor3 = Color3.fromRGB(255, 185, 85)
+				-- Not selected: animate back to default color
+				TweenService:Create(child, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+					BackgroundColor3 = Color3.fromRGB(255, 185, 85)
+				}):Play()
 			end
 		end
 	end
@@ -553,6 +868,32 @@ local function handleUseButtonClick()
 
 	local itemDef = ItemsModule[selectedItem]
 	local isHealItem = itemDef and itemDef.Category == "Heals"
+	-- Check for repel items by name (they're in "Items" category)
+	local isRepelItem = selectedItem == "Focus Spray" or selectedItem == "Super Focus Spray" or selectedItem == "Max Focus Spray"
+
+	-- Repel items can be used immediately without selecting a creature
+	if not inBattle and isRepelItem then
+		local Events = game.ReplicatedStorage:WaitForChild("Events")
+		local result = nil
+		local success = false
+		pcall(function()
+			result = Events.Request:InvokeServer({"UseItem", { Name = selectedItem, Context = "Overworld" }})
+			success = result ~= nil
+		end)
+		
+		local message = result or "Cannot use item."
+		if success and result == true then
+			message = "Item used!"
+		elseif result == false then
+			message = "Cannot use item."
+		elseif type(result) == "string" then
+			message = result
+		end
+		
+		Say:Say("", true, {message}, nil, nil)
+		refreshCreatureList()
+		return
+	end
 
 	-- All usable items outside battle require player to pick a target creature
     if not inBattle then
@@ -578,26 +919,11 @@ local function handleUseButtonClick()
     if ok then
         refreshCreatureList()
         -- Close the bag after using a capture item during battle
+        -- Do NOT restore battle options here - the battle system will show them
+        -- only if the capture fails (via StartNextTurn after turn result processing)
         local def = ItemsModule[selectedItem]
         if inBattle and def and def.Category == "CaptureCubes" then
             BagModule:Close()
-            -- Restore battle options UI so player can continue
-            local okRestore, err = pcall(function()
-                local gui = game.Players.LocalPlayer.PlayerGui
-                local bo = gui:FindFirstChild("GameUI") and gui.GameUI:FindFirstChild("BattleUI") and gui.GameUI.BattleUI:FindFirstChild("BattleOptions")
-                if bo then
-                    bo.Visible = true
-                    for _, child in ipairs(bo:GetChildren()) do
-                        if child:IsA("TextButton") or child:IsA("ImageButton") then
-                            child.Active = true
-                            child.Visible = true
-                        end
-                    end
-                end
-            end)
-            if not okRestore then
-                warn("[Bag] Failed to restore battle options after capture use:", err)
-            end
         end
     end
 end
@@ -723,52 +1049,127 @@ function BagModule:Init(All)
 		local inv = getInventory()
         local added = 0
         local total = 0
+		
+		-- Animation constants for staggered reveal
+		local STAGGER_DELAY = 0.03 -- Small delay between items
+		local FADE_IN_TIME = 0.15
+		
+		-- First pass: collect items to add (for staggered animation)
+		local itemsToAdd = {}
 		for itemName, count in pairs(inv) do
             total += 1
 			local def = ItemsModule[itemName]
 			if def and def.Category == category and count > 0 then
-				local row = template:Clone()
-				row.Visible = true
-				row.Name = itemName
-				row.Parent = listRoot
-				-- Set default background color (not selected)
-				row.BackgroundColor3 = Color3.fromRGB(255, 185, 85)
-				-- Try to populate common fields if present
-				local nameLbl = row:FindFirstChild("Name") or row:FindFirstChild("ItemName")
-				if nameLbl and nameLbl:IsA("TextLabel") then
-					nameLbl.Text = itemName
-				end
-				local countLbl = row:FindFirstChild("Count") or row:FindFirstChild("Qty")
-				if countLbl and countLbl:IsA("TextLabel") then
-					countLbl.Text = "x" .. tostring(count)
-				end
-				-- Description is now shown in Bag.Description.DescriptionText, not in template
-				-- Set item icon image
-				local itemIcon = row:FindFirstChild("ItemIcon")
-				if itemIcon and itemIcon:IsA("ImageLabel") then
-					itemIcon.Image = def.Image or "rbxassetid://0"
-				end
-				-- Click to select
-				local conn = UIFunctions:NewButton(
-					row,
-					{"Action"},
-					{ Click = "One", HoverOn = "One", HoverOff = "One" },
-					0.7,
-					function()
-						Audio.SFX.Click:Play()
-						selectedItem = itemName
-						local confirmBtn = BagGui:FindFirstChild("ConfirmUse", true)
-						if confirmBtn and confirmBtn:IsA("TextButton") then
-							setConfirmState(confirmBtn, selectedItem)
-						end
-						-- Update selection visuals and description
-						updateItemSelection()
-                        print("[Bag] Selected item:", selectedItem)
-					end
-				)
-				if connections and conn then table.insert(connections, conn) end
-                added += 1
+				table.insert(itemsToAdd, { name = itemName, count = count, def = def })
 			end
+		end
+		
+		-- Sort items alphabetically for consistent order
+		table.sort(itemsToAdd, function(a, b) return a.name < b.name end)
+		
+		for i, itemData in ipairs(itemsToAdd) do
+			local itemName = itemData.name
+			local count = itemData.count
+			local def = itemData.def
+			
+			local row = template:Clone()
+			row.Name = itemName
+			row.LayoutOrder = i
+			row.Parent = listRoot
+			row.Visible = true
+			
+			-- Set default background color (not selected)
+			row.BackgroundColor3 = Color3.fromRGB(255, 185, 85)
+			-- Try to populate common fields if present
+			local nameLbl = row:FindFirstChild("Name") or row:FindFirstChild("ItemName")
+			if nameLbl and nameLbl:IsA("TextLabel") then
+				nameLbl.Text = getItemDisplayName(itemName, def)
+			end
+			local countLbl = row:FindFirstChild("Count") or row:FindFirstChild("Qty")
+			if countLbl and countLbl:IsA("TextLabel") then
+				countLbl.Text = "x" .. tostring(count)
+			end
+			-- Set item icon image (with ML type-based rect offsets)
+			local itemIcon = row:FindFirstChild("ItemIcon")
+			if itemIcon and itemIcon:IsA("ImageLabel") then
+				setMLItemIcon(itemIcon, itemName, def)
+			end
+			
+			-- Store original transparency values before hiding for animation
+			local originalBgTransparency = row.BackgroundTransparency
+			local childOriginalTransparencies = {}
+			for _, child in ipairs(row:GetDescendants()) do
+				if child:IsA("TextLabel") then
+					childOriginalTransparencies[child] = { type = "text", value = child.TextTransparency }
+				elseif child:IsA("ImageLabel") then
+					childOriginalTransparencies[child] = { type = "image", value = child.ImageTransparency }
+				elseif child:IsA("UIStroke") then
+					childOriginalTransparencies[child] = { type = "stroke", value = child.Transparency }
+				end
+			end
+			
+			-- Now set to transparent for fade-in
+			row.BackgroundTransparency = 1
+			for child, data in pairs(childOriginalTransparencies) do
+				if data.type == "text" then
+					child.TextTransparency = 1
+				elseif data.type == "image" then
+					child.ImageTransparency = 1
+				elseif data.type == "stroke" then
+					child.Transparency = 1
+				end
+			end
+			
+			-- Click to select
+			local conn = UIFunctions:NewButton(
+				row,
+				{"Action"},
+				{ Click = "One", HoverOn = "One", HoverOff = "One" },
+				0.7,
+				function()
+					Audio.SFX.Click:Play()
+					selectedItem = itemName
+					local confirmBtn = BagGui:FindFirstChild("ConfirmUse", true)
+					if confirmBtn and confirmBtn:IsA("TextButton") then
+						setConfirmState(confirmBtn, selectedItem)
+					end
+					-- Update selection visuals and description
+					updateItemSelection()
+					print("[Bag] Selected item:", selectedItem)
+				end
+			)
+			if connections and conn then table.insert(connections, conn) end
+			
+			-- Staggered fade-in animation
+			task.delay(i * STAGGER_DELAY, function()
+				if not row or not row.Parent then return end
+				
+				-- Fade in background to original value
+				TweenService:Create(row, TweenInfo.new(FADE_IN_TIME, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+					BackgroundTransparency = originalBgTransparency
+				}):Play()
+				
+				-- Fade in text, icons, and strokes to their original transparency values
+				for child, data in pairs(childOriginalTransparencies) do
+					if child and child.Parent then
+						if data.type == "text" then
+							TweenService:Create(child, TweenInfo.new(FADE_IN_TIME, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+								TextTransparency = data.value
+							}):Play()
+						elseif data.type == "image" then
+							TweenService:Create(child, TweenInfo.new(FADE_IN_TIME, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+								ImageTransparency = data.value
+							}):Play()
+						elseif data.type == "stroke" then
+							TweenService:Create(child, TweenInfo.new(FADE_IN_TIME, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+								Transparency = data.value
+							}):Play()
+						end
+					end
+				end
+			end)
+			
+			added += 1
 		end
         print("[Bag] Inventory entries:", total, "Added to list:", added)
         -- Show/hide Nothing stub
@@ -838,12 +1239,30 @@ function BagModule:Init(All)
                     local Starter = game:GetService("StarterPlayer").StarterPlayerScripts.Client.Battle
                     -- Fallback: use UIController directly if battle UI exists
                     local Rep = game:GetService("ReplicatedStorage")
-                    -- A light touch: just toggle the BattleOptions frame back on
+                    -- A light touch: just toggle the Controller frame back on
                     local gui = game.Players.LocalPlayer.PlayerGui
-                    local bo = gui:FindFirstChild("GameUI") and gui.GameUI:FindFirstChild("BattleUI") and gui.GameUI.BattleUI:FindFirstChild("BattleOptions")
-                    if bo then
-                        bo.Visible = true
-                        for _, child in ipairs(bo:GetChildren()) do
+                    local controller = gui:FindFirstChild("GameUI") and gui.GameUI:FindFirstChild("BattleUI") and gui.GameUI.BattleUI:FindFirstChild("Controller")
+                    if controller then
+                        controller.Visible = true
+                        local defaultPos = {
+                            Fight = UDim2.fromScale(0.5, 0.101),
+                            Bag = UDim2.fromScale(0.03, 0.5),
+                            Creatures = UDim2.fromScale(0.952, 0.5),
+                            Run = UDim2.fromScale(0.5, 0.918),
+                            Move1 = UDim2.fromScale(0.5, -3),
+                            Move2 = UDim2.fromScale(-7, 0.5),
+                            Move3 = UDim2.fromScale(2.5, 0.5),
+                            Move4 = UDim2.fromScale(0.5, 2.5),
+                            Back = UDim2.fromScale(-3.2, -2.582),
+                        }
+                        controller.Size = UDim2.fromScale(0.157, 0.611)
+                        for name, pos in pairs(defaultPos) do
+                            local child = controller:FindFirstChild(name)
+                            if child and child:IsA("GuiObject") then
+                                child.Position = pos
+                            end
+                        end
+                        for _, child in ipairs(controller:GetChildren()) do
                             if child:IsA("TextButton") or child:IsA("ImageButton") then
                                 child.Active = true
                                 child.Visible = true
@@ -869,53 +1288,73 @@ function BagModule:Init(All)
 		bindGiveButton(GiveBtn)
 	end
 	
-	UIFunctions:NewButton(
-		game.Players.LocalPlayer.PlayerGui:WaitForChild("GameUI"):WaitForChild("Bag"):WaitForChild("SortBy"):WaitForChild("Items"),
-		{"Action"},
-		{ Click = "One", HoverOn = "One", HoverOff = "One" },
-		0.7,
-        function()
-			Audio.SFX.Click:Play()
-            print("[Bag] Sort by Items clicked")
-			populate("Items")
+	-- Bind category buttons and store connections
+	local function bindCategoryButtons()
+		-- Clear existing category button connections
+		if categoryButtonConnections then
+			for _, conn in ipairs(categoryButtonConnections) do
+				pcall(function() if conn and conn.Connected then conn:Disconnect() end end)
+			end
+			categoryButtonConnections = {}
 		end
-	)
+		
+		local SortBy = game.Players.LocalPlayer.PlayerGui:WaitForChild("GameUI"):WaitForChild("Bag"):WaitForChild("SortBy")
+		
+		local conn1 = UIFunctions:NewButton(
+			SortBy:WaitForChild("Items"),
+			{"Action"},
+			{ Click = "One", HoverOn = "One", HoverOff = "One" },
+			0.7,
+			function()
+				Audio.SFX.Click:Play()
+				print("[Bag] Sort by Items clicked")
+				populate("Items")
+			end
+		)
+		if conn1 then table.insert(categoryButtonConnections, conn1) end
+		
+		local conn2 = UIFunctions:NewButton(
+			SortBy:WaitForChild("Heals"),
+			{"Action"},
+			{ Click = "One", HoverOn = "One", HoverOff = "One" },
+			0.7,
+			function()
+				Audio.SFX.Click:Play()
+				print("[Bag] Sort by Heals clicked")
+				populate("Heals")
+			end
+		)
+		if conn2 then table.insert(categoryButtonConnections, conn2) end
+		
+		local conn3 = UIFunctions:NewButton(
+			SortBy:WaitForChild("CaptureCubes"),
+			{"Action"},
+			{ Click = "One", HoverOn = "One", HoverOff = "One" },
+			0.7,
+			function()
+				Audio.SFX.Click:Play()
+				print("[Bag] Sort by CaptureCubes clicked")
+				populate("CaptureCubes")
+			end
+		)
+		if conn3 then table.insert(categoryButtonConnections, conn3) end
+		
+		local conn4 = UIFunctions:NewButton(
+			SortBy:WaitForChild("MoveLearners"),
+			{"Action"},
+			{ Click = "One", HoverOn = "One", HoverOff = "One" },
+			0.7,
+			function()
+				Audio.SFX.Click:Play()
+				print("[Bag] Sort by MoveLearners clicked")
+				populate("MoveLearners")
+			end
+		)
+		if conn4 then table.insert(categoryButtonConnections, conn4) end
+	end
 	
-	UIFunctions:NewButton(
-		game.Players.LocalPlayer.PlayerGui:WaitForChild("GameUI"):WaitForChild("Bag"):WaitForChild("SortBy"):WaitForChild("Heals"),
-		{"Action"},
-		{ Click = "One", HoverOn = "One", HoverOff = "One" },
-		0.7,
-        function()
-			Audio.SFX.Click:Play()
-            print("[Bag] Sort by Heals clicked")
-			populate("Heals")
-		end
-	)
-	
-	UIFunctions:NewButton(
-		game.Players.LocalPlayer.PlayerGui:WaitForChild("GameUI"):WaitForChild("Bag"):WaitForChild("SortBy"):WaitForChild("CaptureCubes"),
-		{"Action"},
-		{ Click = "One", HoverOn = "One", HoverOff = "One" },
-		0.7,
-        function()
-			Audio.SFX.Click:Play()
-            print("[Bag] Sort by CaptureCubes clicked")
-			populate("CaptureCubes")
-		end
-	)
-	
-	UIFunctions:NewButton(
-		game.Players.LocalPlayer.PlayerGui:WaitForChild("GameUI"):WaitForChild("Bag"):WaitForChild("SortBy"):WaitForChild("MoveLearners"),
-		{"Action"},
-		{ Click = "One", HoverOn = "One", HoverOff = "One" },
-		0.7,
-        function()
-			Audio.SFX.Click:Play()
-            print("[Bag] Sort by MoveLearners clicked")
-			populate("MoveLearners")
-		end
-	)
+	-- Bind category buttons
+	bindCategoryButtons()
 
 	-- Initial population default: Heals
 	populate("Heals")
@@ -1038,17 +1477,17 @@ function BagModule:RefreshBag()
             row.BackgroundColor3 = Color3.fromRGB(255, 185, 85)
             local nameLbl = row:FindFirstChild("Name") or row:FindFirstChild("ItemName")
             if nameLbl and nameLbl:IsA("TextLabel") then
-                nameLbl.Text = itemName
+                nameLbl.Text = getItemDisplayName(itemName, def)
             end
             local countLbl = row:FindFirstChild("Count") or row:FindFirstChild("Qty")
             if countLbl and countLbl:IsA("TextLabel") then
                 countLbl.Text = "x" .. tostring(count)
             end
             -- Description is now shown in Bag.Description.DescriptionText, not in template
-            -- Set item icon image
+            -- Set item icon image (with ML type-based rect offsets)
             local itemIcon = row:FindFirstChild("ItemIcon")
             if itemIcon and itemIcon:IsA("ImageLabel") then
-                itemIcon.Image = def.Image or "rbxassetid://0"
+                setMLItemIcon(itemIcon, itemName, def)
             end
             local conn = UIFunctions:NewButton(
                 row,
@@ -1095,6 +1534,21 @@ function BagModule:Open(All)
     if not _initialized then
         pcall(function() self:Init(All) end)
     end
+	-- Ensure category buttons are bound (they may have been cleared or not initialized)
+	-- If Init() hasn't run yet, it will bind them. If it has, ensure they're still bound.
+	if not _initialized then
+		-- Init() will handle binding, so just ensure it runs
+		pcall(function() self:Init(All) end)
+	else
+		-- Init() already ran, but buttons might be missing - re-bind if needed
+		local BagGui = game.Players.LocalPlayer.PlayerGui:FindFirstChild("GameUI") and game.Players.LocalPlayer.PlayerGui.GameUI:FindFirstChild("Bag")
+		local SortBy = BagGui and BagGui:FindFirstChild("SortBy")
+		if SortBy and (not categoryButtonConnections or #categoryButtonConnections == 0) then
+			-- Buttons need to be re-bound - trigger Init() again or bind manually
+			-- Since populate is local to Init(), we'll just ensure Init runs
+			pcall(function() self:Init(All) end)
+		end
+	end
     -- Detect context (battle vs overworld) via presence of BattleUI
     local GameUI = game.Players.LocalPlayer.PlayerGui:WaitForChild("GameUI")
     -- In battle only when BattleUI is visible, or when caller passes explicit Context = "Battle"
@@ -1304,7 +1758,56 @@ function BagModule:Close(All)
             pcall(OnCloseCallback)
         end
 	end)
-end
-
-return BagModule
+	end
+	
+	-- Set up ML event listeners once when module loads
+	if not _initialized then
+		local Events = ReplicatedStorage:WaitForChild("Events")
+		Events.Communicate.OnClientEvent:Connect(function(eventName, eventData)
+			if eventName == "MLReplacePrompt" then
+				local creature = tostring(eventData.Creature or "")
+				local move = tostring(eventData.Move or "")
+				local currentMoves = (type(eventData.CurrentMoves) == "table" and eventData.CurrentMoves) or {}
+				local slotIndex = tonumber(eventData.SlotIndex) or 1
+				
+				-- Extract item name from selectedItem (should still be set)
+				local itemName = selectedItem or ""
+				
+				-- Show prompt asking if they want to replace a move
+				Say:Say("", false, {string.format("%s wants to learn %s. But %s already knows four moves. Should a move be replaced?", creature, move, creature)}, nil, nil)
+				local wantsToReplace = Say:YieldChoice()
+				Say:Exit()
+				
+				if wantsToReplace then
+					-- YES → open ReplaceMove UI
+					openMLReplaceMoveUI(creature, move, currentMoves, slotIndex, itemName)
+				else
+					-- NO → send decline to server
+					local ok = Events.Request:InvokeServer({"MLMoveReplaceDecision", { SlotIndex = slotIndex, ReplaceIndex = 0, MoveName = move }})
+					if ok then
+						Say:Say("", true, {"Did not learn " .. move .. "."}, nil, nil)
+						refreshCreatureList()
+						updateItemSelection()
+					end
+				end
+			elseif eventName == "MLMoveReplaced" then
+				-- Move was successfully replaced
+				local creature = tostring(eventData.Creature or "")
+				local newMove = tostring(eventData.NewMove or "")
+				Say:Say("", true, {string.format("%s learned %s!", creature, newMove)}, nil, nil)
+				refreshCreatureList()
+				updateItemSelection()
+			elseif eventName == "MLMoveCancelled" then
+				-- Move learning was cancelled
+				local creature = tostring(eventData.Creature or "")
+				local move = tostring(eventData.Move or "")
+				Say:Say("", true, {"Did not learn " .. move .. "."}, nil, nil)
+				refreshCreatureList()
+				updateItemSelection()
+			end
+		end)
+		_initialized = true
+	end
+	
+	return BagModule
 

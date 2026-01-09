@@ -17,6 +17,7 @@ local AbilitiesModule: any = nil
 local StatCalc: any = nil
 local XPManager: any = nil
 local ReplicatedStorage: any = nil
+local ChallengesSystem: any = nil
 
 --[[
 	Initialize CreatureSystem with dependencies
@@ -31,6 +32,14 @@ function CreatureSystem.Initialize(dependencies: {[string]: any})
 	StatCalc = dependencies.StatCalc
 	XPManager = dependencies.XPManager
 	ReplicatedStorage = dependencies.ReplicatedStorage
+	
+	-- ChallengesSystem may be set later via SetChallengesSystem
+	ChallengesSystem = dependencies.ChallengesSystem
+end
+
+-- Allows setting ChallengesSystem after initial init (to avoid circular dependency)
+function CreatureSystem.SetChallengesSystem(system: any)
+	ChallengesSystem = system
 end
 
 --[[
@@ -232,6 +241,9 @@ function CreatureSystem.CheckPartyEvolutions(Player: Player)
 		return
 	end
 	
+	-- Require CreatureSpawnService to check if evolved creatures are spawned
+	local CreatureSpawnService = require(script.Parent:WaitForChild("CreatureSpawnService"))
+	
 	DBG:print("=== CHECKING PARTY EVOLUTIONS ===")
 	DBG:print("Player:", Player.Name)
 	DBG:print("Party size:", PlayerData.Party and #PlayerData.Party or "nil")
@@ -240,30 +252,63 @@ function CreatureSystem.CheckPartyEvolutions(Player: Player)
 	
 	-- Check each creature in the party
 	for i, creature in ipairs(PlayerData.Party) do
-		if creature and creature.Stats and creature.Stats.HP > 0 then
+		if creature and creature.Stats and creature.Stats.HP and creature.Stats.HP > 0 then
 			DBG:print("[Evolution] Checking creature", i, ":", creature.Name, "Level:", creature.Level, "HP:", creature.Stats.HP)
 			local shouldEvolve, evolvedName = XPManager.CheckEvolution(creature)
 			DBG:print("[Evolution] Creature", i, "evolution check result - shouldEvolve:", shouldEvolve, "evolvedName:", evolvedName)
 			if shouldEvolve then
 				DBG:print("Creature", i, "can evolve:", creature.Name, "Level:", creature.Level)
 				
-				local oldName = creature.Nickname or creature.Name
-				local oldSpecies = creature.Name
-				
+				-- Double-check that evolution data is still valid before evolving
 				local creatureData = CreaturesModule[creature.Name]
-				local newSpecies = creatureData and creatureData.EvolvesInto
-				
-				local success, newName = XPManager.EvolveCreature(creature)
-				if success and newSpecies then
-					table.insert(evolvedCreatures, {
-						oldName = oldName,
-						oldSpecies = oldSpecies,
-						newSpecies = newSpecies,
-						nickname = creature.Nickname
-					})
-					DBG:print("Successfully evolved creature", i, "from", oldSpecies, "to", newSpecies)
+				if not creatureData or not creatureData.EvolutionLevel or not creatureData.EvolvesInto then
+					DBG:warn("[Evolution] Evolution data invalid for creature:", creature.Name)
+				elseif not creature.Level or type(creature.Level) ~= "number" then
+					DBG:warn("[Evolution] Invalid level for creature:", creature.Name, "Level:", creature.Level)
 				else
-					DBG:warn("Failed to evolve creature", i, ":", creature.Name)
+					local oldName = creature.Nickname or creature.Name
+					local oldSpecies = creature.Name
+					local newSpecies = creatureData.EvolvesInto
+					
+					local success, newName = XPManager.EvolveCreature(creature)
+					if success and newSpecies then
+						table.insert(evolvedCreatures, {
+							oldName = oldName,
+							oldSpecies = oldSpecies,
+							newSpecies = newSpecies,
+							nickname = creature.Nickname,
+							slotIndex = i,
+							creature = creature
+						})
+						DBG:print("Successfully evolved creature", i, "from", oldSpecies, "to", newSpecies)
+						
+						-- Check if this evolved creature is currently spawned in overworld
+						local spawnedSlotIndex = CreatureSpawnService.GetSpawnedSlotIndex and CreatureSpawnService.GetSpawnedSlotIndex(Player)
+						if spawnedSlotIndex == i then
+							DBG:print("[Evolution] Evolved creature in slot", i, "is currently spawned - respawning with evolved model")
+							-- Despawn old model and respawn with evolved creature data
+							local respawnSuccess, respawnErr = pcall(function()
+								CreatureSpawnService.DespawnPlayerCreature(Player)
+								-- Small delay to ensure despawn completes
+								task.wait(0.1)
+								CreatureSpawnService.ToggleCreatureSpawn(Player, i, creature)
+							end)
+							if not respawnSuccess then
+								DBG:warn("[Evolution] Failed to respawn evolved creature:", respawnErr)
+							else
+								DBG:print("[Evolution] Successfully respawned evolved creature in slot", i)
+							end
+						end
+						
+						-- Update challenge progress for evolution
+						if ChallengesSystem then
+							pcall(function()
+								ChallengesSystem.UpdateProgress(Player, "EvolveCreature", 1)
+							end)
+						end
+					else
+						DBG:warn("Failed to evolve creature", i, ":", creature.Name)
+					end
 				end
 			end
 		end

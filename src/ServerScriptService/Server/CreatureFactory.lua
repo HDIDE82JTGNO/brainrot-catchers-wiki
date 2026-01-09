@@ -179,8 +179,9 @@ function CreatureFactory.CreateFromInfo(info: any)
 
 	local tempIVs = {}
 	local tempStats = {}
+	local manualIVs = info.IVs or {}
 	for statName, base in pairs(creatureDef.BaseStats or {}) do
-		local iv = math.random(0, 31)
+		local iv = manualIVs[statName] or math.random(0, 31)
 		tempIVs[statName] = iv
 		tempStats[statName] = simpleStat(base, level, iv)
 	end
@@ -225,7 +226,7 @@ function CreatureFactory.CreateFromInfo(info: any)
 		Description = creatureDef.Description,
 		Type = creatureDef.Type,
 		-- Assign a species ability (allow override via info.Ability)
-		Ability = info.Ability or Abilities.SelectAbility(creatureDef.Name, false),
+		Ability = info.Ability or Abilities.SelectAbility(creatureDef.Name, info.HiddenAbility == true),
 		Stats = statsWithNature,
 		IVs = tempIVs,
 		LearnableMoves = creatureDef.LearnableMoves,

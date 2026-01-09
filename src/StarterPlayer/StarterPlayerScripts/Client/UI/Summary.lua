@@ -7,7 +7,10 @@ local Players = game:GetService("Players")
 local TypesModule = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Types"))
 local MovesModule = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Moves"))
 local Creatures = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Creatures"))
+local CreatureViewer = require(script.Parent:WaitForChild("CreatureViewer"))
 local StatCalc = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("StatCalc"))
+local UIFunctions = require(script.Parent:WaitForChild("UIFunctions"))
+local Audio = script.Parent.Parent:WaitForChild("Assets"):WaitForChild("Audio")
 
 local MOVE_ANIMATION_TIME = 0.2
 local STAT_ANIMATION_TIME = 0.5
@@ -16,7 +19,15 @@ local TWEEN_STYLE = Enum.EasingStyle.Quart
 local TWEEN_DIRECTION = Enum.EasingDirection.Out
 
 local MoveHoverConnections = setmetatable({}, { __mode = "k" })
-local OrbitConnections = setmetatable({}, { __mode = "k" })
+
+-- Module state
+local _summaryFrame: Frame? = nil
+local _navigationCallbacks = {
+	onNext = nil,
+	onPrevious = nil,
+	onClose = nil,
+}
+local _buttonsConnected = false
 
 local function DarkenColor3(c: Color3, factor: number)
 	local f = math.clamp(factor or 1, 0, 1)
@@ -43,204 +54,14 @@ local function setTypeFrame(frame: Frame?, typeName: string?)
 end
 
 local function setup3DPreview(SummaryFrame: Frame, creatureData: any)
-    local container = SummaryFrame:FindFirstChild("3DPreview")
-    -- Accept any GuiObject (Frame, ImageLabel, etc.) as the preview container
-    if not container or not container:IsA("GuiObject") then return end
+	local container = SummaryFrame:FindFirstChild("3DPreview")
+	if not container or not container:IsA("GuiObject") then return end
 
-	-- Clear dynamic children
-	local previous = container:FindFirstChild("Viewport")
-	if previous and previous:IsA("ViewportFrame") then
-		previous:Destroy()
-	end
-	for _, child in ipairs(container:GetChildren()) do
-		if child:IsA("ImageLabel") and child.Name == "SpriteFallback" then
-			child:Destroy()
-		end
-	end
-	local viewport = Instance.new("ViewportFrame")
-	viewport.Name = "Viewport"
-	viewport.Size = UDim2.fromScale(1, 1)
-	viewport.ZIndex = 15
-	viewport.BackgroundTransparency = 1
-	viewport.LightColor = Color3.fromRGB(255, 255, 255)
-	viewport.Ambient = Color3.fromRGB(255, 255, 255)
-	viewport.Parent = container
-
-	local worldModel = Instance.new("WorldModel")
-	worldModel.Name = "WorldModel"
-	worldModel.Parent = viewport
-
-	local cam = Instance.new("Camera")
-	cam.Name = "ViewportCamera"
-	cam.Parent = viewport
-	viewport.CurrentCamera = cam
-
-	local modelsFolder = ReplicatedStorage:FindFirstChild("Assets")
-	modelsFolder = modelsFolder and modelsFolder:FindFirstChild("CreatureModels") or nil
-	local modelTemplate: Instance? = modelsFolder and modelsFolder:FindFirstChild(tostring(creatureData.BaseName or creatureData.Name)) or nil
-	if modelTemplate and modelTemplate:IsA("Model") then
-		local model = modelTemplate:Clone()
-		model.Parent = worldModel
-		-- Apply shiny recolor if flagged and shiny palette exists on base creature
-		local base = Creatures[creatureData.BaseName or creatureData.Name]
-		local shinyMap = (creatureData.Shiny == true) and base and base.ShinyColors or nil
-		if shinyMap and typeof(shinyMap) == "table" then
-			for partName, color in pairs(shinyMap) do
-				local inst = model:FindFirstChild(partName, true)
-				if inst then
-					if inst:IsA("BasePart") then
-						(inst :: BasePart).Color = color
-					elseif inst:IsA("Decal") then
-						(inst :: Decal).Color3 = color
-					end
-				end
-			end
-		end
-		local anchor: BasePart? = model.PrimaryPart or model:FindFirstChild("HumanoidRootPart") or model:FindFirstChildWhichIsA("BasePart")
-		if anchor and not model.PrimaryPart then model.PrimaryPart = anchor end
-		model:PivotTo(CFrame.new(0,0,0))
-
-		local size = model:GetExtentsSize()
-		local vFov = math.rad(cam.FieldOfView)
-		local vp = container.AbsoluteSize
-		local aspect = (vp.Y > 0) and (vp.X / vp.Y) or 1
-		local hFov = 2 * math.atan(math.tan(vFov * 0.5) * aspect)
-		local halfHeight = math.max(0.5, size.Y * 0.5)
-		local halfWidth = math.max(0.5, math.max(size.X, size.Z) * 0.5)
-		local distV = halfHeight / math.tan(vFov * 0.5)
-		local distH = halfWidth / math.tan(hFov * 0.5)
-		local distance = math.max(4, math.max(distV, distH) * 1.2)
-		local anchorPos = (model.PrimaryPart and model.PrimaryPart.Position) or Vector3.new(0,0,0)
-		local target = anchorPos
-		if math.abs(anchorPos.X) < 1e-3 and math.abs(anchorPos.Y) < 1e-3 and math.abs(anchorPos.Z) < 1e-3 then
-			target = Vector3.new(0, halfHeight, 0)
-		end
-		-- Match Party camera placement and orientation EXACTLY
-		local forward = Vector3.new(0, 0, -1)
-		local camPos = -(target - (forward.Unit * distance))
-		if camPos.Magnitude < 1e-3 then
-			camPos = Vector3.new(0, 0, -distance)
-		end
-		cam.CFrame = CFrame.new(camPos) * CFrame.Angles(0, math.rad(-180), 0)
-		cam.Focus = CFrame.new(target)
-
-		-- Attempt to play idle if present (Humanoid or AnimationController)
-		local animator: Animator? = nil
-		local humanoid = model:FindFirstChildOfClass("Humanoid")
-		if humanoid then
-			animator = humanoid:FindFirstChildOfClass("Animator")
-			if not animator then
-				animator = Instance.new("Animator")
-				animator.Parent = humanoid
-			end
-		else
-			local animController = model:FindFirstChildOfClass("AnimationController")
-			if not animController then
-				animController = Instance.new("AnimationController")
-				animController.Parent = model
-			end
-			animator = animController:FindFirstChildOfClass("Animator")
-			if not animator then
-				animator = Instance.new("Animator")
-				animator.Parent = animController
-			end
-		end
-		local animFolder = model:FindFirstChild("Animations")
-		local idle = animFolder and animFolder:FindFirstChild("Idle") or model:FindFirstChild("Idle")
-		if idle and idle:IsA("Animation") and animator then
-			local track = animator:LoadAnimation(idle)
-			track.Priority = Enum.AnimationPriority.Idle
-			track.Looped = true
-			track:Play()
-		end
-	else
-		-- Fallback to sprite image if no model (prefer shiny sprite when flagged)
-		local base = Creatures[creatureData.BaseName or creatureData.Name]
-		local useShiny = (creatureData.Shiny == true)
-		local spriteId = nil
-		if base then
-			spriteId = (useShiny and base.ShinySprite) or base.Sprite
-		end
-		if spriteId then
-			viewport:Destroy()
-			local img = Instance.new("ImageLabel")
-			img.Name = "SpriteFallback"
-			img.BackgroundTransparency = 1
-			img.Image = spriteId
-			img.Size = UDim2.fromScale(1, 1)
-			img.ZIndex = 15
-			img.Parent = container
-		else
-			viewport:Destroy()
-		end
-	end
-
-	-- Bind orbit drag to rotate model around Y (and slight pitch) like Party
-	if OrbitConnections[container] then
-		for _, conn in ipairs(OrbitConnections[container]) do
-			if conn and conn.Connected then conn:Disconnect() end
-		end
-		OrbitConnections[container] = nil
-	end
-	local conns = {}
-	OrbitConnections[container] = conns
-	local dragging = false
-	local lastX: number? = nil
-	local lastY: number? = nil
-	local rotateSpeed = math.rad(0.35)
-	local yawAccum = 0
-	local pitchAccum = 0
-
-	local function onInputBegan(input: InputObject)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 then
-			dragging = true
-			lastX = input.Position.X
-			lastY = input.Position.Y
-		end
-	end
-	local function onInputEnded(input: InputObject)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 then
-			dragging = false
-			lastX = nil
-		end
-	end
-	local function onInputChanged(input: InputObject)
-		if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-			if lastX and lastY then
-				local dx = input.Position.X - lastX
-				local dy = input.Position.Y - lastY
-				lastX = input.Position.X
-				lastY = input.Position.Y
-				yawAccum += (dx * rotateSpeed)
-				pitchAccum += (dy * rotateSpeed)
-				local maxPitch = math.rad(80)
-				if pitchAccum > maxPitch then pitchAccum = maxPitch end
-				if pitchAccum < -maxPitch then pitchAccum = -maxPitch end
-				if worldModel and #worldModel:GetChildren() > 0 then
-					local m = worldModel:GetChildren()[1]
-					if m and m:IsA("Model") then
-						local hrp = m:FindFirstChild("HumanoidRootPart")
-						if hrp and hrp:IsA("BasePart") then
-							m.PrimaryPart = hrp
-							local pos = hrp.Position
-							local newRoot = CFrame.new(pos) * CFrame.Angles(pitchAccum, yawAccum, 0)
-							m:PivotTo(newRoot)
-						else
-							local cf = m:GetPivot()
-							local newPivot = cf * CFrame.Angles(-dy * rotateSpeed, dx * rotateSpeed, 0)
-							m:PivotTo(newPivot)
-						end
-					end
-				end
-			end
-		end
-	end
-	local c1 = container.InputBegan:Connect(onInputBegan)
-	local c2 = container.InputEnded:Connect(onInputEnded)
-	local c3 = game:GetService("UserInputService").InputChanged:Connect(onInputChanged)
-	table.insert(conns, c1)
-	table.insert(conns, c2)
-	table.insert(conns, c3)
+	CreatureViewer:Load(container, {
+		Name = creatureData.Name,
+		BaseName = creatureData.BaseName or creatureData.Name,
+		Shiny = creatureData.Shiny,
+	})
 end
 
 local function SetIVFrame(SummaryFrame: Frame, frameName: string, value: number?, baseColor: Color3)
@@ -531,23 +352,59 @@ function Summary:Render(SummaryFrame: Frame, creatureData: any)
 		HPCurrent.Size = UDim2.new(fullXScale * hpPercent, 0, fullYScale, 0)
 	end
 
+	-- Compute stats for display
+	local stats, maxStats = StatCalc.ComputeStats(creatureData.Name, creatureData.Level, creatureData.IVs, creatureData.Nature)
+	local displayStats = creatureData.MaxStats or maxStats or maxStatsFallback or {}
+
 	local Attack = SummaryFrame:FindFirstChild("Attack")
+	local AttackStat = Attack and Attack:FindFirstChild("Stat")
 	local AttackCurrent = Attack and Attack:FindFirstChild("Current")
+	if AttackStat and AttackStat:IsA("TextLabel") then
+		AttackStat.Text = tostring(displayStats.Attack or 0)
+	end
 	if AttackCurrent then
 		AttackCurrent.Size = UDim2.new(0, 0, 1, 0)
 		TweenService:Create(AttackCurrent, TweenInfo.new(STAT_ANIMATION_TIME, TWEEN_STYLE, TWEEN_DIRECTION), { Size = UDim2.new(1, 0, 1, 0) }):Play()
 	end
 	local Defense = SummaryFrame:FindFirstChild("Defense")
+	local DefenseStat = Defense and Defense:FindFirstChild("Stat")
 	local DefenseCurrent = Defense and Defense:FindFirstChild("Current")
+	if DefenseStat and DefenseStat:IsA("TextLabel") then
+		DefenseStat.Text = tostring(displayStats.Defense or 0)
+	end
 	if DefenseCurrent then
 		DefenseCurrent.Size = UDim2.new(0, 0, 1, 0)
 		TweenService:Create(DefenseCurrent, TweenInfo.new(STAT_ANIMATION_TIME, TWEEN_STYLE, TWEEN_DIRECTION), { Size = UDim2.new(1, 0, 1, 0) }):Play()
 	end
 	local Speed = SummaryFrame:FindFirstChild("Speed")
+	local SpeedStat = Speed and Speed:FindFirstChild("Stat")
 	local SpeedCurrent = Speed and Speed:FindFirstChild("Current")
+	if SpeedStat and SpeedStat:IsA("TextLabel") then
+		SpeedStat.Text = tostring(displayStats.Speed or 0)
+	end
 	if SpeedCurrent then
 		SpeedCurrent.Size = UDim2.new(0, 0, 1, 0)
 		TweenService:Create(SpeedCurrent, TweenInfo.new(STAT_ANIMATION_TIME, TWEEN_STYLE, TWEEN_DIRECTION), { Size = UDim2.new(1, 0, 1, 0) }):Play()
+	end
+	local SpecialAttack = SummaryFrame:FindFirstChild("SpecialAttack")
+	local SpecialAttackStat = SpecialAttack and SpecialAttack:FindFirstChild("Stat")
+	local SpecialAttackCurrent = SpecialAttack and SpecialAttack:FindFirstChild("Current")
+	if SpecialAttackStat and SpecialAttackStat:IsA("TextLabel") then
+		SpecialAttackStat.Text = tostring(displayStats.SpecialAttack or 0)
+	end
+	if SpecialAttackCurrent then
+		SpecialAttackCurrent.Size = UDim2.new(0, 0, 1, 0)
+		TweenService:Create(SpecialAttackCurrent, TweenInfo.new(STAT_ANIMATION_TIME, TWEEN_STYLE, TWEEN_DIRECTION), { Size = UDim2.new(1, 0, 1, 0) }):Play()
+	end
+	local SpecialDefense = SummaryFrame:FindFirstChild("SpecialDefense")
+	local SpecialDefenseStat = SpecialDefense and SpecialDefense:FindFirstChild("Stat")
+	local SpecialDefenseCurrent = SpecialDefense and SpecialDefense:FindFirstChild("Current")
+	if SpecialDefenseStat and SpecialDefenseStat:IsA("TextLabel") then
+		SpecialDefenseStat.Text = tostring(displayStats.SpecialDefense or 0)
+	end
+	if SpecialDefenseCurrent then
+		SpecialDefenseCurrent.Size = UDim2.new(0, 0, 1, 0)
+		TweenService:Create(SpecialDefenseCurrent, TweenInfo.new(STAT_ANIMATION_TIME, TWEEN_STYLE, TWEEN_DIRECTION), { Size = UDim2.new(1, 0, 1, 0) }):Play()
 	end
 
 	-- IVs
@@ -555,6 +412,8 @@ function Summary:Render(SummaryFrame: Frame, creatureData: any)
 		SetIVFrame(SummaryFrame, "HPIV", creatureData.IVs.HP, Color3.fromRGB(38, 255, 0))
 		SetIVFrame(SummaryFrame, "AttackIV", creatureData.IVs.Attack, Color3.fromRGB(255, 78, 47))
 		SetIVFrame(SummaryFrame, "DefenseIV", creatureData.IVs.Defense, Color3.fromRGB(47, 158, 255))
+		SetIVFrame(SummaryFrame, "SpecialAttackIV", creatureData.IVs.SpecialAttack, Color3.fromRGB(200, 100, 255))
+		SetIVFrame(SummaryFrame, "SpecialDefenseIV", creatureData.IVs.SpecialDefense, Color3.fromRGB(100, 200, 255))
 		SetIVFrame(SummaryFrame, "SPDIV", creatureData.IVs.Speed, Color3.fromRGB(250, 189, 45))
 	end
 
@@ -590,6 +449,147 @@ function Summary:Render(SummaryFrame: Frame, creatureData: any)
 
 	-- 3D preview
 	setup3DPreview(SummaryFrame, creatureData)
+end
+
+-- Get GameUI.Summary frame
+local function getSummaryFrame(): Frame?
+	if _summaryFrame and _summaryFrame.Parent then
+		return _summaryFrame
+	end
+	
+	local player = Players.LocalPlayer
+	if not player then return nil end
+	local playerGui = player:FindFirstChild("PlayerGui")
+	if not playerGui then return nil end
+	local gameUi = playerGui:FindFirstChild("GameUI")
+	if not gameUi then return nil end
+	
+	_summaryFrame = gameUi:FindFirstChild("Summary")
+	return _summaryFrame
+end
+
+-- Connect navigation buttons once
+local function connectButtons()
+	if _buttonsConnected then return end
+	
+	local frame = getSummaryFrame()
+	if not frame then return end
+	
+	-- Connect SummaryClose button
+	local closeBtn = frame:FindFirstChild("SummaryClose")
+	if closeBtn and (closeBtn:IsA("TextButton") or closeBtn:IsA("ImageButton")) then
+		UIFunctions:NewButton(
+			closeBtn,
+			{"Action"},
+			{ Click = "One", HoverOn = "One", HoverOff = "One" },
+			0.3,
+			function()
+				Audio.SFX.Click:Play()
+				if _navigationCallbacks.onClose then
+					_navigationCallbacks.onClose()
+				else
+					Summary:Hide()
+				end
+			end
+		)
+	end
+	
+	-- Connect Next button
+	local nextBtn = frame:FindFirstChild("Next")
+	if nextBtn and (nextBtn:IsA("TextButton") or nextBtn:IsA("ImageButton")) then
+		UIFunctions:NewButton(
+			nextBtn,
+			{"Action"},
+			{ Click = "One", HoverOn = "One", HoverOff = "One" },
+			0.3,
+			function()
+				Audio.SFX.Click:Play()
+				if _navigationCallbacks.onNext then
+					_navigationCallbacks.onNext()
+				end
+			end
+		)
+	end
+	
+	-- Connect Previous button
+	local prevBtn = frame:FindFirstChild("Previous")
+	if prevBtn and (prevBtn:IsA("TextButton") or prevBtn:IsA("ImageButton")) then
+		UIFunctions:NewButton(
+			prevBtn,
+			{"Action"},
+			{ Click = "One", HoverOn = "One", HoverOff = "One" },
+			0.3,
+			function()
+				Audio.SFX.Click:Play()
+				if _navigationCallbacks.onPrevious then
+					_navigationCallbacks.onPrevious()
+				end
+			end
+		)
+	end
+	
+	_buttonsConnected = true
+end
+
+-- Show summary with creature data and context
+function Summary:Show(creatureData: any, context: string?)
+	local frame = getSummaryFrame()
+	if not frame then
+		warn("[Summary] GameUI.Summary frame not found")
+		return
+	end
+	
+	-- Render the creature data
+	Summary:Render(frame, creatureData)
+	
+	-- Show the frame
+	frame.Visible = true
+	
+	-- Ensure buttons are connected
+	connectButtons()
+end
+
+-- Hide summary
+function Summary:Hide()
+	local frame = getSummaryFrame()
+	if not frame then return end
+	
+	frame.Visible = false
+	
+	-- Hide move info tooltip
+	local moveInfo = frame:FindFirstChild("MoveInfo")
+	if moveInfo then moveInfo.Visible = false end
+	
+	-- Clear 3D preview content to free resources
+	local container = frame:FindFirstChild("3DPreview")
+	if container then
+		for _, child in ipairs(container:GetChildren()) do
+			child:Destroy()
+		end
+	end
+end
+
+-- Set navigation callbacks
+function Summary:SetNavigationCallbacks(onNext: (()->())?, onPrevious: (()->())?, onClose: (()->())?)
+	_navigationCallbacks.onNext = onNext
+	_navigationCallbacks.onPrevious = onPrevious
+	_navigationCallbacks.onClose = onClose
+end
+
+-- Update navigation button visibility
+function Summary:UpdateNavigationVisibility(showNext: boolean, showPrevious: boolean)
+	local frame = getSummaryFrame()
+	if not frame then return end
+	
+	local nextBtn = frame:FindFirstChild("Next")
+	if nextBtn and nextBtn:IsA("GuiObject") then
+		nextBtn.Visible = showNext == true
+	end
+	
+	local prevBtn = frame:FindFirstChild("Previous")
+	if prevBtn and prevBtn:IsA("GuiObject") then
+		prevBtn.Visible = showPrevious == true
+	end
 end
 
 return Summary

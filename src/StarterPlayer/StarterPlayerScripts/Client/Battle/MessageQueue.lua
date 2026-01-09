@@ -9,6 +9,9 @@
 local TweenService = game:GetService("TweenService")
 local TextService = game:GetService("TextService")
 
+local ON_SCREEN_POS = UDim2.new(0.78, 0, 0.468, 0)
+local OFF_SCREEN_POS = UDim2.new(1.3, 0, 0.468, 0)
+
 local MessageQueue = {}
 MessageQueue.__index = MessageQueue
 
@@ -31,6 +34,7 @@ function MessageQueue.new(battleNotification: Frame): any
 	self._messageLabel = battleNotification:FindFirstChild("Message")
 	self._suppressPostFaint = false
 	self._faintAnimationCallback = nil
+	self._faintMessageDisplayedCallback = nil
 	self._statusEffectCallback = nil
 	self._thawCallback = nil
 	
@@ -43,6 +47,14 @@ end
 ]]
 function MessageQueue:SetFaintAnimationCallback(callback: (() -> ())?)
 	self._faintAnimationCallback = callback
+end
+
+--[[
+	Sets a callback to be triggered when a faint message finishes displaying (after typewriter + wait)
+	@param callback The callback function
+]]
+function MessageQueue:SetFaintMessageDisplayedCallback(callback: (() -> ())?)
+	self._faintMessageDisplayedCallback = callback
 end
 
 --[[
@@ -197,7 +209,7 @@ function MessageQueue:ClearPersistent()
 			local slideOutTween = TweenService:Create(
 				self._battleNotification,
 				TweenInfo.new(0.3, Enum.EasingStyle.Exponential, Enum.EasingDirection.InOut),
-				{Position = UDim2.new(0, 0, 1, 0)}
+				{Position = OFF_SCREEN_POS}
 			)
 			slideOutTween:Play()
 			slideOutTween.Completed:Wait()
@@ -218,16 +230,27 @@ function MessageQueue:_displayMessage(message: string)
 	-- Add to history
 	table.insert(self._history, message)
 	
-	-- Position notification at bottom
-	self._battleNotification.Position = UDim2.new(0, 0, 1, 0)
+	-- Position notification off-screen on the right before sliding in
+	self._battleNotification.Position = OFF_SCREEN_POS
 	self._battleNotification.Visible = true
 	self._messageLabel.Text = message
 	self._messageLabel.MaxVisibleGraphemes = 0  -- Hide text immediately to prevent flash
-	self._messageLabel.Size = UDim2.new(0.83, 0, 0.34, 0)
+	--self._messageLabel.Size = UDim2.new(0.83, 0, 0.34, 0)
 
 	-- Check if this is a thaw message (status removal)
 	local messageLower = message:lower()
 	local isThawMessage = string.find(messageLower, "thawed out")
+	
+	-- Client-side debug: log critical battle outcome messages when displayed
+	do
+		if string.find(messageLower, "has no more creatures left to fight", 1, true)
+			or string.find(messageLower, "you won the battle", 1, true)
+			or string.find(messageLower, "you lost the battle", 1, true)
+			or string.find(messageLower, "battle ended in a draw", 1, true)
+		then
+			print("[BattleMessage][Outcome]", message)
+		end
+	end
 	
 	-- Check if this is a status message and trigger status effect callback immediately
 	local isStatusMessage = string.find(messageLower, "burned") or 
@@ -264,7 +287,7 @@ function MessageQueue:_displayMessage(message: string)
 	local slideInTween = TweenService:Create(
 		self._battleNotification,
 		TweenInfo.new(0.35, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out),
-		{Position = UDim2.new(0, 0, 0.465, 0)} --2nd line {0, 0},{0.281, 0}
+		{Position = ON_SCREEN_POS}
 	)
 	slideInTween:Play()
 	
@@ -295,17 +318,6 @@ function MessageQueue:_displayMessage(message: string)
             length = #newMsg
             wrappedOnce = true
             lastSpaceIndex = 0
-            TweenService:Create(
-                self._battleNotification,
-                TweenInfo.new(0.25, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out),
-                {Position = UDim2.new(0, 0, 0.281, 0)}
-            ):Play()
-			-- Expand TextLabel height for two-line layout
-			TweenService:Create(
-					self._messageLabel,
-					TweenInfo.new(0.25, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out),
-					{Size = UDim2.new(0.833, 0, 0.556, 0)}
-				):Play()
         end
     end
 	if isFaintMessage then
@@ -320,6 +332,14 @@ function MessageQueue:_displayMessage(message: string)
 		
 		self._messageLabel.MaxVisibleGraphemes = -1
 		task.wait(0.2)  -- Reduced from 0.55
+		
+		-- CRITICAL FIX: Trigger callback when faint message finishes displaying
+		-- This ensures XP steps wait until faint message is fully displayed
+		if self._faintMessageDisplayedCallback then
+			print("[MessageQueue] Faint message finished displaying - triggering callback")
+			task.spawn(self._faintMessageDisplayedCallback)
+			self._faintMessageDisplayedCallback = nil  -- Clear after use
+		end
 	else
 		-- Normal timing for other messages
 		-- No additional delay needed since we already started early
@@ -348,7 +368,7 @@ function MessageQueue:_displayMessage(message: string)
 		local slideOutTween = TweenService:Create(
 			self._battleNotification,
 			TweenInfo.new(0.55, Enum.EasingStyle.Exponential, Enum.EasingDirection.InOut),
-			{Position = UDim2.new(0, 0, 1, 0)}
+			{Position = OFF_SCREEN_POS}
 		)
 		slideOutTween:Play()
 		slideOutTween.Completed:Wait()

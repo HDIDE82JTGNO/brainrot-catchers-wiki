@@ -16,11 +16,42 @@ ButtonClass.ClickPresets = {
 			TweenService:Create(Button, TweenInfo.new(0.2), {Size = Button:GetAttribute("OGSize")}):Play()
 		end)
 	end,
+	-- Subtle bounce effect for smaller buttons
+	["Bounce"] = function(Button: GuiButton)
+		local ogSize = Button:GetAttribute("OGSize")
+		TweenService:Create(Button, TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+			Size = ScaleUDim2(ogSize, 0.92)
+		}):Play()
+		task.delay(0.08, function()
+			TweenService:Create(Button, TweenInfo.new(0.15, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+				Size = ogSize
+			}):Play()
+		end)
+	end,
+	-- Quick press feedback
+	["Press"] = function(Button: GuiButton)
+		local ogSize = Button:GetAttribute("OGSize")
+		TweenService:Create(Button, TweenInfo.new(0.06), {Size = ScaleUDim2(ogSize, 0.95)}):Play()
+		task.delay(0.06, function()
+			TweenService:Create(Button, TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+				Size = ogSize
+			}):Play()
+		end)
+	end,
 }
 
 ButtonClass.HoverOnPresets = {
 	["One"] = function(Button: GuiButton)
 		TweenService:Create(Button, TweenInfo.new(0.2), {Size = ScaleUDim2(Button:GetAttribute("OGSize"), 1.02)}):Play()
+	end,
+	-- Subtle glow effect via slightly larger scale
+	["Bounce"] = function(Button: GuiButton)
+		TweenService:Create(Button, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+			Size = ScaleUDim2(Button:GetAttribute("OGSize"), 1.04)
+		}):Play()
+	end,
+	["Press"] = function(Button: GuiButton)
+		TweenService:Create(Button, TweenInfo.new(0.1), {Size = ScaleUDim2(Button:GetAttribute("OGSize"), 1.02)}):Play()
 	end,
 }
 
@@ -28,29 +59,43 @@ ButtonClass.HoverOffPresets = {
 	["One"] = function(Button: GuiButton)
 		TweenService:Create(Button, TweenInfo.new(0.2), {Size = Button:GetAttribute("OGSize")}):Play()
 	end,
+	["Bounce"] = function(Button: GuiButton)
+		TweenService:Create(Button, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+			Size = Button:GetAttribute("OGSize")
+		}):Play()
+	end,
+	["Press"] = function(Button: GuiButton)
+		TweenService:Create(Button, TweenInfo.new(0.1), {Size = Button:GetAttribute("OGSize")}):Play()
+	end,
 }
 
 -- Animation methods
 function ButtonClass:ClickAnimation(Button: GuiButton, AnimationPreset: any)
-	ButtonClass.ClickPresets[AnimationPreset](Button)
+	if AnimationPreset and ButtonClass.ClickPresets[AnimationPreset] then
+		ButtonClass.ClickPresets[AnimationPreset](Button)
+	end
 end
 
 function ButtonClass:HoverOnAnimation(Button: GuiButton, AnimationPreset: any)
-	ButtonClass.HoverOnPresets[AnimationPreset](Button)
+	if AnimationPreset and ButtonClass.HoverOnPresets[AnimationPreset] then
+		ButtonClass.HoverOnPresets[AnimationPreset](Button)
+	end
 end
 
 function ButtonClass:HoverOffAnimation(Button: GuiButton, AnimationPreset: any)
-	ButtonClass.HoverOffPresets[AnimationPreset](Button)
+	if AnimationPreset and ButtonClass.HoverOffPresets[AnimationPreset] then
+		ButtonClass.HoverOffPresets[AnimationPreset](Button)
+	end
 end
 
--- Helper to update Switch visuals
+-- Helper to update Switch visuals (using Quad easing for smooth, non-bouncy transitions)
 local function UpdateSwitchVisual(Switch, Indicator, state: boolean)
 	if state then
-		TweenService:Create(Indicator, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {Position = UDim2.new(0.5, 0, 0.5, 0)}):Play()
-		TweenService:Create(Indicator, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.new(1, 0.666667, 0.870588)}):Play()
+		TweenService:Create(Indicator, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Position = UDim2.new(0.5, 0, 0.5, 0)}):Play()
+		TweenService:Create(Indicator, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundColor3 = Color3.new(1, 0.666667, 0.870588)}):Play()
 	else
-		TweenService:Create(Indicator, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {Position = UDim2.new(0.1, 0, 0.5, 0)}):Play()
-		TweenService:Create(Indicator, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.new(0.47451, 0.243137, 0.372549)}):Play()
+		TweenService:Create(Indicator, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Position = UDim2.new(0.1, 0, 0.5, 0)}):Play()
+		TweenService:Create(Indicator, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundColor3 = Color3.new(0.47451, 0.243137, 0.372549)}):Play()
 	end
 end
 

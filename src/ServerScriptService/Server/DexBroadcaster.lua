@@ -65,15 +65,29 @@ local function CalculateDexNumber(playerData: any): number
 		end
 	end
 	
-	-- Count creatures in boxes
+	-- Count creatures in boxes (new schema: { Name = string, Creatures = { ... } })
 	if playerData.Boxes then
-		for boxIndex, box in ipairs(playerData.Boxes) do
-			if box then
-				for _, creature in ipairs(box) do
-					if creature and creature.Name then
-						if not uniqueCreatures[creature.Name] then
-							uniqueCreatures[creature.Name] = true
-							count = count + 1
+		for _, box in ipairs(playerData.Boxes) do
+			if type(box) == "table" then
+				-- Handle new schema: box has .Creatures array
+				local creatures = box.Creatures
+				if type(creatures) == "table" then
+					for _, creature in ipairs(creatures) do
+						if creature and creature.Name then
+							if not uniqueCreatures[creature.Name] then
+								uniqueCreatures[creature.Name] = true
+								count = count + 1
+							end
+						end
+					end
+				elseif box.Name == nil then
+					-- Handle legacy schema: box is a direct array of creatures
+					for _, creature in ipairs(box) do
+						if creature and creature.Name then
+							if not uniqueCreatures[creature.Name] then
+								uniqueCreatures[creature.Name] = true
+								count = count + 1
+							end
 						end
 					end
 				end

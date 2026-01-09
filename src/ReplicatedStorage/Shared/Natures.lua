@@ -38,13 +38,12 @@ local NATURE_DEFS: { [string]: { inc: string, dec: string } } = {
 }
 
 local function mapNatureKeyToStat(natureKey: string): string?
-    -- Map SpA -> Attack (increase), SpD -> Defense (increase)
-    -- For decreases on SpA/SpD, remap to Speed to preserve a trade-off when increase also hits the same bucket
+    -- Map keys to actual stat names
     if natureKey == "Atk" then return "Attack" end
     if natureKey == "Def" then return "Defense" end
     if natureKey == "Spe" then return "Speed" end
-    if natureKey == "SpA" then return "Attack" end
-    if natureKey == "SpD" then return "Defense" end
+    if natureKey == "SpA" then return "SpecialAttack" end
+    if natureKey == "SpD" then return "SpecialDefense" end
     return nil
 end
 
@@ -52,7 +51,9 @@ local function pickAlternateStat(avoidStat: string): string
     -- Deterministic rotation to avoid inc/dec colliding on same stat
     if avoidStat == "Attack" then return "Defense" end
     if avoidStat == "Defense" then return "Speed" end
-    return "Attack" -- from Speed -> Attack
+    if avoidStat == "Speed" then return "SpecialAttack" end
+    if avoidStat == "SpecialAttack" then return "SpecialDefense" end
+    return "Attack"
 end
 
 function Natures.GetNature(natureName: string): { inc: string, dec: string }?
@@ -89,6 +90,8 @@ function Natures.ApplyNatureModifiers(stats: { [string]: number }, natureName: s
         HP = stats.HP,
         Attack = stats.Attack,
         Defense = stats.Defense,
+        SpecialAttack = stats.SpecialAttack,
+        SpecialDefense = stats.SpecialDefense,
         Speed = stats.Speed,
     }
 

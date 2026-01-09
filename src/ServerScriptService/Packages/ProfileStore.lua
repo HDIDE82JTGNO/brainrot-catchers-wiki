@@ -317,6 +317,7 @@ local DataStoreService = game:GetService("DataStoreService")
 local MessagingService = game:GetService("MessagingService")
 local HttpService = game:GetService("HttpService")
 local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
 
 local PlaceId = game.PlaceId
 local JobId = game.JobId
@@ -730,25 +731,32 @@ local function SaveProfileAsync(profile, is_ending_session, is_overwriting, last
 	-- Global gating: prevent unintended saves when AutoSave is OFF, except for explicit user manual saves.
 	-- Conditions to allow save:
 	-- 1) A manual user save set Data._AllowOneSave = true (we will clear it below), OR
-    -- 2) Ending session AND not in battle AND not in cutscene AND not on title AND AutoSave enabled, OR
+    -- 2) Ending session AND not in battle AND not in cutscene AND not in Say message AND not on title AND valid chunk AND AutoSave enabled, OR
 	-- 3) Overwrite/Shutdown cases (is_overwriting true or last_save_reason == "Shutdown")
 	local data = profile.Data or {}
 	local autosaveEnabled = (data.Settings and data.Settings.AutoSave) == true
 	local inBattle = data.InBattle == true
-    local atTitle = (data.Chunk == nil) or (data.Chunk == "nil") or (data.Chunk == "Title")
-    local inCutscene = data.InCutscene == true
+	local inCutscene = data.InCutscene == true
+	local inSayMessage = data.InSayMessage == true
+	local currentChunk = data.Chunk
+	
+	-- Invalid chunk states that block saving
+	local chunkInvalid = (currentChunk == nil) or (currentChunk == "nil")
+	local atTitle = (currentChunk == "Title")
+	
 	local allowOne = data._AllowOneSave == true
 	local isShutdown = last_save_reason == "Shutdown"
 	local permitted = false
 	if allowOne then
-		permitted = true
+		-- Manual save: still block if in battle, cutscene, or Say message (defense-in-depth)
+		permitted = (not inBattle) and (not inCutscene) and (not inSayMessage)
 	elseif is_overwriting == true or isShutdown then
 		permitted = true
     elseif is_ending_session == true then
-        permitted = autosaveEnabled and (not inBattle) and (not inCutscene) and (not atTitle)
+        permitted = autosaveEnabled and (not inBattle) and (not inCutscene) and (not inSayMessage) and (not atTitle) and (not chunkInvalid)
 	else
-        -- Non-ending-session save (e.g., autosave loop or message ping): gate by AutoSave, not in battle, not cutscene, not title
-        permitted = autosaveEnabled and (not inBattle) and (not inCutscene) and (not atTitle)
+        -- Non-ending-session save (e.g., autosave loop or message ping): gate by AutoSave, not in battle, not cutscene, not in Say message, not title, valid chunk
+        permitted = autosaveEnabled and (not inBattle) and (not inCutscene) and (not inSayMessage) and (not atTitle) and (not chunkInvalid)
 	end
 	if not permitted then
 		-- Skip save entirely
@@ -2196,8 +2204,13 @@ RunService.Heartbeat:Connect(function()
                 local data = profile.Data or {}
                 local autosaveEnabled = (data.Settings and data.Settings.AutoSave) == true
                 local inBattle = data.InBattle == true
-                local atTitle = (data.Chunk == nil) or (data.Chunk == "nil") or (data.Chunk == "Title")
-                if autosaveEnabled and (not inBattle) and (not atTitle) then
+                local currentChunk = data.Chunk
+                
+                -- Invalid chunk states that block saving
+                local chunkInvalid = (currentChunk == nil) or (currentChunk == "nil")
+                local atTitle = (currentChunk == "Title")
+                
+                if autosaveEnabled and (not inBattle) and (not atTitle) and (not chunkInvalid) then
                     task.spawn(SaveProfileAsync, profile) -- Auto save profile in new thread
                 end
             end

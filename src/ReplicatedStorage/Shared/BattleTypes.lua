@@ -18,7 +18,24 @@ export type BattleMode = "Wild" | "Trainer" | "PvP"
 export type SwitchMode = "Forced" | "Voluntary"
 
 -- Battle Step Types
-export type StepType = "Switch" | "Message" | "Move" | "Damage" | "Heal" | "Status" | "StatStage" | "Faint" | "Miss" | "Crit" | "Flinch"
+export type StepType = "Switch" | "Message" | "Move" | "Damage" | "Heal" | "Status" | "StatStage" | "Faint" | "Miss" | "Crit" | "Flinch" | "EntryHazard" | "HazardDamage"
+
+-- Entry Hazard Types
+export type HazardType = "StealthRock" | "Spikes" | "ToxicSpikes"
+
+-- Entry Hazards per side of field
+export type EntryHazards = {
+	StealthRock: boolean?,  -- true = active
+	Spikes: number?,        -- 0-3 layers
+	ToxicSpikes: number?,   -- 0-2 layers
+}
+
+-- Stat Stage Change Info
+export type StatStageChange = {
+	Stat: string,       -- "Attack" | "Defense" | "Speed" | "Accuracy" | "Evasion"
+	Stages: number,     -- Number of stages to change (-6 to +6)
+	Target: string?,    -- "Self" | "Opponent" (defaults to "Opponent")
+}
 
 -- Battle Step
 export type BattleStep = {
@@ -29,6 +46,10 @@ export type BattleStep = {
 	Critical: boolean?,
 	Effectiveness: string?,
 	FlinchTarget: string?,
+	-- Stat stage step fields
+	Stat: string?,
+	Stages: number?,
+	IsPlayer: boolean?,
 	-- Additional fields as needed
 }
 
@@ -65,6 +86,9 @@ export type BattleState = {
 	Chunk: string,
 	TrainerName: string?,
 	TrainerTeam: {Creature}?,
+	-- Entry Hazards
+	PlayerHazards: EntryHazards?, -- Hazards on the player's side (damage player's switch-ins)
+	FoeHazards: EntryHazards?,    -- Hazards on the foe's side (damage foe's switch-ins)
 	-- Add other fields as needed
 }
 

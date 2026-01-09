@@ -29,6 +29,27 @@ Shared.DEFAULT_PLAYER_DATA = {
 	DefeatedTrainers = {}, -- map of TrainerId -> true
 	RedeemedCodes = {}, -- map of Code -> true (tracks which codes player has redeemed)
 	
+	-- Daily/Weekly Challenges progression
+	-- Stores current period progress and tracking
+	DailyChallenges = {
+		-- Seed for the current daily period (to detect refresh)
+		DaySeed = 0,
+		-- Progress for each active daily challenge: { [ChallengeId] = { Progress = number, Completed = boolean, Claimed = boolean } }
+		Progress = {},
+	},
+	WeeklyChallenges = {
+		-- Seed for the current weekly period (to detect refresh)
+		WeekSeed = 0,
+		-- Progress for each active weekly challenge: { [ChallengeId] = { Progress = number, Completed = boolean, Claimed = boolean } }
+		Progress = {},
+	},
+	
+	-- Repel state (for encounter blocking items)
+	RepelState = {
+		ActiveSteps = 0, -- Number of steps remaining for active repel
+		ItemName = nil, -- Name of active repel item (for display/debugging)
+	},
+	
 	-- Pending battle snapshot for crash/leave rollback; cleared on BattleOver
 	PendingBattle = nil,
 	
@@ -47,6 +68,9 @@ Shared.DEFAULT_PLAYER_DATA = {
 		MET_FREINDS_ROUTE_4 = false, --Set after we meet our friends in route 4
 		MET_FREINDS_ASTERDEN = false, --Set after we meet our friends in Asterden
 		MET_FRIENDS_AFTER_GYM = false, --Set after we meet our friends again after beating the gym
+		HEALER_TOM_LOS = false, -- Prevent Healer Tom LOS hint from retriggering across sessions
+		FOUND_DUCKAROO_HAT = false, --Set after finding Duckaroo's hat in Chunk7
+		RETURNED_DUCKAROO_HAT = false, --Set after returning Duckaroo's hat to Range Champion Harlan in Chunk7
 	},
 }
 

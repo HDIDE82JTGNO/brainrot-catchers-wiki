@@ -43,7 +43,9 @@ local UIFunctions = require(script.Parent.Parent.UI.UIFunctions)
 local MusicManager = require(script.Parent.MusicManager)
 local EncounterZone = require(script.Parent.EncounterZone)
 local TrainerIntroController = require(script.Parent.TrainerIntroController)
+local AgentAnimations = require(script.Parent.Parent.Battle.AgentAnimations)
 local ClientData = require(script.Parent.Parent.Plugins.ClientData)
+local WeatherVFX = require(script.Parent.WeatherVFX)
 
 -- Shared data
 local MovesModule = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Moves"))
@@ -83,15 +85,22 @@ function BattleSystemV2.new(): any
     -- Move replace gating
     self._moveReplaceActive = false
     self._deferredEventsDuringMoveReplace = {}
+	self._deferredTurnResult = nil
 	self._optionsManager = nil
 	self._inTurnProcessing = false -- guards mid-turn UI from reappearing (e.g., after Bag close)
+	self._pendingOutcomeMessages = nil
 	self._pendingBattleOver = false -- defer server BattleOver until turn processing completes
+	self._waitingForOpponentSwitch = false -- PvP: flag to prevent showing options while waiting for opponent's switch
+	
+	-- Camera cycle scheduler
+	self._cameraCycleToken = 0 -- Token to cancel pending camera cycle starts
 	
 	-- Battle data
 	self._battleInfo = nil
 	self._preBattlePartySnapshot = nil
     self._ending = false -- guard to prevent double end sequences
 	self._deferredXPEvents = {} -- Store XP events to show after faint animation
+	self._deferredFriendlyStepsAfterFaint = nil -- Store remaining friendly steps (XP, LevelUp) after foe Faint step
 	self._battleEndReason = nil -- Store the reason for battle end (Win, Loss, Capture, etc.)
 	self._lossReason = false -- Flag for when player loses (all creatures faint)
 	self._studsLost = 0 -- Amount of studs lost when player is defeated
@@ -101,10 +110,12 @@ function BattleSystemV2.new(): any
 	local gui = pg:FindFirstChild("GameUI") or pg:WaitForChild("GameUI")
 	local battleGui = gui:FindFirstChild("BattleUI") or gui:WaitForChild("BattleUI")
 	self._battleUI = battleGui
-	self._battleOptions = battleGui:WaitForChild("BattleOptions")
-	self._moveOptions = battleGui:WaitForChild("MoveOptions")
+	self._battleController = battleGui:WaitForChild("Controller")
 	self._battleNotification = battleGui:WaitForChild("BattleNotification")
-	self._exclamationMark = gui:WaitForChild("ExclamationMark")
+	self._exclamationMark = gui:FindFirstChild("QuestionMark") or gui:FindFirstChild("ExclamationMark")
+	if not self._exclamationMark then
+		warn("[BattleSystemV2] QuestionMark UI not found; exclamation animation will be skipped")
+	end
 	
 	-- Camera
 	self._camera = workspace.CurrentCamera
@@ -201,9 +212,21 @@ function BattleSystemV2:StartBattle(battleInfo: any)
 	print("[BattleSystemV2] Starting battle:", battleInfo.Type)
     -- Reset end-state guard for new battle
     self._ending = false
+    -- Reset entry abilities processed flag for new battle
+    self._entryAbilitiesProcessed = false
 	
 	-- Store battle info
 	self._battleInfo = battleInfo
+	
+	-- Debug: Check for entry ability events
+	if battleInfo.EntryAbilityEvents then
+		print("[BattleSystemV2] Received", #battleInfo.EntryAbilityEvents, "entry ability events from server")
+		for i, event in ipairs(battleInfo.EntryAbilityEvents) do
+			print("[BattleSystemV2] Entry event", i, ":", event.Ability, event.Creature, event.Message)
+		end
+	else
+		print("[BattleSystemV2] No EntryAbilityEvents in battleInfo. Keys:", table.concat(self:_getTableKeys(battleInfo), ", "))
+	end
 	
 	-- Initialize modules
 	self._animationController = AnimationController.new()
@@ -214,9 +237,16 @@ function BattleSystemV2:StartBattle(battleInfo: any)
 	function self:_safeWaitForDrain(timeoutSeconds: number?)
 		local q = self._messageQueue
 		if not q then return end
-		pcall(function()
-			if q.ClearPersistent then q:ClearPersistent() end
-		end)
+		-- CRITICAL: Do NOT clear persistent messages during special flows:
+		-- - Move replace flow (_moveReplaceActive)
+		-- - Switch preview flow (when persistent flag is set, message should stay until user clicks)
+		-- Clearing persistent messages here would cause SwitchPreview messages to slide out prematurely
+		local isPersistent = q._keepMessagePersistent == true
+		if not self._moveReplaceActive and not isPersistent then
+			pcall(function()
+				if q.ClearPersistent then q:ClearPersistent() end
+			end)
+		end
 		local done = false
 		task.spawn(function()
 			pcall(function()
@@ -412,12 +442,41 @@ function BattleSystemV2:StartBattle(battleInfo: any)
 	self._cameraController = CameraController.new(self._camera, scene)
 	print("[BattleSystemV2] Camera controller initialized after exclamation")
 	
+	-- Set camera controller reference in action handler so it can stop cycle on actions
+	if self._actionHandler and self._actionHandler.SetCameraController then
+		self._actionHandler:SetCameraController(self._cameraController)
+	end
+	
+	-- Initialize battle weather VFX if weather is active
+	if battleInfo.Weather then
+		-- Ensure WeatherVFX is initialized
+		if not WeatherVFX:Init() then
+			warn("[BattleSystemV2] WeatherVFX initialization failed")
+		else
+			-- Get spawn points for positioning weather VFX
+			local playerSpawn, foeSpawn = self._sceneManager:GetSpawnPoints()
+			if playerSpawn or foeSpawn then
+				WeatherVFX:SetBattleWeather(
+					battleInfo.Weather,
+					battleInfo.WeatherName,
+					scene,
+					playerSpawn,
+					foeSpawn
+				)
+			else
+				warn("[BattleSystemV2] No spawn points available for weather VFX")
+			end
+		end
+	end
+	
 	-- Spawn creatures
 	self:_spawnInitialCreatures()
 	
 	-- Run battle intro sequence based on type
 	if battleInfo.Type == "Wild" then
 		self:_wildEncounterIntro()
+	elseif battleInfo.Type == "PvP" then
+		self:_pvpBattleIntro()
 	elseif battleInfo.Type == "Trainer" then
 		self:_trainerBattleIntro()
 	end
@@ -430,9 +489,26 @@ end
 function BattleSystemV2:ProcessTurnResult(data: any)
 	print("[BattleSystemV2] Processing turn result")
 	print("[BattleSystemV2] TurnResult data keys:", table.concat(self:_getTableKeys(data), ", "))
+	
+	-- If we were waiting for opponent's forced switch, this result is the switch
+	-- Clear the flag so we can start our turn after processing
+	if self._waitingForOpponentSwitch then
+		print("[BattleSystemV2] Received opponent's forced switch result - clearing wait flag")
+		self._waitingForOpponentSwitch = false
+	end
 
 	-- Guard: we're now in a processing window; suppress mid-turn UI resurfacing
+	self._turnCompleted = false -- reset per turn; avoids stale completion skipping end checks
 	self._inTurnProcessing = true
+	
+	-- Cancel any pending camera cycle start and stop active cycles, reset camera to default
+	self._cameraCycleToken = self._cameraCycleToken + 1 -- Cancel pending cycle starts
+	if self._cameraController then
+		self._cameraController:StopCycle()
+		self._cameraController:ReturnToDefault()
+		print("[BattleSystemV2] Stopped camera cycle and reset to default for turn processing")
+	end
+	
 	-- Disable option interactions and hide any visible menus during turn processing
 	if self._optionsManager then
 		self._optionsManager:SetInteractionEnabled(false)
@@ -480,9 +556,56 @@ function BattleSystemV2:ProcessTurnResult(data: any)
 		BattleMessageGenerator.UpdateCreatureNames(data.PlayerCreature.Name, data.FoeCreature.Name)
 	end
 	
-    -- Update switch mode
+	-- Update switch mode
 	if data.SwitchMode then
 		self._battleState:SetSwitchMode(data.SwitchMode)
+	end
+	-- If the server already marked the battle as ending, record it immediately to block option resurfacing
+	if data.BattleEnd then
+		self._pendingBattleOver = true
+	end
+
+	-- If battle is ending, force all outcome messages to run AFTER both friendly and enemy actions.
+	-- We do this by stripping Message steps out of both lists and appending them to the enemy list,
+	-- which is processed second on the client. This prevents "no more creatures" / win/lose lines
+	-- from appearing before the last move/damage/faint animations finish.
+	if data.BattleEnd then
+		local function extractMessages(list)
+			if type(list) ~= "table" then
+				return nil, {}
+			end
+			local remaining = {}
+			local messages = {}
+			for _, s in ipairs(list) do
+				if type(s) == "table" and s.Type == "Message" then
+					table.insert(messages, s)
+				else
+					table.insert(remaining, s)
+				end
+			end
+			return remaining, messages
+		end
+
+		local friendlyWithoutMsgs, friendlyMsgs = extractMessages(data.Friendly)
+		local enemyWithoutMsgs, enemyMsgs = extractMessages(data.Enemy)
+
+		-- Rebuild lists: friendly keeps non-message actions; enemy gets its actions plus all messages last
+		data.Friendly = friendlyWithoutMsgs
+		data.Enemy = enemyWithoutMsgs or {}
+
+		-- Combine and append outcome messages so they play after enemy actions
+		local combinedMsgs = {}
+		for _, msg in ipairs(friendlyMsgs) do table.insert(combinedMsgs, msg) end
+		for _, msg in ipairs(enemyMsgs) do table.insert(combinedMsgs, msg) end
+		if #combinedMsgs > 0 then
+			-- Ensure enemy list exists so messages always process after friendly steps
+			if type(data.Enemy) ~= "table" then
+				data.Enemy = {}
+			end
+			for _, msg in ipairs(combinedMsgs) do
+				table.insert(data.Enemy, msg)
+			end
+		end
 	end
 	
 	-- Lock actions during turn processing
@@ -586,100 +709,367 @@ function BattleSystemV2:ProcessTurnResult(data: any)
 	end
 	ensureFaintIfMissing()
 	
-	-- Determine if foe fainted in friendly steps (used to gate enemy steps until faint animation finishes)
-	local foeFaintedInFriendly = false
-	if data.Friendly and type(data.Friendly) == "table" then
-		for _, step in ipairs(data.Friendly) do
-			if step.Type == "Faint" then
-				local foeCreatureName = (self._battleState.FoeCreature and (self._battleState.FoeCreature.Nickname or self._battleState.FoeCreature.Name)) or ""
-				if step.IsPlayer == false or step.Creature == foeCreatureName then
-					foeFaintedInFriendly = true
-					print("[BattleSystemV2] Foe fainted in friendly steps - will defer enemy steps")
-					break
-				end
-			end
-		end
-	end
-
-	-- If foe fainted in friendly steps, defer enemy steps until faint animation completes
-	if foeFaintedInFriendly then
-		self._deferredEnemySteps = data.Enemy
-		self._waitingForFoeFaintAnim = true
-	else
-		self._deferredEnemySteps = nil
-		self._waitingForFoeFaintAnim = false
-	end
-
     -- Reset per-turn enemy processing guard
     self._enemyProcessingActive = false
 
-    -- Process friendly actions (player) sequentially and wait for each to complete
-	if data.Friendly and type(data.Friendly) == "table" then
-		print("[BattleSystemV2] Processing", #data.Friendly, "friendly steps")
-		-- Debug: Log all friendly steps
-		for i, step in ipairs(data.Friendly) do
-			print("[BattleSystemV2] Friendly step", i, ":", step.Type or "nil", "Action:", step.Action or "nil", "Creature:", step.Creature or "nil")
+	-- CRITICAL FIX: Check if steps have ExecOrder (PvP with execution order)
+	-- If so, merge and sort to process in correct execution order
+	local function hasExecOrder(list)
+		if type(list) ~= "table" then return false end
+		for _, s in ipairs(list) do
+			if type(s) == "table" and s.ExecOrder then return true end
 		end
-
-		-- Special ordering for preview voluntary switch: ensure opponent send-out happens before player's recall
-		local function hasPlayerRecall(list)
-			for _, s in ipairs(list) do
-				if type(s) == "table" and s.Type == "Switch" and s.Action == "Recall" then return true end
-			end
-			return false
-		end
-		local function extractEnemySendOut(list)
-			if type(list) ~= "table" then return nil end
-			for idx, s in ipairs(list) do
-				if type(s) == "table" and s.Type == "Switch" and s.Action == "SendOut" and s.IsPlayer == false then
-					return table.remove(list, idx)
+		return false
+	end
+	
+	local hasPvPExecOrder = hasExecOrder(data.Friendly) or hasExecOrder(data.Enemy)
+	
+	-- For PvP, skip the deferred faint logic - we process everything in unified execution order
+	if not hasPvPExecOrder then
+		-- Determine if foe fainted in friendly steps (used to gate enemy steps until faint animation finishes)
+		local foeFaintedInFriendly = false
+		local faintStepIndex = nil
+		-- Also detect if capture succeeded (enemy shouldn't attack after being captured)
+		local captureSucceeded = false
+		if data.Friendly and type(data.Friendly) == "table" then
+			for idx, step in ipairs(data.Friendly) do
+				if step.Type == "Faint" then
+					local foeCreatureName = (self._battleState.FoeCreature and (self._battleState.FoeCreature.Nickname or self._battleState.FoeCreature.Name)) or ""
+					if step.IsPlayer == false or step.Creature == foeCreatureName then
+						foeFaintedInFriendly = true
+						faintStepIndex = idx
+						print("[BattleSystemV2] Foe fainted in friendly steps at index", idx, "- will defer enemy steps")
+						break
+					end
+				elseif step.Type == "CaptureSuccess" then
+					captureSucceeded = true
+					print("[BattleSystemV2] Capture succeeded in friendly steps - will skip enemy action steps")
 				end
 			end
-			return nil
+		end
+		
+		-- If capture succeeded, filter out enemy action steps (Move, Heal, Item) since the creature was caught
+		if captureSucceeded and data.Enemy and type(data.Enemy) == "table" then
+			local filteredEnemy = {}
+			for _, step in ipairs(data.Enemy) do
+				if step.Type ~= "Move" and step.Type ~= "Heal" and step.Type ~= "Item" then
+					table.insert(filteredEnemy, step)
+					print("[BattleSystemV2] Keeping enemy step after capture:", step.Type)
+				else
+					print("[BattleSystemV2] Skipping enemy action step after capture:", step.Type)
+				end
+			end
+			data.Enemy = filteredEnemy
 		end
 
-		local processFriendly = function()
-			self:_processStepsSequentially(data.Friendly, true, function()
-			print("[BattleSystemV2] All friendly steps completed")
-			-- After friendly steps complete, either defer or process enemy steps immediately
-			if self._waitingForFoeFaintAnim then
-				print("[BattleSystemV2] Deferring enemy steps until foe faint animation completes")
+		-- If foe fainted in friendly steps, defer enemy steps until faint animation completes
+		-- Also extract and defer any friendly steps that come AFTER the Faint step (like XP, LevelUp)
+		if foeFaintedInFriendly then
+			self._deferredEnemySteps = data.Enemy
+			
+			-- Extract remaining friendly steps after the Faint step (XP, LevelUp, etc.)
+			-- These need to be processed AFTER faint animation but BEFORE enemy steps (SwitchPreview)
+			local remainingFriendlySteps = {}
+			if faintStepIndex and data.Friendly then
+				for i = faintStepIndex + 1, #data.Friendly do
+					table.insert(remainingFriendlySteps, data.Friendly[i])
+				end
+				if #remainingFriendlySteps > 0 then
+					print("[BattleSystemV2] Extracted", #remainingFriendlySteps, "remaining friendly steps after Faint (XP, LevelUp, etc.)")
+				end
+				-- CRITICAL FIX: Truncate data.Friendly to only include steps up to and including Faint
+				-- This prevents XP/LevelUp steps from being processed twice (once now, once after faint animation)
+				local truncatedFriendly = {}
+				for i = 1, faintStepIndex do
+					table.insert(truncatedFriendly, data.Friendly[i])
+				end
+				data.Friendly = truncatedFriendly
+				print("[BattleSystemV2] Truncated friendly steps to", #truncatedFriendly, "steps (up to Faint)")
+			end
+			self._deferredFriendlyStepsAfterFaint = remainingFriendlySteps
+			
+			-- Preserve turn metadata so BattleEnd/state checks still run after the deferred animation
+			self._deferredTurnResult = {
+				BattleEnd = data.BattleEnd,
+				Friendly = data.Friendly,
+				HP = data.HP,
+				SwitchMode = data.SwitchMode,
+			}
+			self._waitingForFoeFaintAnim = true
+		else
+			self._deferredEnemySteps = nil
+			self._deferredFriendlyStepsAfterFaint = nil
+			self._deferredTurnResult = nil
+			self._waitingForFoeFaintAnim = false
+		end
+	else
+		-- PvP mode: clear deferred flags since we handle everything in execution order
+		self._deferredEnemySteps = nil
+		self._deferredFriendlyStepsAfterFaint = nil
+		self._deferredTurnResult = nil
+		self._waitingForFoeFaintAnim = false
+	end
+	
+	if hasPvPExecOrder then
+		-- PvP with execution order: merge and sort all steps, process in unified order
+		print("[BattleSystemV2] PvP mode detected - using execution order for step processing")
+		
+		local allSteps = {}
+		if data.Friendly and type(data.Friendly) == "table" then
+			for _, step in ipairs(data.Friendly) do
+				table.insert(allSteps, step)
+			end
+		end
+		if data.Enemy and type(data.Enemy) == "table" then
+			for _, step in ipairs(data.Enemy) do
+				table.insert(allSteps, step)
+			end
+		end
+		
+		-- Sort by ExecOrder to maintain correct execution sequence
+		table.sort(allSteps, function(a, b)
+			local orderA = (type(a) == "table" and a.ExecOrder) or 9999
+			local orderB = (type(b) == "table" and b.ExecOrder) or 9999
+			return orderA < orderB
+		end)
+		
+		print("[BattleSystemV2] Processing", #allSteps, "merged steps in execution order")
+		for i, step in ipairs(allSteps) do
+			print("[BattleSystemV2] Step", i, "ExecOrder:", step.ExecOrder or "nil", "Type:", step.Type or "nil", "IsPlayer:", step.IsPlayer)
+		end
+		
+		-- UNIVERSAL FIX: Ensure XP steps always come after Faint steps (for all battle types)
+		-- This ensures proper message order: FAINT -> X Fainted! -> XP Messages
+		local hasAnyFaint = false
+		local hasAnyXP = false
+		for _, step in ipairs(allSteps) do
+			if step.Type == "Faint" then
+				hasAnyFaint = true
+			elseif step.Type == "XP" or step.Type == "XPSpread" or step.Type == "LevelUp" or step.Type == "MoveLearned" or step.Type == "MoveReplacePrompt" then
+				hasAnyXP = true
+			end
+		end
+		
+		-- Reorder if we have both Faint and XP steps to ensure correct sequence
+		if hasAnyFaint and hasAnyXP then
+			print("[BattleSystemV2] Faint/XP reordering - ensuring XP comes after Faint message")
+			
+			-- Extract steps into categories for reordering
+			-- Collect ALL XP-related steps from anywhere in the list
+			local beforeFaint = {}
+			local faintSteps = {} -- Can have both player and foe faints
+			local xpLevelUpSteps = {} -- XP, XPSpread, LevelUp, MoveLearned, MoveReplacePrompt (collected from anywhere)
+			local afterFaint = {} -- Non-XP steps after faint
+			
+			local foundFaint = false
+			for _, step in ipairs(allSteps) do
+				if step.Type == "Faint" then
+					table.insert(faintSteps, step)
+					foundFaint = true
+				elseif step.Type == "XP" or step.Type == "XPSpread" or step.Type == "LevelUp" or step.Type == "MoveLearned" or step.Type == "MoveReplacePrompt" then
+					-- Collect XP steps from anywhere in the list
+					table.insert(xpLevelUpSteps, step)
+				elseif foundFaint then
+					-- After faint - non-XP steps
+					table.insert(afterFaint, step)
+				else
+					-- Before faint
+					table.insert(beforeFaint, step)
+				end
+			end
+			
+			-- Also collect any XP steps that might be BEFORE the faint (wrong order from server)
+			local remainingBeforeFaint = {}
+			for _, step in ipairs(beforeFaint) do
+				if step.Type == "XP" or step.Type == "XPSpread" or step.Type == "LevelUp" or step.Type == "MoveLearned" or step.Type == "MoveReplacePrompt" then
+					table.insert(xpLevelUpSteps, step)
+				else
+					table.insert(remainingBeforeFaint, step)
+				end
+			end
+			beforeFaint = remainingBeforeFaint
+			
+			-- Rebuild allSteps in correct order: beforeFaint -> Faint -> XP/LevelUp -> afterFaint
+			allSteps = {}
+			for _, step in ipairs(beforeFaint) do
+				table.insert(allSteps, step)
+			end
+			for _, step in ipairs(faintSteps) do
+				table.insert(allSteps, step)
+			end
+			for _, step in ipairs(xpLevelUpSteps) do
+				table.insert(allSteps, step)
+			end
+			for _, step in ipairs(afterFaint) do
+				table.insert(allSteps, step)
+			end
+			
+			print("[BattleSystemV2] Reordered steps (Faint -> XP):")
+			for i, step in ipairs(allSteps) do
+				print("[BattleSystemV2] Reordered Step", i, "Type:", step.Type or "nil", "IsPlayer:", step.IsPlayer)
+			end
+		end
+		
+		-- CRITICAL FIX: Calculate starting HP by working backwards from final HP using all HP deltas
+		-- This ensures hit markers use correct HP when processing steps in execution order
+		local startingPlayerHP = nil
+		local startingFoeHP = nil
+		if data.HP and type(data.HP) == "table" then
+			local finalPlayerHP = tonumber(data.HP.Player)
+			local finalFoeHP = tonumber(data.HP.Enemy)
+			
+			if finalPlayerHP ~= nil or finalFoeHP ~= nil then
+				-- Calculate starting HP by subtracting all HP deltas from final HP
+				local playerDeltaSum = 0
+				local foeDeltaSum = 0
+				
+				for _, step in ipairs(allSteps) do
+					if type(step) == "table" and type(step.HPDelta) == "table" then
+						if type(step.HPDelta.Player) == "number" then
+							playerDeltaSum = playerDeltaSum + step.HPDelta.Player -- Already negative for damage
+						end
+						if type(step.HPDelta.Enemy) == "number" then
+							foeDeltaSum = foeDeltaSum + step.HPDelta.Enemy -- Already negative for damage
+						end
+					end
+					-- Also check Recoil steps which have RecoilDamage
+					-- RecoilDamage is positive (amount of damage), so we subtract it to get negative delta
+					if step.Type == "Recoil" and type(step.RecoilDamage) == "number" then
+						if step.IsPlayer == true then
+							-- Player's creature took recoil
+							playerDeltaSum = playerDeltaSum - step.RecoilDamage -- RecoilDamage is positive, so subtract to get negative delta
+						elseif step.IsPlayer == false then
+							-- Foe's creature took recoil
+							foeDeltaSum = foeDeltaSum - step.RecoilDamage -- RecoilDamage is positive, so subtract to get negative delta
+						end
+					end
+				end
+				
+				if finalPlayerHP ~= nil then
+					startingPlayerHP = finalPlayerHP - playerDeltaSum
+					print("[BattleSystemV2] Calculated starting Player HP:", startingPlayerHP, "(final:", finalPlayerHP, "delta sum:", playerDeltaSum, ")")
+				end
+				if finalFoeHP ~= nil then
+					startingFoeHP = finalFoeHP - foeDeltaSum
+					print("[BattleSystemV2] Calculated starting Foe HP:", startingFoeHP, "(final:", finalFoeHP, "delta sum:", foeDeltaSum, ")")
+				end
+				
+				-- Pass starting HP to StepProcessor
+				if self._stepProcessor then
+					self._stepProcessor:SetStartingHP(startingPlayerHP, startingFoeHP)
+				end
+			end
+		end
+		
+		-- Process all steps sequentially in execution order
+		self:_processStepsSequentiallyWithIsPlayer(allSteps, function()
+			print("[BattleSystemV2] All PvP steps completed in execution order")
+			-- After all steps complete, check turn end conditions
+			-- CRITICAL: If turn was already completed (e.g., from an earlier step), we still need to ensure
+			-- StartNextTurn() is called to continue the battle flow, especially for deferred SendOut steps
+			if not self._turnCompleted then
+				self:_checkTurnEndConditions(data)
 			else
-				-- Add slight pacing delay before enemy actions to improve readability
-				local hasEnemy = (data.Enemy and type(data.Enemy) == "table" and #data.Enemy > 0)
-				if hasEnemy then
-					print("[BattleSystemV2] Adding 0.5s delay before enemy steps")
-					task.delay(0.5, function()
+				print("[BattleSystemV2] Turn already completed earlier - ensuring StartNextTurn() is called for deferred steps")
+				-- Even if turn is already completed, we need to start the next turn to process deferred steps
+				-- (like SendOut when SendOutInline=false)
+				-- Wait for messages to drain, then start next turn
+				task.spawn(function()
+					self:_safeWaitForDrain(3)
+					self._inTurnProcessing = false
+					if self._actionHandler then self._actionHandler:Unlock() end
+					if self._optionsManager then 
+						self._optionsManager:SetInteractionEnabled(true)
+					end
+					print("[BattleSystemV2] Calling StartNextTurn() for deferred steps after SwitchPreview")
+					self:StartNextTurn()
+				end)
+			end
+		end)
+	else
+		-- Non-PvP or legacy: use existing Friendly-then-Enemy processing
+		-- Process friendly actions (player) sequentially and wait for each to complete
+		if data.Friendly and type(data.Friendly) == "table" then
+			print("[BattleSystemV2] Processing", #data.Friendly, "friendly steps")
+			-- Debug: Log all friendly steps
+			for i, step in ipairs(data.Friendly) do
+				print("[BattleSystemV2] Friendly step", i, ":", step.Type or "nil", "Action:", step.Action or "nil", "Creature:", step.Creature or "nil")
+			end
+
+			-- Special ordering for preview voluntary switch: ensure opponent send-out happens before player's recall
+			local function hasPlayerRecall(list)
+				for _, s in ipairs(list) do
+					if type(s) == "table" and s.Type == "Switch" and s.Action == "Recall" then return true end
+				end
+				return false
+			end
+			local function extractEnemySendOut(list)
+				if type(list) ~= "table" then return nil end
+				for idx, s in ipairs(list) do
+					if type(s) == "table" and s.Type == "Switch" and s.Action == "SendOut" and s.IsPlayer == false then
+						return table.remove(list, idx)
+					end
+				end
+				return nil
+			end
+
+			local processFriendly = function()
+				self:_processStepsSequentially(data.Friendly, true, function()
+				print("[BattleSystemV2] All friendly steps completed")
+				-- After friendly steps complete, either defer or process enemy steps immediately
+				if self._waitingForFoeFaintAnim then
+					print("[BattleSystemV2] Deferring enemy steps until foe faint animation completes")
+				else
+					-- Add slight pacing delay before enemy actions to improve readability
+					local hasEnemy = (data.Enemy and type(data.Enemy) == "table" and #data.Enemy > 0)
+					if hasEnemy then
+						print("[BattleSystemV2] Adding 0.5s delay before enemy steps")
+						task.delay(0.5, function()
+							self:_processEnemySteps(data)
+						end)
+					else
 						self:_processEnemySteps(data)
+					end
+				end
+				end)
+			end
+
+			if hasPlayerRecall(data.Friendly) then
+				local enemySendOutFirst = extractEnemySendOut(data.Enemy)
+				if enemySendOutFirst then
+					print("[BattleSystemV2] Preview switch ordering fix: processing enemy SendOut before player Recall")
+					self._stepProcessor:ProcessStep(enemySendOutFirst, false, function()
+						processFriendly()
 					end)
 				else
-					self:_processEnemySteps(data)
-				end
-			end
-			end)
-		end
-
-		if hasPlayerRecall(data.Friendly) then
-			local enemySendOutFirst = extractEnemySendOut(data.Enemy)
-			if enemySendOutFirst then
-				print("[BattleSystemV2] Preview switch ordering fix: processing enemy SendOut before player Recall")
-				self._stepProcessor:ProcessStep(enemySendOutFirst, false, function()
 					processFriendly()
-				end)
+				end
 			else
 				processFriendly()
 			end
 		else
-			processFriendly()
+			-- No friendly steps, process enemy steps immediately
+			print("[BattleSystemV2] No friendly steps to process")
+			self:_processEnemySteps(data)
 		end
-	else
-		-- No friendly steps, process enemy steps immediately
-		print("[BattleSystemV2] No friendly steps to process")
-		self:_processEnemySteps(data)
 	end
 	
 	-- Wait for all messages to finish
 	self._messageQueue:WaitForDrain()
+
+	-- CRITICAL: If server flagged battle end, ensure it's handled even if _checkTurnEndConditions wasn't called
+	-- This is a fallback to prevent battle options from showing when battle should end
+	if data.BattleEnd == true and not self._ending and not self._pendingBattleOver then
+		print("[BattleSystemV2] BattleEnd flag detected in ProcessTurnResult - ensuring battle ends")
+		self:_safeWaitForDrain(3)
+		self._inTurnProcessing = false
+		if self._optionsManager then 
+			self._optionsManager:SetInteractionEnabled(false)
+			self._optionsManager:HideAll()
+		end
+		self:EndBattle()
+		return
+	end
 
 	-- Safety: in rare edge cases where no branch re-shows options (due to
 	-- server step composition or cancelled tweens), ensure the options are
@@ -687,8 +1077,11 @@ function BattleSystemV2:ProcessTurnResult(data: any)
 	if (not self._ending)
 		and (not self._inTurnProcessing)
 		and (not self._pendingBattleOver)
+		and (not self._waitingForOpponentSwitch) -- PvP: don't show options while waiting for opponent's switch
 		and (self._battleState ~= nil)
 		and (self._battleState.SwitchMode ~= "Forced")
+		and (data.BattleEnd ~= true) -- do not surface options when server says battle ended
+		and (not self._partyIntegration or not self._partyIntegration:IsOpen()) -- don't show options when party UI is open
 		and self._optionsManager and self._optionsManager.GetState then
 		local st = self._optionsManager:GetState()
 		if st ~= "BattleOptions" then
@@ -703,53 +1096,85 @@ end
 -- Called by StepProcessor after faint animation completes
 function BattleSystemV2:OnFaintAnimationComplete(isPlayer: boolean)
     if (not isPlayer) and self._waitingForFoeFaintAnim then
-        print("[NewTestLog] ResumeAfterFaint: foe faint animation complete, checking enemy steps")
-        local deferred = self._deferredEnemySteps
+        print("[NewTestLog] ResumeAfterFaint: foe faint animation complete, checking steps")
+        local deferredEnemy = self._deferredEnemySteps
+        local deferredFriendly = self._deferredFriendlyStepsAfterFaint
+        local deferredMeta = self._deferredTurnResult
         self._deferredEnemySteps = nil
+        self._deferredFriendlyStepsAfterFaint = nil
+        self._deferredTurnResult = nil
         self._waitingForFoeFaintAnim = false
         
         -- Process any deferred XP events now that faint animation is complete
         if self._deferredXPEvents and #self._deferredXPEvents > 0 then
-            print("[NewTestLog] ResumeAfterFaint: processing", #self._deferredXPEvents, "deferred XP events")
+            print("[NewTestLog] ResumeAfterFaint: processing", #self._deferredXPEvents, "deferred XP events from BattleEvent")
             for _, xpEvent in ipairs(self._deferredXPEvents) do
                 self:HandleBattleEvent(xpEvent)
             end
             self._deferredXPEvents = {}
         end
         
-        if deferred and #deferred > 0 then
-            -- Check if enemy steps are still valid (foe might have been KO'd and is being replaced)
-            -- Filter out invalid steps (e.g., heal/attack for a fainted creature being replaced)
-            local validSteps = {}
-            for _, step in ipairs(deferred) do
-                -- Allow Switch steps (creature send-outs) even after faint
-                -- Skip other action steps if they're for an action that can't happen now
-                if step.Type == "Switch" then
-                    table.insert(validSteps, step)
-                    print("[NewTestLog] ResumeAfterFaint: keeping Switch step")
-                elseif step.Type ~= "Move" and step.Type ~= "Heal" and step.Type ~= "Item" then
-                    -- Keep non-action steps (messages, etc.)
-                    table.insert(validSteps, step)
-                    print("[NewTestLog] ResumeAfterFaint: keeping non-action step:", step.Type)
-                else
-                    print("[NewTestLog] ResumeAfterFaint: skipping invalid step after faint:", step.Type)
+        -- Helper function to process enemy steps after friendly steps complete
+        local function processEnemyStepsAfterFriendly()
+            if deferredEnemy and #deferredEnemy > 0 then
+                -- Check if enemy steps are still valid (foe might have been KO'd and is being replaced)
+                -- Filter out invalid steps (e.g., heal/attack for a fainted creature being replaced)
+                local validSteps = {}
+                for _, step in ipairs(deferredEnemy) do
+                    -- Allow Switch steps (creature send-outs) even after faint
+                    -- Skip other action steps if they're for an action that can't happen now
+                    if step.Type == "Switch" then
+                        table.insert(validSteps, step)
+                        print("[NewTestLog] ResumeAfterFaint: keeping Switch step")
+                    elseif step.Type ~= "Move" and step.Type ~= "Heal" and step.Type ~= "Item" then
+                        -- Keep non-action steps (messages, SwitchPreview, etc.)
+                        table.insert(validSteps, step)
+                        print("[NewTestLog] ResumeAfterFaint: keeping non-action step:", step.Type)
+                    else
+                        print("[NewTestLog] ResumeAfterFaint: skipping invalid step after faint:", step.Type)
+                    end
                 end
-            end
-            
-            if #validSteps > 0 then
-                -- Build a synthetic data table to process only valid enemy steps now
-                local d = { Enemy = validSteps }
-                self:_processEnemySteps(d)
+                
+                if #validSteps > 0 then
+                    -- Build a synthetic data table to process only valid enemy steps now
+                    local d = { Enemy = validSteps }
+                    if deferredMeta then
+                        d.BattleEnd = deferredMeta.BattleEnd
+                        d.Friendly = deferredMeta.Friendly
+                        d.HP = deferredMeta.HP
+                        d.SwitchMode = deferredMeta.SwitchMode
+                    end
+                    self:_processEnemySteps(d)
+                else
+                    print("[NewTestLog] ResumeAfterFaint: no valid enemy steps to process")
+                    -- No valid steps - check if battle should end
+                    if self._pendingBattleOver then
+                        if self._moveReplaceActive then
+                            print("[NewTestLog] ResumeAfterFaint: MoveReplace active → deferring BattleOver")
+                            return
+                        end
+                        print("[NewTestLog] ResumeAfterFaint: pending battle over detected, ending battle")
+                        if self._messageQueue and self._messageQueue.WaitForDrain then
+                            self._messageQueue:WaitForDrain()
+                        end
+                        self._inTurnProcessing = false
+                        if self._optionsManager then self._optionsManager:SetInteractionEnabled(true) end
+                        self._pendingBattleOver = false
+                        self:EndBattle()
+                    else
+                        print("[NewTestLog] ResumeAfterFaint: ending turn normally")
+                        self:_checkTurnEndConditions(deferredMeta or {})
+                    end
+                end
             else
-                print("[NewTestLog] ResumeAfterFaint: no valid enemy steps to process")
-                -- No valid steps - check if battle should end
+                print("[NewTestLog] ResumeAfterFaint: no deferred enemy steps")
+                -- No enemy steps at all - check if battle should end
                 if self._pendingBattleOver then
                     if self._moveReplaceActive then
-                        print("[NewTestLog] ResumeAfterFaint: MoveReplace active → deferring BattleOver")
+                        print("[NewTestLog] ResumeAfterFaint: MoveReplace active → deferring BattleOver (no enemy steps)")
                         return
                     end
-                    print("[NewTestLog] ResumeAfterFaint: pending battle over detected, ending battle")
-                    -- Clear processing flag and ensure all messages complete before ending
+                    print("[NewTestLog] ResumeAfterFaint: pending battle over detected (no enemy steps), ending battle")
                     if self._messageQueue and self._messageQueue.WaitForDrain then
                         self._messageQueue:WaitForDrain()
                     end
@@ -758,31 +1183,23 @@ function BattleSystemV2:OnFaintAnimationComplete(isPlayer: boolean)
                     self._pendingBattleOver = false
                     self:EndBattle()
                 else
-                    print("[NewTestLog] ResumeAfterFaint: ending turn normally")
-                    self:_checkTurnEndConditions({})
+                    print("[NewTestLog] ResumeAfterFaint: ending turn normally (no enemy steps)")
+                    self:_checkTurnEndConditions(deferredMeta or {})
                 end
             end
+        end
+        
+        -- CRITICAL FIX: Process remaining friendly steps (XP, LevelUp) BEFORE enemy steps (SwitchPreview)
+        -- This ensures the correct order: Faint → XP gained → Level up → "Want to switch?" prompt
+        if deferredFriendly and #deferredFriendly > 0 then
+            print("[NewTestLog] ResumeAfterFaint: processing", #deferredFriendly, "deferred friendly steps (XP, LevelUp) BEFORE enemy steps")
+            self:_processStepsSequentially(deferredFriendly, true, function()
+                print("[NewTestLog] ResumeAfterFaint: deferred friendly steps complete, now processing enemy steps")
+                processEnemyStepsAfterFriendly()
+            end)
         else
-            print("[NewTestLog] ResumeAfterFaint: no deferred enemy steps")
-            -- No enemy steps at all - check if battle should end
-            if self._pendingBattleOver then
-                if self._moveReplaceActive then
-                    print("[NewTestLog] ResumeAfterFaint: MoveReplace active → deferring BattleOver (no enemy steps)")
-                    return
-                end
-                print("[NewTestLog] ResumeAfterFaint: pending battle over detected (no enemy steps), ending battle")
-                -- Clear processing flag and ensure all messages complete before ending
-                if self._messageQueue and self._messageQueue.WaitForDrain then
-                    self._messageQueue:WaitForDrain()
-                end
-                self._inTurnProcessing = false
-                if self._optionsManager then self._optionsManager:SetInteractionEnabled(true) end
-                self._pendingBattleOver = false
-                self:EndBattle()
-            else
-                print("[NewTestLog] ResumeAfterFaint: ending turn normally (no enemy steps)")
-                self:_checkTurnEndConditions({})
-            end
+            -- No deferred friendly steps, proceed directly to enemy steps
+            processEnemyStepsAfterFriendly()
         end
     end
 end
@@ -808,6 +1225,14 @@ function BattleSystemV2:_processStepsSequentially(steps: {any}, isPlayer: boolea
 		local step = steps[currentIndex]
 		print("[BattleSystemV2] Processing step", currentIndex, "of", #steps, "- Type:", step.Type or "nil", "IsPlayer:", isPlayer)
 		
+		if (self._ending == true) or (self._stepProcessor == nil) then
+			warn("[BattleSystemV2] Step processor unavailable during turn processing - skipping remaining steps")
+			if onComplete then
+				onComplete()
+			end
+			return
+		end
+
 		if type(step) == "table" and step.Type then
 			self._stepProcessor:ProcessStep(step, isPlayer, function()
 				print("[BattleSystemV2] Step", currentIndex, "completed")
@@ -834,6 +1259,105 @@ function BattleSystemV2:_processStepsSequentially(steps: {any}, isPlayer: boolea
 end
 
 --[[
+	Process steps sequentially, using each step's IsPlayer flag for perspective.
+	Used for PvP battles where Friendly+Enemy steps are merged and sorted by ExecOrder.
+	@param steps Array of step objects (each with IsPlayer field)
+	@param onComplete Callback when all steps complete
+]]
+function BattleSystemV2:_processStepsSequentiallyWithIsPlayer(steps: {any}, onComplete: (() -> ())?)
+	local currentIndex = 1
+	
+	local function processNextStep()
+		if currentIndex > #steps then
+			-- All steps completed
+			if onComplete then
+				onComplete()
+			end
+			return
+		end
+		
+		local step = steps[currentIndex]
+		-- Use the step's own IsPlayer flag for perspective
+		local isPlayer = (type(step) == "table" and step.IsPlayer == true)
+		print("[BattleSystemV2] Processing PvP step", currentIndex, "of", #steps, "- Type:", step.Type or "nil", "IsPlayer:", isPlayer, "ExecOrder:", step.ExecOrder or "nil")
+		
+		if (self._ending == true) or (self._stepProcessor == nil) then
+			warn("[BattleSystemV2] Step processor unavailable during PvP turn processing - skipping remaining steps")
+			if onComplete then
+				onComplete()
+			end
+			return
+		end
+
+		if type(step) == "table" and step.Type then
+			self._stepProcessor:ProcessStep(step, isPlayer, function()
+				print("[BattleSystemV2] PvP step", currentIndex, "completed")
+				currentIndex = currentIndex + 1
+				processNextStep()
+			end)
+		else
+			warn("[BattleSystemV2] Skipping invalid PvP step:", step)
+			currentIndex = currentIndex + 1
+			processNextStep()
+		end
+	end
+	
+	processNextStep()
+end
+
+--[[
+	Handles a battle-ending TurnResult without processing move/faint steps.
+	Enqueues outcome messages and ends the battle once the queue drains.
+]]
+function BattleSystemV2:_handleBattleEndTurnResult(data: any)
+	-- Collect outcome messages from the player's perspective (Friendly list)
+	local outcomeMessages = {}
+	local function collectMessages(list)
+		if type(list) ~= "table" then
+			return
+		end
+		for _, step in ipairs(list) do
+			if type(step) == "table" and step.Type == "Message" and type(step.Message) == "string" then
+				table.insert(outcomeMessages, step.Message)
+			end
+		end
+	end
+
+	collectMessages(data.Friendly)
+	-- Fallback to Enemy list if none found
+	if #outcomeMessages == 0 then
+		collectMessages(data.Enemy)
+	end
+	if #outcomeMessages == 0 then
+		table.insert(outcomeMessages, "The battle is over.")
+	end
+
+	-- Hide options and lock input during end flow
+	if self._optionsManager then
+		self._optionsManager:HideAll()
+		self._optionsManager:SetInteractionEnabled(false)
+	end
+	if self._actionHandler then
+		self._actionHandler:Lock()
+	end
+
+	-- Enqueue outcome messages, then end the battle when drained
+	if self._messageQueue then
+		self._messageQueue:EnqueueBatch(outcomeMessages)
+		self._messageQueue:OnDrained(function()
+			if self._ending then
+				return
+			end
+			self._inTurnProcessing = false
+			self:EndBattle()
+		end)
+	else
+		self._inTurnProcessing = false
+		self:EndBattle()
+	end
+end
+
+--[[
 	Processes enemy steps sequentially
 	@param data Turn result data
 ]]
@@ -846,12 +1370,63 @@ function BattleSystemV2:_processEnemySteps(data: any)
     self._enemyProcessingActive = true
 
     if data.Enemy and type(data.Enemy) == "table" then
-        print("[BattleSystemV2] Processing", #data.Enemy, "enemy steps")
-        self:_processStepsSequentially(data.Enemy, false, function()
+        -- Safety check: filter out enemy Move/Heal/Item steps if foe has already fainted (HP = 0)
+        -- This handles edge cases where the Faint step is in the Enemy list itself
+        local foeHP = nil
+        if self._battleState and self._battleState.FoeCreature then
+            local foeStats = self._battleState.FoeCreature.Stats
+            foeHP = foeStats and foeStats.HP
+        end
+        local foeFainted = (type(foeHP) == "number" and foeHP <= 0)
+        
+        -- Also check if any step in the enemy list is a Faint for the foe (happens before Move)
+        local faintStepIndex = nil
+        for idx, step in ipairs(data.Enemy) do
+            if step.Type == "Faint" and step.IsPlayer == false then
+                faintStepIndex = idx
+                print("[BattleSystemV2] Found foe Faint step in enemy steps at index", idx)
+                break
+            end
+        end
+        
+        -- Filter enemy steps: skip Move/Heal/Item that come AFTER a Faint step
+        local stepsToProcess = data.Enemy
+        if faintStepIndex or foeFainted then
+            local filteredSteps = {}
+            for idx, step in ipairs(data.Enemy) do
+                -- Keep Faint step and everything before it
+                -- Skip Move/Heal/Item steps that come after Faint or if foe already fainted
+                if step.Type == "Faint" then
+                    table.insert(filteredSteps, step)
+                elseif faintStepIndex and idx > faintStepIndex then
+                    -- After Faint step: skip action steps
+                    if step.Type ~= "Move" and step.Type ~= "Heal" and step.Type ~= "Item" then
+                        table.insert(filteredSteps, step)
+                        print("[BattleSystemV2] Keeping post-faint enemy step:", step.Type)
+                    else
+                        print("[BattleSystemV2] Skipping enemy action step after faint:", step.Type)
+                    end
+                elseif foeFainted and (step.Type == "Move" or step.Type == "Heal" or step.Type == "Item") then
+                    -- Foe already fainted (HP=0): skip action steps
+                    print("[BattleSystemV2] Skipping enemy action step (foe HP=0):", step.Type)
+                else
+                    table.insert(filteredSteps, step)
+                end
+            end
+            stepsToProcess = filteredSteps
+        end
+        
+        print("[BattleSystemV2] Processing", #stepsToProcess, "enemy steps (filtered from", #data.Enemy, ")")
+        self:_processStepsSequentially(stepsToProcess, false, function()
             print("[BattleSystemV2] All enemy steps completed")
             self._enemyProcessingActive = false
             -- After all steps complete, check for turn end conditions
-            self:_checkTurnEndConditions(data)
+            -- Only check if turn hasn't been completed yet (prevents duplicate calls)
+            if not self._turnCompleted then
+                self:_checkTurnEndConditions(data)
+            else
+                print("[BattleSystemV2] Turn already completed - skipping duplicate _checkTurnEndConditions call from enemy steps")
+            end
         end)
     else
         self._enemyProcessingActive = false
@@ -871,12 +1446,49 @@ function BattleSystemV2:_checkTurnEndConditions(data: any)
         local allowReentry = (self._battleState and self._battleState.SwitchMode == "Forced")
         if not allowReentry then
             print("[BattleSystemV2] Turn already completed - ignoring duplicate call")
+            print("[BattleSystemV2] Stack trace:", debug.traceback())
             return
         end
     end
 	
 	self._turnCompleted = true
-	print("[BattleSystemV2] Processing turn end conditions")
+	print("[BattleSystemV2] ===== PROCESSING TURN END CONDITIONS =====")
+	print("[BattleSystemV2] BattleEnd:", data.BattleEnd, "SwitchMode:", data.SwitchMode)
+	
+	-- CRITICAL HP SYNC: Ensure client HP matches server's authoritative values after all steps
+	-- This prevents HP desync in PvP where step processing might leave stale values
+	if data.HP and self._battleState and self._uiController then
+		local serverPlayerHP = data.HP.Player
+		local serverPlayerMaxHP = data.HP.PlayerMax
+		local serverEnemyHP = data.HP.Enemy
+		local serverEnemyMaxHP = data.HP.EnemyMax
+		
+		-- Sync player creature HP
+		if serverPlayerHP and serverPlayerMaxHP and self._battleState.PlayerCreature then
+			local clientPlayerHP = self._battleState.PlayerCreature.Stats and self._battleState.PlayerCreature.Stats.HP
+			if clientPlayerHP ~= serverPlayerHP then
+				print("[BattleSystemV2][HPSync] Player HP mismatch - client:", clientPlayerHP, "server:", serverPlayerHP, "- correcting")
+				self._battleState.PlayerCreature.Stats = self._battleState.PlayerCreature.Stats or {}
+				self._battleState.PlayerCreature.Stats.HP = serverPlayerHP
+				self._battleState.PlayerCreature.MaxStats = self._battleState.PlayerCreature.MaxStats or {}
+				self._battleState.PlayerCreature.MaxStats.HP = serverPlayerMaxHP
+				self._uiController:UpdateCreatureUI(true, self._battleState.PlayerCreature, true)
+			end
+		end
+		
+		-- Sync foe creature HP
+		if serverEnemyHP and serverEnemyMaxHP and self._battleState.FoeCreature then
+			local clientEnemyHP = self._battleState.FoeCreature.Stats and self._battleState.FoeCreature.Stats.HP
+			if clientEnemyHP ~= serverEnemyHP then
+				print("[BattleSystemV2][HPSync] Foe HP mismatch - client:", clientEnemyHP, "server:", serverEnemyHP, "- correcting")
+				self._battleState.FoeCreature.Stats = self._battleState.FoeCreature.Stats or {}
+				self._battleState.FoeCreature.Stats.HP = serverEnemyHP
+				self._battleState.FoeCreature.MaxStats = self._battleState.FoeCreature.MaxStats or {}
+				self._battleState.FoeCreature.MaxStats.HP = serverEnemyMaxHP
+				self._uiController:UpdateCreatureUI(false, self._battleState.FoeCreature, true)
+			end
+		end
+	end
 	
     -- Check if foe fainted
     local foeFainted = false
@@ -911,18 +1523,19 @@ function BattleSystemV2:_checkTurnEndConditions(data: any)
 	if self._pendingBattleOver then
 		-- Clear processing flag and ensure all messages/effects complete before ending
 		self:_safeWaitForDrain(3)
-        self._inTurnProcessing = false
-        if self._optionsManager then self._optionsManager:SetInteractionEnabled(true) end
 		self._pendingBattleOver = false
+		self._inTurnProcessing = false
+		if self._optionsManager then self._optionsManager:SetInteractionEnabled(true) end
 		self:EndBattle()
 		return
 	elseif data.BattleEnd then
 		-- If server flagged end as part of this result, honor it only after friendly/enemy steps complete
 		-- and after messages drain; if a BattleOver event also came early, we will reach here soon anyway.
+		self:_safeWaitForDrain(3)
 		self._inTurnProcessing = false
 		if self._optionsManager then self._optionsManager:SetInteractionEnabled(true) end
-		self:_safeWaitForDrain(3)
 		self:EndBattle()
+		return
     elseif foeFainted then
         if enemySendOut then
             -- Do not end; normal flow will finish, then StartNextTurn will be called
@@ -955,16 +1568,94 @@ function BattleSystemV2:_checkTurnEndConditions(data: any)
 		-- Otherwise, keep options hidden/disabled while waiting for Switch TurnResult
 		print("[BattleSystemV2] Forced switch active - waiting for switch to complete")
 		self._inTurnProcessing = false
-		if self._optionsManager then self._optionsManager:SetInteractionEnabled(false) end
+		if self._optionsManager then 
+			self._optionsManager:SetInteractionEnabled(false)
+			self._optionsManager:HideAll()
+		end
+		return
+	elseif data.WaitingForOpponentSwitch then
+		-- PvP: Opponent's creature fainted and they need to switch
+		-- Don't show battle options until opponent has switched and server sends new turn result
+		print("[BattleSystemV2] Waiting for opponent to switch - keeping options hidden")
+		self:_safeWaitForDrain(3)
+		self._inTurnProcessing = false
+		self._waitingForOpponentSwitch = true
+		if self._optionsManager then 
+			self._optionsManager:SetInteractionEnabled(false)
+			self._optionsManager:HideAll()
+		end
+		-- Don't call StartNextTurn - we'll receive another TurnResult when opponent switches
 		return
 	else
 		-- Wait for message queue to drain before unlocking and starting next turn
+		print("[BattleSystemV2] Normal turn end - starting next turn")
 		self:_safeWaitForDrain(3)
 		if self._actionHandler then self._actionHandler:Unlock() end
         self._inTurnProcessing = false
         if self._optionsManager then self._optionsManager:SetInteractionEnabled(true) end
+		print("[BattleSystemV2] Calling StartNextTurn()")
 		self:StartNextTurn()
+		print("[BattleSystemV2] StartNextTurn() completed")
 	end
+	print("[BattleSystemV2] ===== TURN END CONDITIONS COMPLETE =====")
+end
+
+--[[
+	Internal: Schedules camera cycle start with guards
+	Only starts cycle if battle is idle, not ending, and options are visible
+]]
+function BattleSystemV2:_scheduleCameraCycle(delaySeconds: number?)
+	local delay = delaySeconds or 1.5
+	self._cameraCycleToken = self._cameraCycleToken + 1
+	local currentToken = self._cameraCycleToken
+	
+	task.spawn(function()
+		-- Wait for delay
+		task.wait(delay)
+		
+		-- Check if this schedule call is still valid
+		if currentToken ~= self._cameraCycleToken then
+			print("[BattleSystemV2] Camera cycle schedule cancelled (newer schedule exists)")
+			return
+		end
+		
+		-- Only start cycle if battle is still active, not processing, not ending, and options are visible
+		if not self._battleState or not self._battleInfo or not self._cameraController then
+			print("[BattleSystemV2] Camera cycle cancelled - battle not active")
+			return
+		end
+		
+		if self._inTurnProcessing then
+			print("[BattleSystemV2] Camera cycle cancelled - turn processing active")
+			return
+		end
+		
+		if self._ending or self._pendingBattleOver then
+			print("[BattleSystemV2] Camera cycle cancelled - battle ending")
+			return
+		end
+		
+		-- Check if battle options are visible
+		if not self._optionsManager then
+			print("[BattleSystemV2] Camera cycle cancelled - no options manager")
+			return
+		end
+		
+		local optionsState = self._optionsManager:GetState()
+		if optionsState ~= "BattleOptions" and optionsState ~= "MoveOptions" then
+			print("[BattleSystemV2] Camera cycle cancelled - options not visible (state:", optionsState, ")")
+			return
+		end
+		
+		-- Double-check token hasn't changed during checks
+		if currentToken ~= self._cameraCycleToken then
+			print("[BattleSystemV2] Camera cycle schedule cancelled (token changed during validation)")
+			return
+		end
+		
+		print("[BattleSystemV2] Starting camera cycle through all positions")
+		self._cameraController:StartCycleAll(3)
+	end)
 end
 
 --[[
@@ -973,10 +1664,25 @@ end
 function BattleSystemV2:StartNextTurn()
 	print("[BattleSystemV2] Starting next turn")
 	
-	-- Don't start next turn if battle has ended
+	-- Don't start next turn if battle has ended or is ending
 	if not self._battleState or not self._battleInfo then
 		print("[BattleSystemV2] Cannot start next turn - battle has ended")
 		return
+	end
+	
+	-- CRITICAL: Don't show options if battle is ending (prevents options from appearing after running out of creatures)
+	if self._ending or self._pendingBattleOver then
+		print("[BattleSystemV2] Cannot start next turn - battle is ending (ending:", self._ending, "pendingBattleOver:", self._pendingBattleOver, ")")
+		return
+	end
+	
+	-- Process entry ability events on first turn only (this blocks until complete)
+	print("[BattleSystemV2] StartNextTurn - Entry processed flag:", self._entryAbilitiesProcessed, "Has events:", self._battleInfo.EntryAbilityEvents ~= nil)
+	if not self._entryAbilitiesProcessed and self._battleInfo.EntryAbilityEvents then
+		self._entryAbilitiesProcessed = true
+		print("[BattleSystemV2] Processing entry ability events now!")
+		self:_processEntryAbilityEvents(self._battleInfo.EntryAbilityEvents)
+		print("[BattleSystemV2] Entry ability events finished, continuing to battle options")
 	end
 	
 	-- Clear any stale forced switch mode before starting a new player turn
@@ -987,6 +1693,23 @@ function BattleSystemV2:StartNextTurn()
 	self._battleState:IncrementTurn()
 	
 	-- Show battle options using the new options manager
+	-- Double-check that battle hasn't ended during entry ability processing
+	if self._ending or self._pendingBattleOver then
+		print("[BattleSystemV2] Battle ended during entry ability processing - not showing options")
+		return
+	end
+	
+	-- Don't show options if party menu is open or in forced switch mode
+	if self._partyIntegration and self._partyIntegration:IsOpen() then
+		print("[BattleSystemV2] Party menu is open - not showing battle options")
+		return
+	end
+	
+	if self._battleState and self._battleState.SwitchMode == "Forced" then
+		print("[BattleSystemV2] Forced switch mode active - not showing battle options")
+		return
+	end
+	
 	if self._optionsManager then
 		print("[BattleSystemV2] Showing battle options via options manager")
 		self._optionsManager:SetInteractionEnabled(true)
@@ -995,10 +1718,69 @@ function BattleSystemV2:StartNextTurn()
 		warn("[BattleSystemV2] Options manager not initialized")
 	end
 	
-	-- Start camera cycle
+	-- Start camera cycle after delay (Pokemon Sword style) using scheduler with guards
 	if self._cameraController then
-		self._cameraController:StartCycle("Default", 3)
+		self:_scheduleCameraCycle(1.5)
 	end
+end
+
+--[[
+	Processes entry ability events from battle start
+	@param events Array of AbilityActivation events
+]]
+function BattleSystemV2:_processEntryAbilityEvents(events: {any})
+	if not events or #events == 0 then
+		return
+	end
+	
+	print("[BattleSystemV2] Processing", #events, "entry ability events")
+	
+	for i, event in ipairs(events) do
+		if event.Type == "AbilityActivation" then
+			local isFriendly = event.IsPlayer == true
+			local creatureName = event.Creature or "Creature"
+			local abilityName = event.Ability or "Unknown"
+			local message = event.Message or (creatureName .. "'s " .. abilityName .. " activated!")
+			
+			print("[BattleSystemV2] Entry ability event", i, "- Ability:", abilityName, "Creature:", creatureName, "Message:", message)
+			
+			-- Show ability notification (slides in) - only shows ability name and creature
+			if self._uiController and self._uiController.ShowAbilityNotification then
+				self._uiController:ShowAbilityNotification(abilityName, creatureName, isFriendly)
+			end
+			
+			-- Enqueue the message to the normal battle message system (auto-advances)
+			if self._messageQueue then
+				self._messageQueue:Enqueue(message)
+			end
+			
+			-- Play stat change effect if applicable
+			if event.StatChange and self._combatEffects then
+				local model = isFriendly 
+					and self._sceneManager:GetFoeCreature()  -- Intimidate affects foe when player's creature has it
+					or self._sceneManager:GetPlayerCreature()  -- Foe's intimidate affects player
+				
+				if model then
+					self._combatEffects:PlayStatChangeEffect(model, event.StatChange.Stat, event.StatChange.Stages)
+				end
+			end
+			
+			-- Wait for the message queue to finish displaying (auto-advances)
+			if self._messageQueue then
+				self._messageQueue:WaitForDrain()
+			end
+			
+			-- Hide ability notification (slides out)
+			if self._uiController and self._uiController.HideAbilityNotification then
+				self._uiController:HideAbilityNotification()
+			end
+			
+			-- Small delay for notification to slide out before next ability
+			task.wait(0.3)
+		end
+	end
+	
+	print("[BattleSystemV2] Entry ability events processed")
 end
 
 --[[
@@ -1152,9 +1934,11 @@ function BattleSystemV2:_startBlackoutSequence()
 	task.wait(0.5)
 	
 	-- Clean up battle scene during blackout, but keep ClientData intact (PendingCapture)
+	-- Camera cleanup is handled inside _cleanupBattleScene() via cameraController:Cleanup()
 	self:_cleanupBattleScene()
 	
-	-- Reset camera during blackout
+	-- Reset camera during blackout (cameraController:Cleanup() already handles this, but ensure it's done)
+	-- _resetCamera() is redundant here since Cleanup() already resets camera, but keeping for safety
 	self:_resetCamera()
 	
 	-- End encounter/trainer battle music and re-enable movement
@@ -1237,6 +2021,11 @@ function BattleSystemV2:_startBlackoutSequence()
 				local chunkName = (ChunkLoader:GetCurrentChunk() and ChunkLoader:GetCurrentChunk().Model and ChunkLoader:GetCurrentChunk().Model.Name) or nil
 				RelocationSignals.FirePostBattleRelocated({ Reason = "AylaLoss", Chunk = chunkName })
 			end)
+		elseif self._battleInfo and self._battleInfo.Type == "PvP" then
+			-- PvP: do NOT run blackout/defeat messaging; server restores HP/party to pre-battle snapshot
+			print("[BattleSystemV2] Player defeated in PvP - skipping blackout defeat flow")
+			self._lossReason = false
+			handledCustomLoss = true
 		end
 		if not handledCustomLoss then
 			self._lossReason = false
@@ -1276,6 +2065,54 @@ function BattleSystemV2:_startBlackoutSequence()
 			print("[BattleSystemV2] Could not refresh Party UI - script path issue or UI not available")
 		end
 		
+		-- Check if spawned creature fainted and despawn it
+		pcall(function()
+			local CreatureSpawner = require(script.Parent:WaitForChild("CreatureSpawner"))
+			local ClientData = require(script.Parent.Parent.Plugins.ClientData)
+			local StatCalc = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("StatCalc"))
+			local spawnedSlotIndex = CreatureSpawner:GetSpawnedSlotIndex()
+			
+			if spawnedSlotIndex then
+				local partyData = ClientData:Get()
+				if partyData and partyData.Party and partyData.Party[spawnedSlotIndex] then
+					local creature = partyData.Party[spawnedSlotIndex]
+					-- Check if creature has 0 HP using same logic as Party.lua
+					local maxFromServer = creature.MaxStats and creature.MaxStats.HP
+					local statsFallback, maxStatsFallback = StatCalc.ComputeStats(creature.Name, creature.Level, creature.IVs)
+					local maxHP = (typeof(maxFromServer) == "number" and maxFromServer > 0 and maxFromServer)
+						or (maxStatsFallback and maxStatsFallback.HP)
+						or (creature.Stats and creature.Stats.HP)
+						or (creature.BaseStats and creature.BaseStats.HP)
+						or 1
+					
+					local percent = creature.CurrentHP
+					local currentHP: number
+					if typeof(percent) == "number" then
+						percent = math.clamp(percent, 0, 100)
+						currentHP = math.floor(maxHP * (percent / 100) + 0.5)
+					elseif creature.Stats and typeof(creature.Stats.HP) == "number" then
+						currentHP = math.clamp(creature.Stats.HP, 0, maxHP)
+					else
+						currentHP = maxHP
+					end
+					
+					currentHP = math.clamp(currentHP, 0, math.max(1, maxHP))
+					
+					if currentHP <= 0 then
+						print("[BattleSystemV2] Spawned creature fainted (slot", spawnedSlotIndex, ") - despawning")
+						-- Despawn the creature by calling ToggleCreatureSpawn
+						local Request = Events:WaitForChild("Request")
+						local despawnSuccess = Request:InvokeServer({"ToggleCreatureSpawn", spawnedSlotIndex})
+						if despawnSuccess then
+							print("[BattleSystemV2] Successfully despawned fainted creature")
+						else
+							warn("[BattleSystemV2] Failed to despawn fainted creature")
+						end
+					end
+				end
+			end
+		end)
+		
 		-- Clear battle state
 		self:_clearBattleState()
 		-- Allow future ends
@@ -1297,6 +2134,11 @@ end
 ]]
 function BattleSystemV2:_cleanupBattleScene()
 	print("[BattleSystemV2] Cleaning up battle scene")
+	
+	-- Clean up battle weather VFX
+	pcall(function()
+		WeatherVFX:CleanupBattle()
+	end)
 	
 	-- Clean up scene manager (this will destroy the battle scene)
 	if self._sceneManager then
@@ -1383,9 +2225,14 @@ end
 --[[
 	Internal: Shows switch preview choice UI (Yes/No)
 	@param onComplete Callback to invoke when choice is made or proceeding normally
+	
+	CRITICAL: This function sets up button handlers but does NOT block.
+	The onComplete callback is called ONLY when the user clicks a button.
+	The step processor will wait for this callback before processing the next step.
 ]]
 function BattleSystemV2:_showSwitchPreviewChoice(onComplete: (() -> ())?)
-	print("[BattleSystemV2] Showing switch preview choice UI")
+	print("[BattleSystemV2] _showSwitchPreviewChoice called - setting up Yes/No buttons")
+	print("[BattleSystemV2] onComplete callback provided:", onComplete ~= nil)
 	
 	-- Get UI references
 	local PlayerGui = game.Players.LocalPlayer.PlayerGui
@@ -1395,34 +2242,86 @@ function BattleSystemV2:_showSwitchPreviewChoice(onComplete: (() -> ())?)
 	local YesButton = ChoiceFrame:WaitForChild("Yes")
 	local NoButton = ChoiceFrame:WaitForChild("No")
 	
-	-- Show the choice UI
+	print("[BattleSystemV2] UI elements found - showing Choice frame")
+	
+	-- Show the choice UI immediately after the message is displayed
 	ChoiceFrame.Visible = true
+	ChoiceFrame.Active = true  -- Ensure it's interactable
+	print("[BattleSystemV2] Choice frame now visible - waiting for user input")
+	print("[BattleSystemV2] NoButton exists:", NoButton ~= nil, "Active:", NoButton and NoButton.Active, "Visible:", NoButton and NoButton.Visible)
 	
 	-- Track if choice was made to prevent double-firing
 	local choiceMade = false
 	
-    -- Handle No button
-    local noConnection
-    noConnection = NoButton.MouseButton1Down:Connect(function()
-		if choiceMade then return end
+	-- Handle No button - use both MouseButton1Down and Activated for better compatibility
+	local noConnection
+	local function handleNoClick()
+		if choiceMade then 
+			print("[BattleSystemV2] No button clicked but choice already made - ignoring")
+			return 
+		end
 		choiceMade = true
 		
+		print("[BattleSystemV2] ===== NO BUTTON CLICKED =====")
 		print("[BattleSystemV2] Player chose NO - proceeding with enemy send-out")
+		print("[BattleSystemV2] onComplete callback type:", type(onComplete), "is nil:", onComplete == nil)
 		ChoiceFrame.Visible = false
+		ChoiceFrame.Active = false
 		
 		-- Disconnect both handlers
-		if noConnection then noConnection:Disconnect() end
-		if self._yesConnection then self._yesConnection:Disconnect() end
-		
-		-- Clear the persistent message and proceed normally
-		self._messageQueue:ClearPersistent()
-		if onComplete then
-			onComplete()
+		if noConnection then 
+			noConnection:Disconnect()
+			noConnection = nil
 		end
-	end)
+		if self._yesConnection then 
+			self._yesConnection:Disconnect()
+			self._yesConnection = nil
+		end
+		
+		-- Clear the persistent message and slide it out asynchronously (non-blocking)
+		-- Call ClearPersistent in a spawned task so its blocking wait doesn't delay onComplete
+		-- ClearPersistent will clear the flag AND slide out the message
+		if self._messageQueue then
+			print("[BattleSystemV2] Clearing persistent message (async)")
+			task.spawn(function()
+				if self._messageQueue and self._messageQueue.ClearPersistent then
+					print("[BattleSystemV2] Sliding out persistent message")
+					self._messageQueue:ClearPersistent()
+				end
+			end)
+		end
+		
+		-- CRITICAL: Call onComplete immediately to allow next step (SendOut) to process
+		-- Don't wait for message slide-out animation - proceed with battle flow
+		print("[BattleSystemV2] About to call onComplete callback")
+		if onComplete then
+			print("[BattleSystemV2] Calling onComplete now")
+			local success, err = pcall(onComplete)
+			if not success then
+				warn("[BattleSystemV2] ERROR calling onComplete:", err)
+				warn(debug.traceback())
+			else
+				print("[BattleSystemV2] onComplete called successfully - step should continue")
+			end
+		else
+			warn("[BattleSystemV2] CRITICAL: onComplete callback is nil! This will break the flow!")
+			warn(debug.traceback())
+		end
+		
+		-- Trigger deferred trainer SendOut after SwitchPreview completes
+		self:_triggerDeferredTrainerSendOut()
+		
+		print("[BattleSystemV2] ===== NO BUTTON HANDLER COMPLETE =====")
+	end
 	
-    -- Handle Yes button
-    self._yesConnection = YesButton.MouseButton1Down:Connect(function()
+	-- Connect to both MouseButton1Down and Activated events for better compatibility
+	noConnection = NoButton.MouseButton1Down:Connect(handleNoClick)
+	if NoButton.Activated then
+		NoButton.Activated:Connect(handleNoClick)
+	end
+	
+	-- Handle Yes button
+	self._yesConnection = YesButton.MouseButton1Down:Connect(function()
 		if choiceMade then return end
 		choiceMade = true
 		
@@ -1434,9 +2333,13 @@ function BattleSystemV2:_showSwitchPreviewChoice(onComplete: (() -> ())?)
 		if self._yesConnection then self._yesConnection:Disconnect() end
 		
 		-- Clear the persistent message and show party UI for switching
-		self._messageQueue:ClearPersistent()
+		if self._messageQueue then
+			self._messageQueue:ClearPersistent()
+		end
 		self:_showPartySwitchForPreview(onComplete)
 	end)
+	
+	print("[BattleSystemV2] Button handlers connected - step will wait until user clicks Yes/No")
 end
 
 -- Generic Yes/No choice using BattleUI.Choice; keeps current battle message persistent
@@ -1688,6 +2591,9 @@ function BattleSystemV2:_showPartySwitchForPreview(onComplete: (() -> ())?)
 			if onComplete then
 				onComplete()
 			end
+			
+			-- Trigger deferred trainer SendOut after SwitchPreview switch completes
+			self:_triggerDeferredTrainerSendOut()
 		end)
 		
 		-- Set up cancel callback
@@ -1706,6 +2612,9 @@ function BattleSystemV2:_showPartySwitchForPreview(onComplete: (() -> ())?)
 			if onComplete then
 				onComplete()
 			end
+			
+			-- Trigger deferred trainer SendOut even if switch was cancelled
+			self:_triggerDeferredTrainerSendOut()
 		end)
 		
 		-- Open party UI via integration (same as Creatures button)
@@ -1774,6 +2683,11 @@ end
 	Internal: Clears all battle state
 ]]
 function BattleSystemV2:_clearBattleState()
+	-- Clean up step processor (cleans up capture effects, etc.)
+	if self._stepProcessor and self._stepProcessor.Cleanup then
+		self._stepProcessor:Cleanup()
+	end
+	
 	-- Clear state
 	self._battleState = nil
 	self._battleInfo = nil
@@ -1831,8 +2745,8 @@ function BattleSystemV2:_spawnInitialCreatures()
 		return
 	end
 	
-    -- Spawn foe creature: For Wild battles we spawn immediately; for Trainer battles, we spawn during the intro sequence after the message.
-    if self._battleInfo.Type == "Wild" then
+    -- Spawn foe creature: For Wild/PvP battles we spawn immediately; for Trainer battles, we spawn during the intro sequence after the message.
+    if self._battleInfo.Type == "Wild" or self._battleInfo.Type == "PvP" then
         local useHologramForFoe = false
         self._sceneManager:SpawnCreature(
             self._battleInfo.FoeCreature,
@@ -1871,6 +2785,10 @@ end
 function BattleSystemV2:_wildEncounterIntro()
 	print("[BattleSystemV2] Wild encounter intro")
 	
+	-- Ensure battle FOV is set (may have been overwritten by encounter zone tween or other scripts)
+	self._camera.CameraType = Enum.CameraType.Scriptable
+	self._camera.FieldOfView = 45
+	
 	-- Stop any camera cycles
 	if self._cameraController then
 		self._cameraController:StopCycle()
@@ -1881,12 +2799,7 @@ function BattleSystemV2:_wildEncounterIntro()
 		self._cameraController:SetPosition("FoeZoomOut", 1, true)
 	end
 	
-	-- Show battle message then shiny callout if applicable
-	local message = self._battleInfo.Message or "A wild creature appeared!"
-	self._messageQueue:Enqueue(message)
-	if self._battleInfo and self._battleInfo.FoeCreature and self._battleInfo.FoeCreature.Shiny then
-		self._messageQueue:Enqueue("It's sparkling!")
-	end
+
 	
 	-- Add highlight to foe
 	local foeModel = self._sceneManager:GetFoeCreature()
@@ -1896,6 +2809,13 @@ function BattleSystemV2:_wildEncounterIntro()
 	
 	-- Fade out exclamation mark
 	UIFunctions:FadeOutExclamationMark(self._exclamationMark)
+
+		-- Show battle message then shiny callout if applicable
+		local message = self._battleInfo.Message or "A wild creature appeared!"
+		self._messageQueue:Enqueue(message)
+		if self._battleInfo and self._battleInfo.FoeCreature and self._battleInfo.FoeCreature.Shiny then
+			self._messageQueue:Enqueue("It's sparkling!")
+		end
 	
 	task.wait(1.5)
 	
@@ -1946,8 +2866,30 @@ function BattleSystemV2:_wildEncounterIntro()
 		)
 	end
 	
-	-- Wait for messages and creature spawn
-	self._messageQueue:WaitForDrain()
+	-- Wait for "Go Y!" message and creature spawn
+	self:_safeWaitForDrain(3)
+	
+	-- Show weather message if weather is active (after creature spawn, before BattleOptions)
+	-- Only show messages for weather types that have battle effects
+	if self._battleInfo.Weather then
+		local weatherName = self._battleInfo.Weather
+		-- Only show messages for weather types with battle effects: Sunlight, Rain, Sandstorm, Snow
+		local hasBattleEffects = weatherName == "Sunlight" or weatherName == "Rain" or weatherName == "Sandstorm" or weatherName == "Snow"
+		
+		if hasBattleEffects then
+			local weatherMessage = BattleMessageGenerator.Weather(weatherName, "Start")
+			
+			if weatherMessage and weatherMessage ~= "" then
+				print("[BattleSystemV2] Showing weather message:", weatherMessage)
+				self._messageQueue:Enqueue(weatherMessage)
+				self:_safeWaitForDrain(3)
+			else
+				print("[BattleSystemV2] Weather message generation failed or empty for:", weatherName)
+			end
+		else
+			print("[BattleSystemV2] Skipping weather message for non-battle weather:", weatherName)
+		end
+	end
 	
 	-- Wait for player creature to exist
 	local maxWait = 3
@@ -1962,11 +2904,150 @@ function BattleSystemV2:_wildEncounterIntro()
 	self:StartNextTurn()
 end
 
+-- PvP battle intro (mirrors trainer pacing without NPC trainer assets)
+function BattleSystemV2:_pvpBattleIntro()
+	print("[BattleSystemV2] PvP battle intro")
+	
+	-- Ensure battle FOV is set (may have been overwritten by other scripts)
+	self._camera.CameraType = Enum.CameraType.Scriptable
+	self._camera.FieldOfView = 45
+	
+	-- Stop any camera cycles
+	if self._cameraController then
+		self._cameraController:StopCycle()
+	end
+
+	-- Prepare opponent agent for staging (client-side clone of opponent character)
+	local opponentUserId = self._battleInfo and self._battleInfo.OpponentUserId
+	if opponentUserId then
+		local opponentPlayer = Players:GetPlayerByUserId(opponentUserId)
+		if opponentPlayer and opponentPlayer.Character then
+			pcall(function()
+				TrainerIntroController:PrepareFromNPC(opponentPlayer.Character)
+			end)
+		end
+	end
+	local agent = TrainerIntroController:ConsumePrepared()
+	
+	-- Set camera to foe zoom out (same as trainer intro)
+	if self._cameraController then
+		self._cameraController:SetPosition("FoeZoomOut", 1, true)
+	end
+
+	-- Fade out the exclamation mark
+	UIFunctions:FadeOutExclamationMark(self._exclamationMark)
+
+	-- Small pacing delay to mirror trainer timing
+	task.wait(1.5)
+
+	-- Animate to default camera position (if available)
+	if self._cameraController then
+		self._cameraController:SetPosition("Default", 1, false)
+	end
+
+	task.wait(1.0)
+
+	-- Place agent at foe spawn for pacing (optional)
+	do
+		local _, foeSpawn = self._sceneManager:GetSpawnPoints()
+		if agent and foeSpawn then
+			agent:PlaceAtSpawn(foeSpawn.CFrame)
+			task.delay(0.654, function()
+				agent:PlayAnimation("78441710358556", 0.1, false)
+			end)
+		end
+	end
+
+	-- Spawn player creature (foe was spawned earlier in _spawnInitialCreatures)
+	local playerSpawn = self._sceneManager:GetSpawnPoints()
+	if playerSpawn then
+		local creatureName = self._battleInfo.PlayerCreature.Nickname or self._battleInfo.PlayerCreature.Name
+		self._messageQueue:Enqueue("Go " .. creatureName .. "!")
+		
+		self._sceneManager:SpawnCreature(
+			self._battleInfo.PlayerCreature,
+			playerSpawn,
+			true,
+			true, -- Use hologram
+			function()
+				-- Start idle animation
+				local playerModel = self._sceneManager:GetPlayerCreature()
+				if playerModel then
+					self._animationController:PlayIdleAnimation(playerModel)
+				end
+				
+				-- Update player UI
+				self._uiController:UpdateCreatureUI(true, self._battleInfo.PlayerCreature, false)
+				self._uiController:UpdateLevelUI(self._battleInfo.PlayerCreature, false)
+				
+				-- Slide in You UI when player creature is sent out
+				self._uiController:SlideYouUIIn(function()
+					print("[BattleSystemV2] You UI slide-in completed after creature sent out (PvP)")
+				end)
+				
+				-- Update cached creature names for message formatting
+				if self._battleInfo.PlayerCreature and self._battleInfo.FoeCreature then
+					BattleMessageGenerator.UpdateCreatureNames(
+						self._battleInfo.PlayerCreature.Name, 
+						self._battleInfo.FoeCreature.Name
+					)
+				end
+			end
+		)
+	end
+	
+	-- Wait for "Go Y!" message and creature spawn
+	self:_safeWaitForDrain(3)
+
+	-- Fade agent after intro
+	if agent then
+		agent:TweenBackAndFade(10, 0.6, false)
+	end
+	
+	-- Wait for player creature to exist
+	local maxWait = 3
+	local startTime = tick()
+	while not self._sceneManager:GetPlayerCreature() and (tick() - startTime) < maxWait do
+		task.wait(0.1)
+	end
+	
+	task.wait(0.2) -- Ensure animations start
+	
+	-- Show weather message if weather is active (after creature spawn, before BattleOptions)
+	-- Only show messages for weather types that have battle effects
+	if self._battleInfo.Weather then
+		local weatherName = self._battleInfo.Weather
+		-- Only show messages for weather types with battle effects: Sunlight, Rain, Sandstorm, Snow
+		local hasBattleEffects = weatherName == "Sunlight" or weatherName == "Rain" or weatherName == "Sandstorm" or weatherName == "Snow"
+		
+		if hasBattleEffects then
+			local weatherMessage = BattleMessageGenerator.Weather(weatherName, "Start")
+			
+			if weatherMessage and weatherMessage ~= "" then
+				print("[BattleSystemV2] Showing weather message:", weatherMessage)
+				self._messageQueue:Enqueue(weatherMessage)
+				self:_safeWaitForDrain(3)
+			else
+				print("[BattleSystemV2] Weather message generation failed or empty for:", weatherName)
+			end
+		else
+			print("[BattleSystemV2] Skipping weather message for non-battle weather:", weatherName)
+		end
+	end
+	
+	-- Start the next turn
+	self:StartNextTurn()
+end
+
 --[[
 	Internal: Trainer battle intro sequence
 ]]
 function BattleSystemV2:_trainerBattleIntro()
     print("[BattleSystemV2] Trainer battle intro")
+    
+    -- Ensure battle FOV is set (may have been overwritten by LOS tween or other scripts)
+    self._camera.CameraType = Enum.CameraType.Scriptable
+    self._camera.FieldOfView = 45
     
     -- Stop any camera cycles
     if self._cameraController then
@@ -1983,6 +3064,10 @@ function BattleSystemV2:_trainerBattleIntro()
 		local agent = TrainerIntroController:ConsumePrepared()
 		if agent and foeSpawn then
 			agent:PlaceAtSpawn(foeSpawn.CFrame)
+			-- Preload agent animations for faster playback during battle
+			AgentAnimations:PreloadAnimations()
+		else
+			warn("[BattleSystemV2] Trainer intro agent missing; continuing without NPC staging")
 		end
 	
     
@@ -1995,7 +3080,9 @@ function BattleSystemV2:_trainerBattleIntro()
     -- Play intro pose/idle shortly after spawn
     local INTRO_ANIM = "78441710358556"
 	task.delay(0.654, function()
-		agent:PlayAnimation(INTRO_ANIM, 0.1, false)
+		if agent then
+			agent:PlayAnimation(INTRO_ANIM, 0.1, false)
+		end
 	end)
     
     -- Show trainer wants-to-battle message first
@@ -2046,6 +3133,8 @@ function BattleSystemV2:_trainerBattleIntro()
                     end
                 end
             )
+        else
+            warn("[BattleSystemV2] Missing foe spawn for trainer intro; spawning skipped")
         end
     end
     self._messageQueue:WaitForDrain()
@@ -2088,7 +3177,31 @@ function BattleSystemV2:_trainerBattleIntro()
         )
     end
     
-    self._messageQueue:WaitForDrain()
+    -- Wait for "Go Y!" message and creature spawn
+    self:_safeWaitForDrain(3)
+    
+    -- Show weather message if weather is active (after creature spawn, before BattleOptions)
+    -- Only show messages for weather types that have battle effects
+    if self._battleInfo.Weather then
+        local weatherName = self._battleInfo.Weather
+        -- Only show messages for weather types with battle effects: Sunlight, Rain, Sandstorm, Snow
+        local hasBattleEffects = weatherName == "Sunlight" or weatherName == "Rain" or weatherName == "Sandstorm" or weatherName == "Snow"
+        
+        if hasBattleEffects then
+            local weatherMessage = BattleMessageGenerator.Weather(weatherName, "Start")
+            
+            if weatherMessage and weatherMessage ~= "" then
+                print("[BattleSystemV2] Showing weather message:", weatherMessage)
+                self._messageQueue:Enqueue(weatherMessage)
+                self:_safeWaitForDrain(3)
+            else
+                print("[BattleSystemV2] Weather message generation failed or empty for:", weatherName)
+            end
+        else
+            print("[BattleSystemV2] Skipping weather message for non-battle weather:", weatherName)
+        end
+    end
+    
     self:StartNextTurn()
 end
 
@@ -2323,18 +3436,25 @@ function BattleSystemV2:_runAwaySequence()
 	-- Wait 0.5 seconds
 	task.wait(0.5)
 	
-	-- Clean up battle during blackout
+	-- Clean up battle during blackout (this includes camera cleanup)
 	if self._sceneManager then
 		self._sceneManager:Cleanup()
 	end
 	
-	-- Reset camera FOV during blackout (when screen is fully black)
-	self._camera.FieldOfView = 70
-	print("[BattleSystemV2] Camera FOV reset to 70 during blackout")
+	-- Cleanup camera controller properly during blackout (when screen is fully black)
+	if self._cameraController then
+		self._cameraController:Cleanup()
+	end
 	
-	-- Reset camera to normal mode
+	-- Reset camera to normal mode (cameraController:Cleanup() already handles this, but ensure it's done)
+	self._camera.FieldOfView = 70
 	self._camera.CameraType = Enum.CameraType.Custom
-	self._camera.CameraSubject = LocalPlayer.Character and LocalPlayer.Character:WaitForChild("Humanoid")
+	if LocalPlayer.Character then
+		local humanoid = LocalPlayer.Character:FindFirstChild("Humanoid")
+		if humanoid then
+			self._camera.CameraSubject = humanoid
+		end
+	end
 	
 	-- Clear battle data
 	self._battleInfo = nil
@@ -2769,4 +3889,32 @@ function BattleSystemV2:_fadeOutBlackout()
 	end)
 end
 
+--[[
+	Internal: Triggers deferred trainer SendOut after SwitchPreview completes
+	This requests the server to process the deferred SendOut that was set when the trainer's creature fainted
+]]
+function BattleSystemV2:_triggerDeferredTrainerSendOut()
+	-- Only trigger for trainer battles
+	if not self._battleInfo or self._battleInfo.Type ~= "Trainer" then
+		return
+	end
+	
+	print("[BattleSystemV2] Triggering deferred trainer SendOut")
+	
+	-- Request server to process deferred SendOut
+	local Events = game:GetService("ReplicatedStorage"):WaitForChild("Events")
+	local Request = Events:WaitForChild("Request")
+	
+	local success, result = pcall(function()
+		return Request:InvokeServer({"ProcessDeferredTrainerSendOut"})
+	end)
+	
+	if success and result then
+		print("[BattleSystemV2] Deferred trainer SendOut triggered successfully")
+	else
+		warn("[BattleSystemV2] Failed to trigger deferred trainer SendOut:", result)
+	end
+end
+
 return BattleSystemV2
+

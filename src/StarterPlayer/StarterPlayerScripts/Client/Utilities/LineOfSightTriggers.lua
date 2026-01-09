@@ -9,6 +9,7 @@ local ActiveTriggers = {}
 local TriggeredOnce = {}
 local LastTriggeredAt = {}
 local CharacterFunctions = require(script.Parent:WaitForChild("CharacterFunctions"))
+local ClientData = require(script.Parent.Parent:WaitForChild("Plugins"):WaitForChild("ClientData"))
 local CutsceneRegistry = require(script.Parent:WaitForChild("CutsceneRegistry"))
 local EncounterZone = require(script.Parent:WaitForChild("EncounterZone"))
 local MusicManager = require(script.Parent:WaitForChild("MusicManager"))
@@ -65,17 +66,61 @@ local function isInLineOfSight(npcRoot: BasePart, playerPos: Vector3, fovDeg: nu
 	return angle <= (fovDeg * 0.5)
 end
 
+local function hasPersistentEvent(key: string)
+	local data = ClientData:Get()
+	if not data or not data.Events then return false end
+	return data.Events[key] == true
+end
+
+local function setPersistentEventAsync(key: string)
+	-- Update local cache immediately so future checks are consistent this session
+	local data = ClientData:Get()
+	if data then
+		data.Events = data.Events or {}
+		data.Events[key] = true
+	end
+	-- Also persist to the server; fire-and-forget to avoid blocking the trigger flow
+	task.spawn(function()
+		local ok, _ = pcall(function()
+			local events = ReplicatedStorage:WaitForChild("Events")
+			return events.Request:InvokeServer({"SetEvent", key, true})
+		end)
+		if not ok then
+			warn("[LOS] Failed to persist event flag for key:", key)
+		end
+	end)
+end
+
 function LOS:SetupOnceTrigger(npcModel: Model, config)
-    -- config: {MaxDistance, FOV, OnTrigger, UniqueKey}
+    -- config: {MaxDistance, FOV, OnTrigger, UniqueKey, Persistent, PersistentKey}
 	if not npcModel or not config or not config.OnTrigger then return end
 	local hrp = npcModel:FindFirstChild("HumanoidRootPart")
 	if not hrp then return end
 
 	local key = config.UniqueKey or (npcModel:GetFullName() .. "::LOS")
+	local persistentKey = config.PersistentKey or key
+	local shouldPersist = config.Persistent == true
+
+	-- If the caller asked for persistence, respect any saved flag before wiring up
+	if shouldPersist and hasPersistentEvent(persistentKey) then
+		TriggeredOnce[key] = true
+		return
+	end
 	if TriggeredOnce[key] then return end
 
 	local conn
+	local function checkPersistedAndStopIfNeeded()
+		if not shouldPersist then return false end
+		if hasPersistentEvent(persistentKey) then
+			TriggeredOnce[key] = true
+			if conn then conn:Disconnect() end
+			return true
+		end
+		return false
+	end
+
 	conn = RunService.Heartbeat:Connect(function()
+		if checkPersistedAndStopIfNeeded() then return end
 		local playerPos = getPlayerPosition()
 		if not playerPos then return end
 		if config.MaxDistance and not isWithinDistance(playerPos, hrp.Position, config.MaxDistance) then return end
@@ -111,6 +156,9 @@ function LOS:SetupOnceTrigger(npcModel: Model, config)
         end
         -- Fire once
 		TriggeredOnce[key] = true
+		if shouldPersist then
+			setPersistentEventAsync(persistentKey)
+		end
 		if conn then conn:Disconnect() end
         -- Pass both the model and its HRP for convenience; extra args are ignored by older handlers
         config.OnTrigger(npcModel, hrp)

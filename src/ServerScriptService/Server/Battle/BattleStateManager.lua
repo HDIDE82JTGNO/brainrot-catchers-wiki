@@ -8,6 +8,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local HttpService = game:GetService("HttpService")
 local BattleTypes = require(ReplicatedStorage.Shared.BattleTypes)
+local StatStages = require(ReplicatedStorage.Shared.StatStages)
 
 type BattleState = BattleTypes.BattleState
 type BattleMode = BattleTypes.BattleMode
@@ -47,6 +48,10 @@ function BattleStateManager.new(
 	self.EscapeAttempts = 0
 	self.Chunk = chunk
 	self.SwitchMode = nil
+	
+	-- Initialize stat stages for both creatures
+	StatStages.EnsureCreatureHasStages(playerCreature)
+	StatStages.EnsureCreatureHasStages(foeCreature)
 	
 	-- Store in active battles
 	ActiveBattles[self.id] = self
@@ -97,17 +102,20 @@ function BattleStateManager:IncrementTurn()
 end
 
 --[[
-	Updates the player's active creature
+	Updates the player's active creature (resets stat stages)
 	@param newCreature The new creature
 	@param newIndex The new index in the party
 ]]
 function BattleStateManager:UpdatePlayerCreature(newCreature: Creature, newIndex: number)
 	self.PlayerCreature = newCreature
 	self.PlayerCreatureIndex = newIndex
+	-- Reset stat stages for the new creature
+	StatStages.ResetAll(newCreature)
+	StatStages.EnsureCreatureHasStages(newCreature)
 end
 
 --[[
-	Updates the foe's active creature
+	Updates the foe's active creature (resets stat stages)
 	@param newCreature The new creature
 	@param newIndex The new index (optional for wild battles)
 ]]
@@ -116,6 +124,37 @@ function BattleStateManager:UpdateFoeCreature(newCreature: Creature, newIndex: n
 	if newIndex then
 		self.FoeCreatureIndex = newIndex
 	end
+	-- Reset stat stages for the new creature
+	StatStages.ResetAll(newCreature)
+	StatStages.EnsureCreatureHasStages(newCreature)
+end
+
+--[[
+	Resets stat stages for the player's creature
+]]
+function BattleStateManager:ResetPlayerStatStages()
+	if self.PlayerCreature then
+		StatStages.ResetAll(self.PlayerCreature)
+	end
+end
+
+--[[
+	Resets stat stages for the foe's creature
+]]
+function BattleStateManager:ResetFoeStatStages()
+	if self.FoeCreature then
+		StatStages.ResetAll(self.FoeCreature)
+	end
+end
+
+--[[
+	Gets the stat stages for display
+	@param isPlayer Whether to get player or foe stages
+	@return table The stat stages
+]]
+function BattleStateManager:GetStatStages(isPlayer: boolean): any
+	local creature = isPlayer and self.PlayerCreature or self.FoeCreature
+	return StatStages.GetAllStages(creature)
 end
 
 --[[
@@ -164,6 +203,9 @@ function BattleStateManager:GetSnapshot(): {[string]: any}
 		SwitchMode = self.SwitchMode,
 		EscapeAttempts = self.EscapeAttempts,
 		Chunk = self.Chunk,
+		-- Include stat stages for client display
+		PlayerStatStages = self.PlayerCreature and self.PlayerCreature.StatStages or nil,
+		FoeStatStages = self.FoeCreature and self.FoeCreature.StatStages or nil,
 	}
 end
 

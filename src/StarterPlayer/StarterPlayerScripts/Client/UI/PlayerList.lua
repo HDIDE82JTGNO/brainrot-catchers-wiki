@@ -7,9 +7,11 @@ local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Events = ReplicatedStorage:WaitForChild("Events")
 
 -- Modules
 local ClientData = require(script.Parent.Parent.Plugins.ClientData)
+local ViewPlayerManager = require(script.Parent.ViewPlayerManager)
 
 -- Chat Colors Module (from devforum post)
 local function GetNameColor(username: string, version_: number?): Color3
@@ -108,6 +110,11 @@ local _listFrame: ScrollingFrame?
 local _template: Frame?
 local _hideShowButton: TextButton?
 
+-- Use ViewPlayerManager for tweening
+local function _tweenViewPlayer(vp: GuiObject, show: boolean)
+	ViewPlayerManager.TweenViewPlayer(vp, show)
+end
+
 --[[
 	Internal: Gets UI references with lazy loading
 ]]
@@ -169,6 +176,8 @@ local function CreatePlayerEntry(player: Player): GuiObject
 	entry.Name = player.Name
 	entry.Visible = true
 	entry.Parent = listFrame
+	entry.Active = true
+	entry.Selectable = true
 	
 	-- Set player information (Dex number will be updated via server broadcast)
 	local actualNameLabel = entry:FindFirstChild("ActualName")
@@ -202,6 +211,25 @@ local function CreatePlayerEntry(player: Player): GuiObject
 	if uiStroke then
 		uiStroke.Color = DarkenColor(chatColor, 0.7)
 	end
+
+	-- Click handler to open ViewPlayer UI (ignore self)
+	local localPlayer = Players.LocalPlayer
+	entry.MouseButton1Click:Connect(function()
+		if not player or not player.Parent then return end
+
+		
+		-- Use ViewPlayerManager with level mode storage via entry attribute
+		local function levelModeStorage(mode: string?): string?
+			if mode ~= nil then
+				entry:SetAttribute("SelectedLevelMode", mode)
+				return mode
+			else
+				return entry:GetAttribute("SelectedLevelMode") or "keep"
+			end
+		end
+		
+		ViewPlayerManager.OpenForPlayer(player, levelModeStorage)
+	end)
 	
 	return entry
 end

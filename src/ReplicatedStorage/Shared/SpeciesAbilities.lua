@@ -7,9 +7,31 @@ local SpeciesAbilities: {[string]: { {Name: string, Chance: number} }} = {
         { Name = "Fireup", Chance = 98 }, -- blaze analogue
         { Name = "Menace", Chance = 2 }, -- Intimidate analogue
     },
+    ["Frycito"] = {
+        { Name = "Fireup", Chance = 80 },
+        { Name = "Menace", Chance = 20 },
+    },
+    ["Yoyoi Shaur"] = {
+        { Name = "Trickster", Chance = 60 },
+        { Name = "Magic Mirror", Chance = 30 },
+        { Name = "Magic Eyes", Chance = 10 },
+    },
+    ["Yoyoya Shaur"] = {
+        { Name = "Synchronize", Chance = 60 },
+        { Name = "Magic Mirror", Chance = 30 },
+        { Name = "Magic Eyes", Chance = 10 },
+    },
     ["Frulli Frulla"] = {
         { Name = "Big Beaks", Chance = 98 },
         { Name = "Wind Wings", Chance = 2 }, -- Gale Wings analogue
+    },
+    ["Frulilala"] = {
+        { Name = "Big Beaks", Chance = 98 },
+        { Name = "Wind Wings", Chance = 2 },
+    },
+    ["Frulli Fruletro"] = {
+        { Name = "Big Beaks", Chance = 98 },
+        { Name = "Wind Wings", Chance = 2 },
     },
     ["Kitung"] = {
         { Name = "Steadfast", Chance = 50 },

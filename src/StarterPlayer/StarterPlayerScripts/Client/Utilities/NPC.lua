@@ -169,7 +169,12 @@ function NPC:StartFollowingPlayer(npcModel: Model, cfg: FollowConfig?): boolean
 						_stopWalkAnim(npcModel)
 						walking = false
 					end
-					pcall(function() NPCAnimations:PlayEmotionLoop(npcModel, "Happy") end)
+					-- Don't override idle animations for Following Creatures (they use server-managed animations)
+					-- Following Creatures have names like "PlayerName_Creature_SlotIndex"
+					local isFollowingCreature = string.find(npcModel.Name, "_Creature_") ~= nil
+					if not isFollowingCreature then
+						pcall(function() NPCAnimations:PlayEmotionLoop(npcModel, "Happy") end)
+					end
 				else
 					-- Choose direct steering vs pathfinding
 					local needPath = dist > 18
@@ -244,8 +249,11 @@ function NPC:StartFollowingPlayer(npcModel: Model, cfg: FollowConfig?): boolean
 		-- Cleanup when loop exits
 		humanoid:Move(Vector3.zero)
 		_stopWalkAnim(npcModel)
-		-- Restore a neutral idle when follow stops
-		pcall(function() NPCAnimations:PlayEmotionLoop(npcModel, "Happy") end)
+		-- Restore a neutral idle when follow stops (but not for Following Creatures)
+		local isFollowingCreature = string.find(npcModel.Name, "_Creature_") ~= nil
+		if not isFollowingCreature then
+			pcall(function() NPCAnimations:PlayEmotionLoop(npcModel, "Happy") end)
+		end
 	end)
 	return true
 end
@@ -429,7 +437,7 @@ function NPC:Setup(NPC, ClickFunction)
 			end)
 			-- Stop player movement and face trainer; hide topbar during engagement
 			CharacterFunctions:CanMove(false)
-			pcall(function() UI.TopBar:Hide() end)
+			pcall(function() UI.TopBar:Hide() UI.TopBar:SetSuppressed(true) end)
 			local player = game.Players.LocalPlayer
 			local character = player.Character or player.CharacterAdded:Wait()
 			local hrp = character and character:FindFirstChild("HumanoidRootPart")
@@ -604,6 +612,12 @@ function NPC:Setup(NPC, ClickFunction)
 		-- Check if any TopBar menu is open - prevent NPC interactions
 		if UI.TopBar:IsMenuOpen() then
 			return -- Don't allow NPC interaction when menus are open
+		end
+		-- Check if player is in battle - prevent NPC interactions during battle
+		local ClientDataMod = require(script.Parent.Parent.Plugins.ClientData)
+		local pd = ClientDataMod:Get()
+		if pd and pd.InBattle == true then
+			return -- Don't allow NPC interaction while in battle
 		end
 		-- If this NPC has LOS trainer logic, allow click-to-initiate battle using same gating
 		if dialogueData and dialogueData.LineOfSight == true then

@@ -172,6 +172,8 @@ function CaughtUI:Show(creatureData)
         Name = creatureData.Name,
         BaseName = creatureData.Name,
         Shiny = creatureData.Shiny,
+    }, {
+        LockRotation = true
     })
 
     -- Dex registration narration (wait for user proceed)

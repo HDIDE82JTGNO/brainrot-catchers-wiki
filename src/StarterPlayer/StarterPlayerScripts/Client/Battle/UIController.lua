@@ -24,6 +24,20 @@ UIController.__index = UIController
 
 export type UICallback = () -> ()
 
+-- Ability notification positions
+local ABILITY_POSITIONS = {
+	Friendly = {
+		OffScreen = UDim2.new(-0.5, 0, 0.13, 0),
+		OnScreen = UDim2.new(0.025, 0, 0.13, 0),
+		Color = Color3.fromRGB(96, 191, 255), -- Blue for friendly
+	},
+	Foe = {
+		OffScreen = UDim2.new(1.3, 0, -0.5, 0),
+		OnScreen = UDim2.new(0.68, 0, -0.5, 0),
+		Color = Color3.fromRGB(255, 92, 92), -- Red for foe
+	},
+}
+
 --[[
 	Creates a new UI controller instance
 	@return UIController
@@ -32,11 +46,11 @@ function UIController.new(): any
 	local self = setmetatable({}, UIController)
 	
 	self._battleUI = BattleUI
-	self._battleOptions = BattleUI:WaitForChild("BattleOptions")
-	self._moveOptions = BattleUI:WaitForChild("MoveOptions")
+	self._controller = BattleUI:WaitForChild("Controller")
 	self._youUI = BattleUI:WaitForChild("You")
 	self._foeUI = BattleUI:WaitForChild("Foe")
 	self._battleNotification = BattleUI:WaitForChild("BattleNotification")
+	self._abilityNotification = BattleUI:FindFirstChild("AbilityNotification")
 	
 	self._activeTweens = {} :: {Tween}
 	self._youUIPosition = nil
@@ -44,6 +58,8 @@ function UIController.new(): any
 	self._foeFaintedByIndex = {} :: {[number]: boolean}
 	self._previousStatus = {} :: {[boolean]: string?}  -- Track previous status for each side
 	self._combatEffects = nil  -- Will be set by BattleSystem
+	self._abilityNotificationTween = nil  -- Track current ability notification tween
+	self._xpBarTweens = {} :: {Tween}  -- Track XP bar tweens separately to cancel on new animations
 	
 	return self
 end
@@ -70,10 +86,10 @@ end
 function UIController:ClearCreatureAmount()
 	local function clear(container: Instance?)
 		if not container then return end
-		for _, child in ipairs(container:GetChildren()) do
-			if child.Name ~= "Template" and not child:IsA("UIListLayout") then
-				child:Destroy()
-			end
+		local holder = container:FindFirstChild("Holder")
+		local target = holder or container
+		for _, child in ipairs(target:GetChildren()) do
+			if child.Name ~= "Template" and not child:IsA("UIListLayout") then child:Destroy() end
 		end
 	end
 
@@ -104,11 +120,13 @@ function UIController:RefreshCreatureAmount(battleType: string, playerParty: {an
 		if not containerParent or not party then return end
 		local container = containerParent:FindFirstChild("CreatureAmount")
 		if not container then return end
-		local template = container:FindFirstChild("Template")
+		local holder = container:FindFirstChild("Holder")
+		local templateParent = holder or container
+		local template = templateParent:FindFirstChild("Template")
 		if not (template and template:IsA("GuiObject")) then return end
 
 		-- Cleanup existing non-template children
-		for _, child in ipairs(container:GetChildren()) do
+		for _, child in ipairs(templateParent:GetChildren()) do
 			if child ~= template and not child:IsA("UIListLayout") then child:Destroy() end
 		end
 
@@ -138,7 +156,7 @@ function UIController:RefreshCreatureAmount(battleType: string, playerParty: {an
 			clone.Visible = true
 			clone.Name = string.format("Slot%d", i)
 			clone.LayoutOrder = i
-			clone.Parent = container
+			clone.Parent = templateParent
 
 			-- Determine fainted
 			local fainted = false
@@ -175,7 +193,9 @@ function UIController:RefreshCreatureAmount(battleType: string, playerParty: {an
 			render(self._foeUI, foeParty or {}, true)
 		else
 			-- Wild battle: hide foe count
-			for _, child in ipairs(foeContainer:GetChildren()) do
+			local holder = foeContainer:FindFirstChild("Holder")
+			local target = holder or foeContainer
+			for _, child in ipairs(target:GetChildren()) do
 				if child.Name ~= "Template" and not child:IsA("UIListLayout") then child:Destroy() end
 			end
 			foeContainer.Visible = false
@@ -187,28 +207,28 @@ end
 	Shows battle options
 ]]
 function UIController:ShowBattleOptions()
-	self:_toggleOptions(self._battleOptions, true)
+	self:_toggleOptions(self._controller, true)
 end
 
 --[[
 	Hides battle options
 ]]
 function UIController:HideBattleOptions()
-	self:_toggleOptions(self._battleOptions, false)
+	self:_toggleOptions(self._controller, false)
 end
 
 --[[
 	Shows move options
 ]]
 function UIController:ShowMoveOptions()
-	self:_toggleOptions(self._moveOptions, true)
+	self:_toggleOptions(self._controller, true)
 end
 
 --[[
 	Hides move options
 ]]
 function UIController:HideMoveOptions()
-	self:_toggleOptions(self._moveOptions, false)
+	self:_toggleOptions(self._controller, false)
 end
 
 --[[
@@ -228,7 +248,13 @@ function UIController:UpdateCreatureUI(
 		return
 	end
 	
-	print("[UIController] Updating creature UI for:", creatureData.Name, "IsPlayer:", isPlayer)
+	local hpValue = creatureData.Stats and creatureData.Stats.HP or "nil"
+	local maxHPValue = creatureData.MaxStats and creatureData.MaxStats.HP or "nil"
+	local hpPercent = "unknown"
+	if type(hpValue) == "number" and type(maxHPValue) == "number" and maxHPValue > 0 then
+		hpPercent = math.floor((hpValue / maxHPValue) * 100 + 0.5) .. "%"
+	end
+	print("[UIController] UpdateCreatureUI called - Creature:", creatureData.Name or creatureData.Nickname or "Unknown", "IsPlayer:", isPlayer, "HP:", hpValue, "/", maxHPValue, "(" .. hpPercent .. ")", "shouldTween:", shouldTween)
 	
 	-- Update creature name (use nickname if available)
 	local creatureName = ui:FindFirstChild("CreatureName") or ui:FindFirstChild("Name")
@@ -286,8 +312,34 @@ function UIController:UpdateHPBar(
 		return
 	end
 	
-	local currentHP = creatureData.Stats and creatureData.Stats.HP or 0
+	-- Get HP values - handle both Stats.HP format and fallback to MaxStats.HP for full HP
 	local maxHP = creatureData.MaxStats and creatureData.MaxStats.HP or 1
+	local currentHP = creatureData.Stats and creatureData.Stats.HP
+	
+	-- If Stats.HP is nil, assume full HP (fresh creature just sent out)
+	if currentHP == nil then
+		currentHP = maxHP
+		-- Distinguish between expected (fresh creature send-out) and unexpected (damage update) scenarios
+		if shouldTween then
+			-- Unexpected: HP update during damage should always have Stats.HP set
+			warn("[UIController] UNEXPECTED: Stats.HP is nil during damage update (shouldTween=true), defaulting to full HP:", maxHP, "IsPlayer:", isPlayer)
+		else
+			-- Expected: Fresh creature send-out may not have Stats.HP set yet
+			print("[UIController] Stats.HP is nil (fresh creature send-out), defaulting to full HP:", maxHP)
+		end
+	end
+	
+	-- Also try CurrentHP percentage field as fallback (some creature formats use this)
+	-- Only use this fallback if shouldTween is false (fresh creature send-out), not during damage updates
+	if currentHP == 0 and creatureData.CurrentHP and creatureData.CurrentHP > 0 and not shouldTween then
+		-- CurrentHP is a percentage (0-100), convert to actual HP
+		currentHP = math.floor((creatureData.CurrentHP / 100) * maxHP + 0.5)
+		print("[UIController] Using CurrentHP percentage fallback (fresh creature):", creatureData.CurrentHP, "% -> ", currentHP)
+	elseif currentHP == 0 and creatureData.CurrentHP and creatureData.CurrentHP > 0 and shouldTween then
+		-- During damage updates, if HP is 0 but CurrentHP exists, this is suspicious
+		warn("[UIController] SUSPICIOUS: HP is 0 during damage update but CurrentHP percentage exists:", creatureData.CurrentHP, "% - This should have been handled at hit marker. Stats.HP should be set correctly.")
+	end
+	
 	local hpPercentage = math.clamp(currentHP / maxHP, 0, 1)
 	
 	print("[UIController] Updating HP bar - Current:", currentHP, "Max:", maxHP, "Percentage:", hpPercentage)
@@ -365,7 +417,7 @@ function UIController:UpdateHPBar(
 	table.insert(self._activeTweens, colorTween)
 	colorTween:Play()
 	
-	print("[UIController] HP bar updated to", math.floor(hpPercentage * 100 + 0.5), "%")
+	print("[UIController] HP bar updated to", math.floor(hpPercentage * 100 + 0.5), "%", isPlayer and "Friendly" or "Foe")
 end
 
 --[[
@@ -389,28 +441,62 @@ function UIController:UpdateLevelUI(creatureData: any, shouldTween: boolean?, is
 		return
 	end
 	
-	local xpProgress = (creatureData.XPProgress or 0) / 100
-	local targetSize = UDim2.new(xpProgress, 0, lvProgress.Size.Y.Scale, lvProgress.Size.Y.Offset)
+	-- Constants for LvProgress size constraints
+	local MAX_X_SCALE = 0.838
+	local MIN_VISIBLE_X_SCALE = 0.01
+	local Y_SCALE = 0.18
 	
-	print("[XP] UI: UpdateLevelUI called - XPProgress:", creatureData.XPProgress or "nil", "Progress:", xpProgress, "shouldTween:", shouldTween, "isLevelUp:", isLevelUp)
+	local xpProgress = (creatureData.XPProgress or 0) / 100
+	-- Clamp the X scale to maximum of 0.838
+	local clampedXScale = math.min(xpProgress * MAX_X_SCALE, MAX_X_SCALE)
+	local targetSize = UDim2.new(clampedXScale, 0, Y_SCALE, 0)
+	
+	-- Handle visibility based on X scale threshold
+	local function updateVisibility(xScale: number)
+		if xScale < MIN_VISIBLE_X_SCALE then
+			lvProgress.Visible = false
+		else
+			lvProgress.Visible = true
+		end
+	end
+	
+	print("[XP] UI: UpdateLevelUI called - XPProgress:", creatureData.XPProgress or "nil", "Progress:", xpProgress, "ClampedX:", clampedXScale, "shouldTween:", shouldTween, "isLevelUp:", isLevelUp)
+	
+	-- Cancel any existing XP bar tweens to prevent conflicts
+	for _, oldTween in ipairs(self._xpBarTweens) do
+		if oldTween then
+			oldTween:Cancel()
+		end
+	end
+	self._xpBarTweens = {}
 	
 	if shouldTween and isLevelUp then
 		-- Level-up animation: Fill to max → snap to 0 → update level → tween to new progress
-		print("[XP] UI: Animating level-up sequence - fill to max → snap to 0 → update level → tween to", xpProgress)
+		print("[XP] UI: Animating level-up sequence - fill to max → snap to 0 → update level → tween to", clampedXScale)
 		
-		-- Step 1: Tween to max (100%)
+		-- Ensure visible for fill animation
+		lvProgress.Visible = true
+		
+		-- Step 1: Tween to max (capped at MAX_X_SCALE)
 		local fillTween = TweenService:Create(
 			lvProgress,
 			TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-			{Size = UDim2.new(1, 0, lvProgress.Size.Y.Scale, lvProgress.Size.Y.Offset)}
+			{Size = UDim2.new(MAX_X_SCALE, 0, Y_SCALE, 0)}
 		)
 		table.insert(self._activeTweens, fillTween)
+		table.insert(self._xpBarTweens, fillTween)
 		fillTween:Play()
 		
 		-- Step 2: After fill completes, snap to 0 and update level labels
-		fillTween.Completed:Connect(function()
-			-- Snap to 0
-			lvProgress.Size = UDim2.new(0, 0, lvProgress.Size.Y.Scale, lvProgress.Size.Y.Offset)
+		fillTween.Completed:Connect(function(playbackState)
+			-- Only proceed if the tween completed successfully (not cancelled)
+			if playbackState ~= Enum.PlaybackState.Completed then
+				return
+			end
+			
+			-- Snap to 0 and hide (below minimum threshold)
+			lvProgress.Size = UDim2.new(0, 0, Y_SCALE, 0)
+			lvProgress.Visible = false
 			
 			-- Update level labels immediately
 			local currentLevelLabel = self._youUI:FindFirstChild("CurrentLevelLabel")
@@ -445,24 +531,49 @@ function UIController:UpdateLevelUI(creatureData: any, shouldTween: boolean?, is
 			-- Small pause
 			task.wait(0.1)
 			
-			-- Step 3: Tween to new progress
+			-- Step 3: Tween to new progress (show if above threshold)
+			if clampedXScale >= MIN_VISIBLE_X_SCALE then
+				lvProgress.Visible = true
+			end
+			
 			local progressTween = TweenService:Create(
 				lvProgress,
 				TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
 				{Size = targetSize}
 			)
 			table.insert(self._activeTweens, progressTween)
+			table.insert(self._xpBarTweens, progressTween)
 			progressTween:Play()
+			
+			-- Update visibility after tween completes
+			progressTween.Completed:Connect(function(state)
+				if state == Enum.PlaybackState.Completed then
+					updateVisibility(clampedXScale)
+				end
+			end)
 		end)
 	elseif shouldTween then
 		-- Normal XP gain animation (no level-up)
+		-- Show if we're tweening to a visible size
+		if clampedXScale >= MIN_VISIBLE_X_SCALE then
+			lvProgress.Visible = true
+		end
+		
 		local tween = TweenService:Create(
 			lvProgress,
 			TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
 			{Size = targetSize}
 		)
 		table.insert(self._activeTweens, tween)
+		table.insert(self._xpBarTweens, tween)
 		tween:Play()
+		
+		-- Update visibility after tween completes
+		tween.Completed:Connect(function(state)
+			if state == Enum.PlaybackState.Completed then
+				updateVisibility(clampedXScale)
+			end
+		end)
 		
 		-- Update level labels immediately for non-level-up tweens
 		local currentLevelLabel = self._youUI:FindFirstChild("CurrentLevelLabel")
@@ -496,6 +607,7 @@ function UIController:UpdateLevelUI(creatureData: any, shouldTween: boolean?, is
 	else
 		-- Instant update (no animation)
 		lvProgress.Size = targetSize
+		updateVisibility(clampedXScale)
 		
 		-- Update level labels
 		local currentLevelLabel = self._youUI:FindFirstChild("CurrentLevelLabel")
@@ -598,7 +710,7 @@ function UIController:SlideUIOut(isPlayer: boolean)
 	
 	if isPlayer then
 		-- Slide player UI to the left (matching slide-in off-screen position)
-		targetPosition = UDim2.new(-0.15, 0, -0.55, 0)
+		targetPosition = UDim2.new(-0.5, 0, 0.65, 0)
 	else
 		-- Slide foe UI to the right (position {1.25, 0},{-0.802, 0})
 		targetPosition = UDim2.new(1.25, 0, -0.802, 0)
@@ -627,7 +739,7 @@ function UIController:SlideYouUIIn(callback: (() -> ())?)
 	local TweenService = game:GetService("TweenService")
 	
 	-- Set initial position off-screen (slide from left)
-	local offScreenPosition = UDim2.new(-0.15, 0, -0.55, 0)
+	local offScreenPosition = UDim2.new(-0.5, 0, 0.65, 0)
 	self._youUI.Position = offScreenPosition
 	self._youUI.Visible = true
 	
@@ -779,6 +891,118 @@ function UIController:UpdateStatusDisplay(isPlayer: boolean, creatureData: any)
 end
 
 --[[
+	Shows ability notification for when an ability triggers
+	@param abilityName The name of the ability
+	@param creatureName The name of the creature with the ability
+	@param isFriendly Whether this is the player's creature
+	@param onComplete Optional callback when notification should hide
+]]
+function UIController:ShowAbilityNotification(abilityName: string, creatureName: string, isFriendly: boolean, onComplete: (() -> ())?)
+	if not self._abilityNotification then
+		warn("[UIController] AbilityNotification UI not found in BattleUI")
+		if onComplete then onComplete() end
+		return
+	end
+	
+	local config = isFriendly and ABILITY_POSITIONS.Friendly or ABILITY_POSITIONS.Foe
+	
+	-- Cancel any existing ability notification tween
+	if self._abilityNotificationTween then
+		self._abilityNotificationTween:Cancel()
+		self._abilityNotificationTween = nil
+	end
+	
+	-- Update ability notification content
+	local abilityLabel = self._abilityNotification:FindFirstChild("AbilityName") or self._abilityNotification:FindFirstChild("Text")
+	if abilityLabel and abilityLabel:IsA("TextLabel") then
+		abilityLabel.Text = abilityName
+	end
+	
+	local creatureLabel = self._abilityNotification:FindFirstChild("CreatureName")
+	if creatureLabel and creatureLabel:IsA("TextLabel") then
+		creatureLabel.Text = creatureName
+	end
+	
+	-- Set ImageColor if it's an ImageLabel/ImageButton
+	if self._abilityNotification:IsA("ImageLabel") or self._abilityNotification:IsA("ImageButton") then
+		self._abilityNotification.ImageColor3 = config.Color
+	elseif self._abilityNotification:IsA("Frame") then
+		self._abilityNotification.BackgroundColor3 = config.Color
+	end
+	
+	-- Also color any child image
+	local bgImage = self._abilityNotification:FindFirstChild("Background") or self._abilityNotification:FindFirstChildWhichIsA("ImageLabel")
+	if bgImage and (bgImage:IsA("ImageLabel") or bgImage:IsA("ImageButton")) then
+		bgImage.ImageColor3 = config.Color
+	end
+	
+	-- Position off-screen initially
+	self._abilityNotification.Position = config.OffScreen
+	self._abilityNotification.Visible = true
+	
+	-- Tween in
+	local tweenIn = TweenService:Create(
+		self._abilityNotification,
+		TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+		{Position = config.OnScreen}
+	)
+	
+	self._abilityNotificationTween = tweenIn
+	table.insert(self._activeTweens, tweenIn)
+	tweenIn:Play()
+	
+	print("[UIController] Showing ability notification -", abilityName, "for", creatureName, "isFriendly:", isFriendly)
+	
+	-- Store the hide callback for later
+	self._abilityNotificationHideCallback = onComplete
+	self._abilityNotificationConfig = config
+end
+
+--[[
+	Hides the ability notification with a tween out animation
+	@param onComplete Optional callback when hide animation completes
+]]
+function UIController:HideAbilityNotification(onComplete: (() -> ())?)
+	if not self._abilityNotification then
+		if onComplete then onComplete() end
+		return
+	end
+	
+	if not self._abilityNotification.Visible then
+		if onComplete then onComplete() end
+		return
+	end
+	
+	-- Cancel any existing tween
+	if self._abilityNotificationTween then
+		self._abilityNotificationTween:Cancel()
+		self._abilityNotificationTween = nil
+	end
+	
+	-- Get the config for this notification (stored when shown)
+	local config = self._abilityNotificationConfig or ABILITY_POSITIONS.Friendly
+	
+	-- Tween out
+	local tweenOut = TweenService:Create(
+		self._abilityNotification,
+		TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.In),
+		{Position = config.OffScreen}
+	)
+	
+	self._abilityNotificationTween = tweenOut
+	table.insert(self._activeTweens, tweenOut)
+	
+	tweenOut.Completed:Connect(function()
+		self._abilityNotification.Visible = false
+		self._abilityNotificationConfig = nil
+		if onComplete then onComplete() end
+	end)
+	
+	tweenOut:Play()
+	print("[UIController] Hiding ability notification")
+end
+
+--[[
 	Resets UI positions to their original state
 ]]
 function UIController:ResetUIPositions()
@@ -790,6 +1014,11 @@ function UIController:ResetUIPositions()
 	if self._foeUI and self._foeUIPosition then
 		self._foeUI.Position = self._foeUIPosition
 		print("[UIController] Reset foe UI position")
+	end
+	
+	-- Hide ability notification if visible
+	if self._abilityNotification then
+		self._abilityNotification.Visible = false
 	end
 end
 
@@ -803,6 +1032,7 @@ function UIController:Cleanup()
 		end
 	end
 	self._activeTweens = {}
+	self._xpBarTweens = {}
 end
 
 --[[
@@ -919,7 +1149,7 @@ function UIController:_updateTypeDisplay(ui: Frame, creatureData: any)
     local typeText = typeFrame and typeFrame:FindFirstChild("TypeText")
     if typeFrame and typeText and typeText:IsA("TextLabel") and names[1] and Types[names[1]] then
         local color = Types[names[1]].uicolor
-        typeFrame.BackgroundColor3 = color
+        typeFrame.ImageColor3 = color
         typeText.Text = names[1]
         local stroke = typeFrame:FindFirstChild("UIStroke")
         if stroke then
@@ -933,7 +1163,7 @@ function UIController:_updateTypeDisplay(ui: Frame, creatureData: any)
         local label = second:FindFirstChild("TypeText")
         if names[2] and Types[names[2]] then
             second.Visible = true
-            second.BackgroundColor3 = Types[names[2]].uicolor
+            second.ImageColor3 = Types[names[2]].uicolor
             if label and label:IsA("TextLabel") then
                 label.Text = names[2]
             end

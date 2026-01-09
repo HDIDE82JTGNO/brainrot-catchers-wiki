@@ -272,6 +272,21 @@ function SettingsModule:Init(All)
 			end)
 		end
 	end
+	
+	-- Set up Close button
+	local CloseButton = SettingsUI:WaitForChild("Topbar"):WaitForChild("Close")
+	if CloseButton then
+		UIFunctions:NewButton(
+			CloseButton,
+			{"Action"},
+			{Click = "One", HoverOn = "One", HoverOff = "One"},
+			0.7,
+			function()
+				Audio.SFX.Click:Play()
+				SettingsModule:Close()
+			end
+		)
+	end
 end
 
 --// Settings Open

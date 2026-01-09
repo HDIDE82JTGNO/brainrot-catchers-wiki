@@ -173,6 +173,91 @@ local function OnDoorTrigger(DoorModel, Hit, ChunkLoadFunction)
 		end
 	end
 
+	-- Soft gate: block heading to Route 4 (Chunk6) from Asterden (Chunk5) until the Grass Gym is cleared
+	do
+		local targetChunk = tostring(LoadChunk)
+		if targetChunk == "Chunk6" then
+			local ChunkLoader = require(script.Parent.ChunkLoader)
+			local currentChunk = ChunkLoader:GetCurrentChunk()
+			local currentChunkName = currentChunk and (currentChunk.Model and currentChunk.Model.Name) or (currentChunk and currentChunk.Name) or nil
+			if currentChunkName == "Chunk5" then
+				local ClientData = require(script.Parent.Parent.Plugins.ClientData)
+				local pd = ClientData:Get() or {}
+				local badges = tonumber(pd.Badges) or 0
+				local defeatedVincent = pd.DefeatedTrainers and pd.DefeatedTrainers["Gym1_Leader_Vincent"] == true
+				local postGymCutscene = pd.Events and pd.Events.MET_FRIENDS_AFTER_GYM == true
+				local clearedGym = (badges >= 1) or defeatedVincent or postGymCutscene
+
+				if not clearedGym then
+					local Say = require(script.Parent.Say)
+					Say:Say("Me", true, {
+						{ Text = "I should beat the Asterden Gym before heading to Route 4.", Emotion = "Thinking" },
+					})
+
+					local Trigger = DoorModel:FindFirstChild("Trigger")
+					local character = LocalPlayer.Character
+					local hrp = character and character:FindFirstChild("HumanoidRootPart")
+					if Trigger and hrp and Trigger:IsA("BasePart") then
+						local look = Trigger.CFrame.LookVector
+						local retreatPoint = Trigger.Position + (look * -7)
+						local target = Vector3.new(retreatPoint.X, hrp.Position.Y, retreatPoint.Z)
+						local MoveTo = require(script.Parent.MoveTo)
+						MoveTo.MoveToTarget(target, {
+							minWalkSpeed = 12,
+							timeout = 1.5,
+							delayAfter = 0.5,
+							preserveFacing = true,
+						})
+						pcall(function() Say:Exit() end)
+					end
+
+					return
+				end
+			end
+		end
+	end
+
+	-- Soft gate: block Gym2 door in Chunk7 until hat is returned
+	do
+		local targetChunk = tostring(LoadChunk)
+		if targetChunk == "Gym2" then
+			local ChunkLoader = require(script.Parent.ChunkLoader)
+			local currentChunk = ChunkLoader:GetCurrentChunk()
+			local currentChunkName = currentChunk and (currentChunk.Model and currentChunk.Model.Name) or (currentChunk and currentChunk.Name) or nil
+			if currentChunkName == "Chunk7" then
+				local ClientData = require(script.Parent.Parent.Plugins.ClientData)
+				local pd = ClientData:Get() or {}
+				local returnedHat = pd.Events and pd.Events.RETURNED_DUCKAROO_HAT == true
+
+				if not returnedHat then
+					local Say = require(script.Parent.Say)
+					Say:Say("Me", true, {
+						{ Text = "The gym is closed. I should find Duckaroo's hat first.", Emotion = "Thinking" },
+					})
+
+					local Trigger = DoorModel:FindFirstChild("Trigger")
+					local character = LocalPlayer.Character
+					local hrp = character and character:FindFirstChild("HumanoidRootPart")
+					if Trigger and hrp and Trigger:IsA("BasePart") then
+						local look = Trigger.CFrame.LookVector
+						local retreatPoint = Trigger.Position + (look * -7)
+						local target = Vector3.new(retreatPoint.X, hrp.Position.Y, retreatPoint.Z)
+						local MoveTo = require(script.Parent.MoveTo)
+						MoveTo.MoveToTarget(target, {
+							minWalkSpeed = 12,
+							timeout = 1.5,
+							delayAfter = 0.5,
+							preserveFacing = true,
+						})
+						pcall(function() Say:Exit() end)
+					end
+
+					return
+				end
+			end
+		end
+	end
+
 	-- Mark this interaction as active
 	ActiveDoorInteractions[InteractionKey] = true
 	
@@ -274,7 +359,7 @@ local function OnDoorTrigger(DoorModel, Hit, ChunkLoadFunction)
 	local CurrentChunk = ChunkLoader.CurrentChunk and ChunkLoader.CurrentChunk.Model
 	if CurrentChunk then
 		ChunkLoader.PreviousChunk = CurrentChunk.Name
-		DBG:print("Set PreviousChunk to:", ChunkLoader.PreviousChunk, "LastDoorLoadChunk:", ChunkLoader.LastDoorLoadChunk)
+		warn("[DoorExit] Set PreviousChunk to:", ChunkLoader.PreviousChunk, "| Going to:", ActualLoadChunk, "| CurrentChunk was:", CurrentChunk.Name)
 		-- If heading into a universal facility like CatchCare, set LastChunk to the current chunk
 		-- so that exiting returns to the immediate origin (not an older chunk)
 		if tostring(ActualLoadChunk) == "CatchCare" then

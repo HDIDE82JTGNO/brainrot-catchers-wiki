@@ -10,6 +10,7 @@ local BattleValidator = require(script.BattleValidator)
 local DamageCalculator = require(script.DamageCalculator)
 local AIController = require(script.AIController)
 local XPManager = require(script.XPManager)
+local Obedience = require(script.Obedience)
 
 return {
 	-- State Management
@@ -26,4 +27,7 @@ return {
 	
 	-- Progression
 	XPManager = XPManager,
+	
+	-- Obedience
+	Obedience = Obedience,
 }

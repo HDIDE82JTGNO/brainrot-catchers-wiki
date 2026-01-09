@@ -27,6 +27,8 @@ function CameraController.new(camera: Camera, battleScene: Model): any
 	self._activeTween = nil
 	self._cycleRunning = false
 	self._cycleVersion = 0
+	self._isCleaningUp = false
+	self._tweenConnections = {} -- Track all tween completion connections
 	
 	-- Cache camera positions from scene
 	self:_cacheCameraPositions()
@@ -68,8 +70,14 @@ end
 	@param onComplete Optional callback
 ]]
 function CameraController:TransitionTo(targetCFrame: CFrame, duration: number, onComplete: (() -> ())?)
+	-- Prevent new tweens during cleanup
+	if self._isCleaningUp then
+		return
+	end
+	
 	if self._activeTween then
 		self._activeTween:Cancel()
+		self._activeTween = nil
 	end
 	
 	local tweenInfo = TweenInfo.new(
@@ -102,6 +110,9 @@ function CameraController:StartCycle(positionName: string, duration: number)
 		return
 	end
 	
+	-- Reset cleanup flag when starting a new cycle
+	self._isCleaningUp = false
+	
 	self._cycleRunning = true
 	self._cycleVersion = self._cycleVersion + 1
 	local currentVersion = self._cycleVersion
@@ -109,14 +120,78 @@ function CameraController:StartCycle(positionName: string, duration: number)
 	task.spawn(function()
 		local index = 1
 		
-		while self._cycleRunning and currentVersion == self._cycleVersion do
+		while self._cycleRunning and currentVersion == self._cycleVersion and not self._isCleaningUp do
 			local cameraPosition = positions[index]
 			if cameraPosition then
-				self:TransitionTo(cameraPosition.CFrame, duration)
-				task.wait(duration + 0.1)
+				-- Check cleanup flag before creating tween
+				if self._isCleaningUp then
+					break
+				end
+				
+				if self._activeTween then
+					self._activeTween:Cancel()
+					self._activeTween = nil
+				end
+				
+				-- Check cleanup flag again before creating new tween
+				if self._isCleaningUp then
+					break
+				end
+				
+				local tweenInfo = TweenInfo.new(
+					duration,
+					Enum.EasingStyle.Quad,
+					Enum.EasingDirection.InOut
+				)
+				
+				self._activeTween = TweenService:Create(self._camera, tweenInfo, {CFrame = cameraPosition.CFrame})
+				self._activeTween:Play()
+				
+				-- Wait for tween completion instead of using task.wait
+				local tweenCompleted = false
+				local connection
+				connection = self._activeTween.Completed:Connect(function()
+					tweenCompleted = true
+					if connection then
+						connection:Disconnect()
+						-- Remove from tracked connections
+						local idx = table.find(self._tweenConnections, connection)
+						if idx then
+							table.remove(self._tweenConnections, idx)
+						end
+					end
+				end)
+				
+				-- Track this connection
+				table.insert(self._tweenConnections, connection)
+				
+				-- Wait for completion or until cycle is stopped
+				while not tweenCompleted and self._cycleRunning and currentVersion == self._cycleVersion and not self._isCleaningUp do
+					task.wait(0.05)
+				end
+				
+				if connection then
+					connection:Disconnect()
+					-- Remove from tracked connections
+					local idx = table.find(self._tweenConnections, connection)
+					if idx then
+						table.remove(self._tweenConnections, idx)
+					end
+				end
+				
+				-- Small delay before next transition
+				if self._cycleRunning and currentVersion == self._cycleVersion and not self._isCleaningUp then
+					task.wait(0.1)
+				end
 			end
 			
+			-- Increment index for next position
 			index = (index % #positions) + 1
+		end
+		
+		-- Clear active tween reference when cycle exits
+		if self._activeTween and currentVersion == self._cycleVersion then
+			self._activeTween = nil
 		end
 	end)
 end
@@ -128,19 +203,234 @@ function CameraController:StopCycle()
 	self._cycleRunning = false
 	self._cycleVersion = self._cycleVersion + 1
 	
+	-- Cancel active tween immediately
 	if self._activeTween then
 		self._activeTween:Cancel()
 		self._activeTween = nil
 	end
+	
+	-- Disconnect all tracked tween connections
+	for _, connection in ipairs(self._tweenConnections) do
+		if connection then
+			connection:Disconnect()
+		end
+	end
+	self._tweenConnections = {}
+end
+
+--[[
+	Starts cycling through all camera position sets (Pokemon Sword style)
+	Cycles through: Default → FriendlyZoomOut → ToSide → ToSide2 → BirdsEye → FoeZoomOut → (repeat)
+	@param duration Duration for each transition in seconds
+]]
+function CameraController:StartCycleAll(duration: number)
+	self:StopCycle()
+	
+	-- Define the order of position sets to cycle through
+	local positionOrder = {"Default", "FriendlyZoomOut", "ToSide", "ToSide2", "BirdsEye", "FoeZoomOut"}
+	
+	-- Filter to only include positions that exist
+	local availablePositions = {}
+	for _, positionName in ipairs(positionOrder) do
+		if self._cameraPositions[positionName] and #self._cameraPositions[positionName] > 0 then
+			table.insert(availablePositions, positionName)
+		end
+	end
+	
+	if #availablePositions == 0 then
+		warn("[CameraController] No camera positions available for cycling")
+		return
+	end
+	
+	-- Reset cleanup flag when starting a new cycle
+	self._isCleaningUp = false
+	
+	self._cycleRunning = true
+	self._cycleVersion = self._cycleVersion + 1
+	local currentVersion = self._cycleVersion
+	
+	task.spawn(function()
+		local positionSetIndex = 1
+		local previousPositionSetName = nil
+		
+		while self._cycleRunning and currentVersion == self._cycleVersion and not self._isCleaningUp do
+			local positionSetName = availablePositions[positionSetIndex]
+			local positions = self._cameraPositions[positionSetName]
+			
+			if positions and #positions > 0 then
+				-- Cycle through all positions in this set
+				for positionIndex = 1, #positions do
+					if not (self._cycleRunning and currentVersion == self._cycleVersion and not self._isCleaningUp) then
+						break
+					end
+					
+					local cameraPosition = positions[positionIndex]
+					if cameraPosition then
+						-- Check if we're transitioning to a new position set (instant) or within same set (tween)
+						local isNewPositionSet = (previousPositionSetName ~= positionSetName)
+						local isFirstPositionInSet = (positionIndex == 1)
+						local shouldTween = not (isNewPositionSet and isFirstPositionInSet)
+						
+						-- Check cleanup flag before creating tween
+						if self._isCleaningUp then
+							break
+						end
+						
+						if self._activeTween then
+							self._activeTween:Cancel()
+							self._activeTween = nil
+						end
+						
+						if shouldTween then
+							-- Check cleanup flag again before creating new tween
+							if self._isCleaningUp then
+								break
+							end
+							
+							-- Tween within the same position set (e.g., 1→2)
+							local tweenInfo = TweenInfo.new(
+								duration,
+								Enum.EasingStyle.Quad,
+								Enum.EasingDirection.InOut
+							)
+							
+							self._activeTween = TweenService:Create(self._camera, tweenInfo, {CFrame = cameraPosition.CFrame})
+							self._activeTween:Play()
+							
+							-- Wait for tween completion
+							local tweenCompleted = false
+							local connection
+							connection = self._activeTween.Completed:Connect(function()
+								tweenCompleted = true
+								if connection then
+									connection:Disconnect()
+									-- Remove from tracked connections
+									local idx = table.find(self._tweenConnections, connection)
+									if idx then
+										table.remove(self._tweenConnections, idx)
+									end
+								end
+							end)
+							
+							-- Track this connection
+							table.insert(self._tweenConnections, connection)
+							
+							-- Wait for completion or until cycle is stopped
+							while not tweenCompleted and self._cycleRunning and currentVersion == self._cycleVersion and not self._isCleaningUp do
+								task.wait(0.05)
+							end
+							
+							if connection then
+								connection:Disconnect()
+								-- Remove from tracked connections
+								local idx = table.find(self._tweenConnections, connection)
+								if idx then
+									table.remove(self._tweenConnections, idx)
+								end
+							end
+							
+							-- Small delay before next transition
+							if self._cycleRunning and currentVersion == self._cycleVersion and not self._isCleaningUp then
+								task.wait(0.1)
+							end
+						else
+							-- Instant transition to first position of new set
+							self._camera.CFrame = cameraPosition.CFrame
+							-- Small delay before next transition
+							if self._cycleRunning and currentVersion == self._cycleVersion and not self._isCleaningUp then
+								task.wait(0.1)
+							end
+						end
+						
+						-- Update previous position set name after processing
+						previousPositionSetName = positionSetName
+					end
+				end
+			end
+			
+			-- Move to next position set
+			positionSetIndex = (positionSetIndex % #availablePositions) + 1
+		end
+		
+		-- Clear active tween reference when cycle exits
+		if self._activeTween and currentVersion == self._cycleVersion then
+			self._activeTween = nil
+		end
+	end)
+end
+
+--[[
+	Stops cycle and returns camera to Default position
+]]
+function CameraController:ReturnToDefault()
+	-- Set cleanup flag temporarily to prevent new tweens from starting
+	self._isCleaningUp = true
+	
+	-- Stop cycle (non-blocking)
+	self._cycleRunning = false
+	self._cycleVersion = self._cycleVersion + 1
+	
+	-- Cancel active tween immediately
+	if self._activeTween then
+		self._activeTween:Cancel()
+		self._activeTween = nil
+	end
+	
+	-- Disconnect all tracked tween connections
+	for _, connection in ipairs(self._tweenConnections) do
+		if connection then
+			connection:Disconnect()
+		end
+	end
+	self._tweenConnections = {}
+	
+	-- Check if Default position exists
+	local defaultPositions = self._cameraPositions["Default"]
+	if defaultPositions and #defaultPositions > 0 then
+		local defaultPosition = defaultPositions[1]
+		if defaultPosition then
+			-- Instantly snap to Default position
+			self._camera.CFrame = defaultPosition.CFrame
+		end
+	else
+		warn("[CameraController] Default position not found")
+	end
+	
+	-- Reset cleanup flag so cycles can resume later if needed
+	self._isCleaningUp = false
 end
 
 --[[
 	Resets camera to normal gameplay mode
 ]]
 function CameraController:ResetToGameplay()
-	self:StopCycle()
+	-- Set cleanup flag to prevent new tweens
+	self._isCleaningUp = true
+	
+	-- Stop cycle and cancel any active tweens
+	self._cycleRunning = false
+	self._cycleVersion = self._cycleVersion + 1
+	
+	if self._activeTween then
+		self._activeTween:Cancel()
+		self._activeTween = nil
+	end
+	
+	-- Disconnect all tracked tween connections
+	for _, connection in ipairs(self._tweenConnections) do
+		if connection then
+			connection:Disconnect()
+		end
+	end
+	self._tweenConnections = {}
+	
+	-- Set camera properties directly to prevent lingering tweens
+	-- Store current CFrame to prevent camera from snapping
+	local currentCFrame = self._camera.CFrame
 	self._camera.CameraType = Enum.CameraType.Custom
 	self._camera.FieldOfView = 70
+	-- Restore CFrame to prevent visual glitch
+	self._camera.CFrame = currentCFrame
 end
 
 --[[
@@ -174,7 +464,28 @@ end
 	Cleanup all camera operations
 ]]
 function CameraController:Cleanup()
-	self:StopCycle()
+	-- Set cleanup flag first to prevent new tweens
+	self._isCleaningUp = true
+	
+	-- Stop cycle
+	self._cycleRunning = false
+	self._cycleVersion = self._cycleVersion + 1
+	
+	-- Cancel active tween
+	if self._activeTween then
+		self._activeTween:Cancel()
+		self._activeTween = nil
+	end
+	
+	-- Disconnect all tracked tween connections
+	for _, connection in ipairs(self._tweenConnections) do
+		if connection then
+			connection:Disconnect()
+		end
+	end
+	self._tweenConnections = {}
+	
+	-- Reset to gameplay mode
 	self:ResetToGameplay()
 end
 

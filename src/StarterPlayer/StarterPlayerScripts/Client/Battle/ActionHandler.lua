@@ -25,6 +25,7 @@ function ActionHandler.new(battleState: any): any
 	self._battleState = battleState
 	self._actionLocked = false
     self._lastTurnId = 0
+	self._cameraController = nil
 	self._callbacks = {
 		onMoveSelected = nil,
 		onSwitchRequested = nil,
@@ -77,6 +78,14 @@ function ActionHandler:OnCantRun(callback: ActionCallback)
 end
 
 --[[
+	Sets the camera controller reference
+	@param cameraController The camera controller instance
+]]
+function ActionHandler:SetCameraController(cameraController: any)
+	self._cameraController = cameraController
+end
+
+--[[
 	Executes a move
 	@param moveIndex The move index (1-4)
 ]]
@@ -100,6 +109,11 @@ function ActionHandler:ExecuteMove(moveIndex: number)
 	end
 	
 	local move = moves[moveIndex]
+	
+	-- Stop camera cycle and return to Default when action is taken
+	if self._cameraController then
+		self._cameraController:ReturnToDefault()
+	end
 	
 	-- Lock actions
 	self._actionLocked = true
@@ -160,6 +174,11 @@ function ActionHandler:RequestSwitch(creatureIndex: number)
 		return
 	end
 	
+	-- Stop camera cycle and return to Default when action is taken
+	if self._cameraController then
+		self._cameraController:ReturnToDefault()
+	end
+	
 	-- Lock actions
 	self._actionLocked = true
 	self._battleState.PlayerTurnUsed = true
@@ -210,6 +229,11 @@ function ActionHandler:AttemptRun()
 			self._callbacks.onCantRun()
 		end
 		return
+	end
+	
+	-- Stop camera cycle and return to Default when action is taken
+	if self._cameraController then
+		self._cameraController:ReturnToDefault()
 	end
 	
 	-- Lock actions

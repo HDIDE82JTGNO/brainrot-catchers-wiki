@@ -1,6 +1,7 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
+local MarketplaceService = game:GetService("MarketplaceService")
 
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
@@ -18,27 +19,15 @@ local Items = require(Shared:WaitForChild("Items"))
 local UtilitiesFolder = script.Parent.Parent:WaitForChild("Utilities")
 local Say = require(UtilitiesFolder:WaitForChild("Say"))
 local CharacterFunctions = require(UtilitiesFolder:WaitForChild("CharacterFunctions"))
+local BoxBackgrounds = require(UtilitiesFolder:WaitForChild("BoxBackgrounds"))
 local ClientData = require(script.Parent.Parent:WaitForChild("Plugins"):WaitForChild("ClientData"))
 
 local Events = ReplicatedStorage:WaitForChild("Events")
 local Request = Events:WaitForChild("Request")
 
 local Vault = {}
--- Predefined Box Background IDs (expandable)
-local BOX_BACKGROUNDS: {number} = {
-    140677672905926, -- CatchInc
-    81042384701409,  -- BC's logo
-    89197109127471,  -- Yellow studs
-    122211658648741, -- Blue studs
-    104351619158315, -- Red studs
-    82088477616564,  -- Shiny (1)
-}
-
-local function getDefaultBackgroundForBox(index: number): string
-    if #BOX_BACKGROUNDS == 0 then return "" end
-    local i = math.max(1, ((index - 1) % #BOX_BACKGROUNDS) + 1)
-    return tostring(BOX_BACKGROUNDS[i])
-end
+-- Vault+ gamepass ID
+local VAULTPLUS_GAMEPASS_ID = 1656816296
 
 local function setCurrentBoxBackground(imageContainer: Instance?, bgId: string?)
     if not imageContainer then return end
@@ -53,7 +42,7 @@ local function getBackgroundForBoxIndex(boxes: {any}, index: number): string
     local entry = boxes[index]
     local bgId = entry and (entry :: any).Background
     if not bgId or bgId == "" then
-        bgId = getDefaultBackgroundForBox(index)
+        bgId = BoxBackgrounds.GetDefaultBackgroundForBox(index)
     end
     return tostring(bgId)
 end
@@ -75,9 +64,12 @@ end
 
 -- Internal state
 local _currentBoxIndex = 1
+local _currentCreatureIndex = nil -- Index of creature currently shown in summary (within current box)
 local _swapState = { from = nil } -- from = { where = "Box"|"Party", box = number?, index = number }
 local _pendingBoxesOrder = nil -- snapshot to send on close
 local _pendingParty = nil -- snapshot party to send on close
+local _selectionMode = false -- Whether vault is in selection mode
+local _selectionCallback = nil -- Callback function for selection mode: (creatureData, locationInfo) -> ()
 
 local function getGui()
     local gui = GameUI:FindFirstChild("Vault")
@@ -118,14 +110,32 @@ end
 local function coalesceBoxes(pd)
     local boxes = (pd and pd.Boxes) or {}
     local out = {}
+    
+    -- Check Vault+ ownership to determine max box count
+    local success, ownsGamepass = pcall(function()
+        return MarketplaceService:UserOwnsGamePassAsync(LocalPlayer.UserId, VAULTPLUS_GAMEPASS_ID)
+    end)
+    local maxBoxes = (success and ownsGamepass) and 50 or 8
+    
+    -- Process existing boxes from player data
     for i, entry in ipairs(boxes) do
         local name = (type(entry) == "table" and entry.Name) or ("Box " .. tostring(i))
         local list = (type(entry) == "table" and entry.Creatures) or {}
-        table.insert(out, { Name = tostring(name), Creatures = list })
+        out[i] = { Name = tostring(name), Creatures = list }
     end
+    
+    -- Ensure all boxes up to max count exist (create empty ones if missing)
+    for i = 1, maxBoxes do
+        if not out[i] then
+            out[i] = { Name = "Box " .. tostring(i), Creatures = {} }
+        end
+    end
+    
+    -- If somehow no boxes exist, ensure at least Box 1
     if #out == 0 then
-        table.insert(out, { Name = "Box 1", Creatures = {} })
+        out[1] = { Name = "Box 1", Creatures = {} }
     end
+    
     return out
 end
 
@@ -135,6 +145,20 @@ local function clampToMax30(creatures: {any}): {any}
         out[i] = creatures[i]
     end
     return out
+end
+
+-- Compact an array by removing nil gaps (shifts elements forward)
+local function compactArray(arr: {any}, maxSize: number?): {any}
+    local compacted = {}
+    local count = 0
+    local max = maxSize or #arr
+    for i = 1, max do
+        if arr[i] ~= nil then
+            count += 1
+            compacted[count] = arr[i]
+        end
+    end
+    return compacted
 end
 
 local function clearChildrenExcept(container, keepSet)
@@ -157,6 +181,9 @@ end
 local function showCreatureOptions(rootButton, handlers, context)
     local gui = getGui()
     if not gui then return end
+    
+    -- In selection mode, only show Swap and Summary buttons
+    local isSelectionMode = _selectionMode
     -- Remove any existing options under other boxes
     local function purgeExisting()
         for _, b in ipairs(gui:GetDescendants()) do
@@ -184,8 +211,16 @@ local function showCreatureOptions(rootButton, handlers, context)
     local options = template:Clone()
     options.Visible = true
     options.Parent = rootButton
+    
+    -- In selection mode, only show Swap and Summary buttons
+    if isSelectionMode then
+        for _, child in ipairs(options:GetChildren()) do
+            if child:IsA("GuiObject") and child.Name ~= "Swap" and child.Name ~= "Summary" then
+                child:Destroy()
+            end
+        end
     -- If slot is empty, keep only Swap button
-    if context and context.isEmpty == true then
+    elseif context and context.isEmpty == true then
         for _, child in ipairs(options:GetChildren()) do
             if child:IsA("GuiObject") and child.Name ~= "Swap" then
                 child:Destroy()
@@ -225,10 +260,17 @@ local function showCreatureOptions(rootButton, handlers, context)
             end)
         end
     end
-    bind("Swap", handlers.onSwap)
-    bind("Summary", handlers.onSummary)
-    bind("TakeItem", handlers.onTakeItem)
-    bind("Desync", handlers.onDesync)
+    
+    -- In selection mode, Swap button triggers selection callback
+    if isSelectionMode then
+        bind("Swap", handlers.onSwap or function() end)
+        bind("Summary", handlers.onSummary or function() end)
+    else
+        bind("Swap", handlers.onSwap)
+        bind("Summary", handlers.onSummary)
+        bind("TakeItem", handlers.onTakeItem)
+        bind("Desync", handlers.onDesync)
+    end
 
     -- Click-off-to-dismiss
     local UIS = game:GetService("UserInputService")
@@ -251,6 +293,71 @@ local function showCreatureOptions(rootButton, handlers, context)
     end)
     options.Destroying:Connect(function()
         if conn then conn:Disconnect() end
+    end)
+end
+
+local function closeVaultWithSelection(creatureData, locationInfo)
+    -- Call the selection callback if provided
+    if _selectionCallback then
+        _selectionCallback(creatureData, locationInfo)
+    end
+    
+    -- Close the vault (reuse existing close logic)
+    local gui = getGui()
+    if not gui then return end
+    
+    -- Play close sfx/flash
+    pcall(function()
+        local s = SFX and SFX:FindFirstChild("ShutOff")
+        if s and s:IsA("Sound") then s:Play() end
+    end)
+    playVaultFlash(false)
+    
+    -- Send pending ordering to server (only if not in selection mode, but we'll do it anyway for consistency)
+    -- Note: snapshotBoxesForSave is defined later, but will be available at runtime
+    local function getSnapshotPayload()
+        local pd = ClientData:Get()
+        local boxes = _pendingBoxesOrder or coalesceBoxes(pd)
+        local outBoxes = {}
+        for i, entry in ipairs(boxes) do
+            outBoxes[i] = { Name = tostring(entry.Name or ("Box " .. tostring(i))), Creatures = clampToMax30(entry.Creatures or {}) }
+        end
+        return { Boxes = outBoxes }
+    end
+    
+    local payload = getSnapshotPayload()
+    local pd = ClientData:Get()
+    payload.Party = _pendingParty or (pd and pd.Party) or {}
+    pcall(function()
+        Request:InvokeServer({"UpdateVaultBoxes", payload})
+    end)
+    
+    -- Properly show TopBar via UI module API
+    pcall(function()
+        local UI = require(script.Parent)
+        if UI and UI.TopBar and UI.TopBar.Show then
+            UI.TopBar:Show()
+        end
+    end)
+    
+    -- Hide the Vault only after the flash has fully covered the screen
+    task.delay(0.75, function()
+        if gui and gui.Parent then
+            gui.Visible = false
+            -- Also reset summary visibility so it won't persist next time
+            local middle = gui:FindFirstChild("Middle")
+            SummaryUI:Hide()
+            _currentCreatureIndex = nil
+            if middle then middle.Visible = true end
+            -- Re-enable movement now that Vault is fully closed
+            pcall(function()
+                CharacterFunctions:SetSuppressed(false)
+                CharacterFunctions:CanMove(true)
+            end)
+            -- Reset selection mode state
+            _selectionMode = false
+            _selectionCallback = nil
+        end
     end)
 end
 
@@ -307,27 +414,76 @@ local function renderCurrentBox()
     do
         local bgId = (entry and (entry :: any).Background)
         if not bgId or bgId == "" then
-            bgId = getDefaultBackgroundForBox(_currentBoxIndex)
+            bgId = BoxBackgrounds.GetDefaultBackgroundForBox(_currentBoxIndex)
         end
         setCurrentBoxBackground(currentBox, bgId)
     end
 
     clearChildrenExcept(currentBox, { UIGridLayout = true, UIAspectRatioConstraint = true, UIPadding = true })
+    
+    -- Animation constants for staggered reveal
+    local STAGGER_DELAY = 0.015 -- Very small delay for 30 items
+    local FADE_IN_TIME = 0.12
 
     for i = 1, 30 do
         local creature = list[i]
         local b = boxTemplate:Clone()
-        b.Visible = true
         b.Name = "BoxBtn_" .. tostring(i)
+        b.LayoutOrder = i
         b.Parent = currentBox
+        b.Visible = true
+        
         if creature then
             setIconState(b, creature)
         else
             clearAllChildren(b)
         end
+        
+        -- Store original transparency values before hiding for animation
+        local originalBgTransparency = b.BackgroundTransparency
+        local childOriginalTransparencies = {}
+        for _, child in ipairs(b:GetDescendants()) do
+            if child:IsA("ImageLabel") then
+                childOriginalTransparencies[child] = { type = "image", value = child.ImageTransparency }
+            elseif child:IsA("UIStroke") then
+                childOriginalTransparencies[child] = { type = "stroke", value = child.Transparency }
+            end
+        end
+        
+        -- Now set to transparent for fade-in
+        b.BackgroundTransparency = 1
+        for child, data in pairs(childOriginalTransparencies) do
+            if data.type == "image" then
+                child.ImageTransparency = 1
+            elseif data.type == "stroke" then
+                child.Transparency = 1
+            end
+        end
 
         b.MouseButton1Click:Connect(function()
             local isEmpty = creature == nil
+            
+            -- Handle selection mode
+            if _selectionMode then
+                -- Only allow selection of non-empty slots
+                if creature == nil then return end
+                local ctx = { where = "Box", box = _currentBoxIndex, index = i, isEmpty = false }
+                showCreatureOptions(b, {
+                    onSwap = function()
+                        -- In selection mode, Swap triggers the callback
+                        -- Don't close vault yet - let the callback handle confirmation first
+                        local locationInfo = { where = "Box", box = _currentBoxIndex, index = i }
+                        if _selectionCallback then
+                            _selectionCallback(creature, locationInfo)
+                        end
+                    end,
+                    onSummary = function()
+                        if creature then Vault:ShowSummary(creature, i) end
+                    end,
+                }, ctx)
+                return
+            end
+            
             if isEmpty and _swapState.from == nil then return end
             local ctx = { where = "Box", box = _currentBoxIndex, index = i, isEmpty = isEmpty }
             showCreatureOptions(b, {
@@ -359,7 +515,30 @@ local function renderCurrentBox()
                     local listA, idxA = getRef(from)
                     local listB, idxB = getRef(to)
                     if listA and listB then
-                        listA[idxA], listB[idxB] = listB[idxB], listA[idxA]
+                        local creatureA = listA[idxA]
+                        local creatureB = listB[idxB]
+                        
+                        -- Handle different swap scenarios
+                        if creatureB == nil and from.where == "Party" then
+                            -- Moving creature from party to empty box slot: remove from party and compact
+                            listB[idxB] = creatureA
+                            table.remove(listA, idxA)
+                            -- Compact party array (remove gaps)
+                            party2 = compactArray(party2, 6)
+                        elseif creatureA == nil and to.where == "Party" then
+                            -- Moving creature from empty box slot to party: add to end of party
+                            if #party2 < 6 then
+                                table.insert(party2, creatureB)
+                                listB[idxB] = nil
+                            else
+                                -- Party is full, can't add
+                                return
+                            end
+                        else
+                            -- Normal swap: both slots have creatures
+                            listA[idxA], listB[idxB] = listB[idxB], listA[idxA]
+                        end
+                        
                         _pendingBoxesOrder = boxes2
                         _pendingParty = party2
                         renderCurrentBox()
@@ -368,7 +547,7 @@ local function renderCurrentBox()
                     end
                 end,
                 onSummary = function()
-                    if creature then Vault:ShowSummary(creature) end
+                    if creature then Vault:ShowSummary(creature, i) end
                 end,
                 onTakeItem = function()
                     if not creature or not creature.HeldItem or creature.HeldItem == "" then
@@ -422,6 +601,31 @@ local function renderCurrentBox()
                     end
                 end,
             }, ctx)
+        end)
+        
+        -- Staggered fade-in animation
+        task.delay(i * STAGGER_DELAY, function()
+            if not b or not b.Parent then return end
+            
+            -- Fade in background to original value
+            TweenService:Create(b, TweenInfo.new(FADE_IN_TIME, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                BackgroundTransparency = originalBgTransparency
+            }):Play()
+            
+            -- Fade in icons and strokes to their original transparency values
+            for child, data in pairs(childOriginalTransparencies) do
+                if child and child.Parent then
+                    if data.type == "image" then
+                        TweenService:Create(child, TweenInfo.new(FADE_IN_TIME, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                            ImageTransparency = data.value
+                        }):Play()
+                    elseif data.type == "stroke" then
+                        TweenService:Create(child, TweenInfo.new(FADE_IN_TIME, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                            Transparency = data.value
+                        }):Play()
+                    end
+                end
+            end
         end)
     end
 end
@@ -484,7 +688,7 @@ function Vault:PopulateBoxList()
                 end
             end
         end
-        -- Switch to this box when box area clicked
+        -- Switch to this box when box area clicked (enabled in selection mode to allow accessing creatures from other boxes)
         local buttonArea = e:FindFirstChild("Box") or e
         if buttonArea and buttonArea:IsA("GuiObject") then
             buttonArea.InputBegan:Connect(function(input)
@@ -493,7 +697,7 @@ function Vault:PopulateBoxList()
                     renderCurrentBox()
                 end
             end)
-    end
+        end
 end
 
 function Vault:RenderParty()
@@ -530,6 +734,28 @@ function Vault:RenderParty()
 
         b.MouseButton1Click:Connect(function()
             local isEmpty = creature == nil
+            
+            -- Handle selection mode
+            if _selectionMode then
+                -- Only allow selection of non-empty slots
+                if creature == nil then return end
+                local ctx = { where = "Party", index = i, isEmpty = false }
+                showCreatureOptions(b, {
+                    onSwap = function()
+                        -- In selection mode, Swap triggers the callback
+                        -- Don't close vault yet - let the callback handle confirmation first
+                        local locationInfo = { where = "Party", index = i }
+                        if _selectionCallback then
+                            _selectionCallback(creature, locationInfo)
+                        end
+                    end,
+                    onSummary = function()
+                        if creature then Vault:ShowSummary(creature) end
+                    end,
+                }, ctx)
+                return
+            end
+            
             if isEmpty and _swapState.from == nil then return end
             local ctx = { where = "Party", index = i, isEmpty = isEmpty }
             showCreatureOptions(b, {
@@ -559,7 +785,30 @@ function Vault:RenderParty()
                         local listA, idxA = getRef(from)
                         local listB, idxB = getRef(to)
                         if listA and listB then
-                            listA[idxA], listB[idxB] = listB[idxB], listA[idxA]
+                            local creatureA = listA[idxA]
+                            local creatureB = listB[idxB]
+                            
+                            -- Handle different swap scenarios
+                            if creatureB == nil and from.where == "Party" then
+                                -- Moving creature from party to empty box slot: remove from party and compact
+                                listB[idxB] = creatureA
+                                table.remove(listA, idxA)
+                                -- Compact party array (remove gaps)
+                                party2 = compactArray(party2, 6)
+                            elseif creatureA == nil and to.where == "Party" then
+                                -- Moving creature from empty box slot to party: add to end of party
+                                if #party2 < 6 then
+                                    table.insert(party2, creatureB)
+                                    listB[idxB] = nil
+                                else
+                                    -- Party is full, can't add
+                                    return
+                                end
+                            else
+                                -- Normal swap: both slots have creatures
+                                listA[idxA], listB[idxB] = listB[idxB], listA[idxA]
+                            end
+                            
                             _pendingBoxesOrder = boxes2
                             _pendingParty = party2
                             renderCurrentBox()
@@ -618,15 +867,74 @@ function Vault:RenderParty()
     end
 end
 
-function Vault:ShowSummary(creatureData)
+function Vault:ShowSummary(creatureData, creatureIndex: number?)
     local gui = getGui(); if not gui then return end
-    local summary = gui:FindFirstChild("Summary"); if not summary then return end
-    -- Hide main lists if present
     local middle = gui:FindFirstChild("Middle")
+    
+    -- Track current creature index
+    _currentCreatureIndex = creatureIndex
+    
+    -- Hide main lists if present
     if middle then middle.Visible = false end
-    summary.Visible = true
-    -- Delegate rendering to shared Summary UI
-    SummaryUI:Render(summary, creatureData)
+    
+    -- Get current box creatures for navigation
+    local pd = ClientData:Get()
+    local boxes = _pendingBoxesOrder or coalesceBoxes(pd)
+    local entry = boxes[_currentBoxIndex]
+    local creatures = (entry and entry.Creatures) or {}
+    
+    -- Filter out nil entries for navigation
+    local validCreatures = {}
+    local validIndices = {}
+    for i, creature in ipairs(creatures) do
+        if creature then
+            table.insert(validCreatures, creature)
+            table.insert(validIndices, i)
+        end
+    end
+    
+    local creatureCount = #validCreatures
+    local canNavigate = creatureCount > 1
+    
+    -- Find current index in valid creatures list
+    local currentValidIndex = 1
+    if creatureIndex then
+        for i, origIdx in ipairs(validIndices) do
+            if origIdx == creatureIndex then
+                currentValidIndex = i
+                break
+            end
+        end
+    end
+    
+    -- Navigation function
+    local function navigate(delta: number)
+        if creatureCount <= 1 then return end
+        local nextValidIndex = ((currentValidIndex - 1 + delta) % creatureCount) + 1
+        local nextOrigIndex = validIndices[nextValidIndex]
+        local nextCreature = validCreatures[nextValidIndex]
+        if nextCreature then
+            Vault:ShowSummary(nextCreature, nextOrigIndex)
+        end
+    end
+    
+    -- Set up navigation callbacks
+    SummaryUI:SetNavigationCallbacks(
+        canNavigate and function() navigate(1) end or nil,
+        canNavigate and function() navigate(-1) end or nil,
+        function()
+            -- Close callback: show middle and hide summary
+            if middle then middle.Visible = true end
+            SummaryUI:Hide()
+            _currentCreatureIndex = nil
+        end
+    )
+    
+    -- Update navigation button visibility
+    SummaryUI:UpdateNavigationVisibility(canNavigate, canNavigate)
+    
+    -- Show summary with creature data
+    SummaryUI:Show(creatureData, "Vault")
 
     -- Ability UI wiring (Summary.AdditionalInfo.HA, Summary.Ability.AbilityText, Summary.Hidden.HiddenText)
     local function getHiddenAbilityName(speciesName: string?): string?
@@ -649,14 +957,17 @@ function Vault:ShowSummary(creatureData)
         return hiddenName
     end
 
-    do
+    -- Get GameUI.Summary frame for ability UI updates
+    local player = Players.LocalPlayer
+    local summaryFrame = player and player:FindFirstChild("PlayerGui") and player.PlayerGui:FindFirstChild("GameUI") and player.PlayerGui.GameUI:FindFirstChild("Summary")
+    if summaryFrame then
         local abilityName = tostring(creatureData.Ability or "")
         local speciesName = creatureData.BaseName or creatureData.Name
         local hiddenName = getHiddenAbilityName(speciesName)
         local hasHidden = (abilityName ~= "" and hiddenName ~= nil and abilityName == hiddenName)
 
         -- Ability text
-        local abilityFrame = summary:FindFirstChild("Ability")
+        local abilityFrame = summaryFrame:FindFirstChild("Ability")
         if abilityFrame and abilityFrame:IsA("Frame") then
             local abilityText = abilityFrame:FindFirstChild("AbilityText")
             if abilityText and abilityText:IsA("TextLabel") then
@@ -665,12 +976,12 @@ function Vault:ShowSummary(creatureData)
         end
 
         -- Hidden ability indicators
-        local additionalInfo = summary:FindFirstChild("AdditionalInfo")
+        local additionalInfo = summaryFrame:FindFirstChild("AdditionalInfo")
         local ha = additionalInfo and additionalInfo:FindFirstChild("HA")
         if ha and ha:IsA("GuiObject") then
             ha.Visible = hasHidden
         end
-        local hiddenFrame = summary:FindFirstChild("Hidden")
+        local hiddenFrame = summaryFrame:FindFirstChild("Hidden")
         if hiddenFrame and hiddenFrame:IsA("Frame") then
             hiddenFrame.Visible = hasHidden
             local hiddenText = hiddenFrame:FindFirstChild("HiddenText")
@@ -678,16 +989,6 @@ function Vault:ShowSummary(creatureData)
                 hiddenText.Text = hasHidden and hiddenName or ""
             end
         end
-    end
-
-    -- Back button inside summary
-    local closeBtn = summary:FindFirstChild("SummaryClose") or summary:FindFirstChild("Close")
-    if closeBtn and closeBtn:IsA("TextButton") then
-        closeBtn.MouseButton1Click:Connect(function()
-            summary.Visible = false
-            if middle then middle.Visible = true end
-            local mi = summary:FindFirstChild("MoveInfo"); if mi then mi.Visible = false end
-        end)
     end
 end
 
@@ -701,10 +1002,88 @@ local function snapshotBoxesForSave()
     return { Boxes = outBoxes }
 end
 
-function Vault:Open()
+local function closeVaultWithSelection(creatureData, locationInfo)
+    -- Call the selection callback if provided
+    if _selectionCallback then
+        _selectionCallback(creatureData, locationInfo)
+    end
+    
+    -- Close the vault (reuse existing close logic)
+    local gui = getGui()
+    if not gui then return end
+    
+    -- Play close sfx/flash
+    pcall(function()
+        local s = SFX and SFX:FindFirstChild("ShutOff")
+        if s and s:IsA("Sound") then s:Play() end
+    end)
+    playVaultFlash(false)
+    
+    -- Send pending ordering to server (only if not in selection mode, but we'll do it anyway for consistency)
+    local payload = snapshotBoxesForSave()
+    local pd = ClientData:Get()
+    payload.Party = _pendingParty or (pd and pd.Party) or {}
+    pcall(function()
+        Request:InvokeServer({"UpdateVaultBoxes", payload})
+    end)
+    
+    -- Properly show TopBar via UI module API
+    pcall(function()
+        local UI = require(script.Parent)
+        if UI and UI.TopBar and UI.TopBar.Show then
+            UI.TopBar:Show()
+        end
+    end)
+    
+    -- Hide the Vault only after the flash has fully covered the screen
+    task.delay(0.75, function()
+        if gui and gui.Parent then
+            gui.Visible = false
+            -- Also reset summary visibility so it won't persist next time
+            local middle = gui:FindFirstChild("Middle")
+            SummaryUI:Hide()
+            _currentCreatureIndex = nil
+            if middle then middle.Visible = true end
+            -- Re-enable movement now that Vault is fully closed
+            pcall(function()
+                CharacterFunctions:SetSuppressed(false)
+                CharacterFunctions:CanMove(true)
+            end)
+            -- Reset selection mode state
+            _selectionMode = false
+            _selectionCallback = nil
+        end
+    end)
+end
+
+function Vault:Open(options: {selectionMode: boolean?, onSelect: ((any, any) -> ())?}?)
     local gui = getGui(); if not gui then return end
+    
+    -- Check if Mystery Trade is active (only allow selection mode if in Selecting state)
+    if options and options.selectionMode == true then
+        local ok, MysteryTrade = pcall(function()
+            return require(script.Parent:WaitForChild("MysteryTrade"))
+        end)
+        if ok and MysteryTrade then
+            local state = MysteryTrade:GetState()
+            if state ~= "Selecting" then
+                -- Not in selecting state, don't allow vault to open in selection mode
+                return
+            end
+        end
+    end
+    
     _swapState.from = nil
     _pendingBoxesOrder = nil
+
+    -- Set up selection mode state
+    if options and options.selectionMode == true then
+        _selectionMode = true
+        _selectionCallback = options.onSelect
+    else
+        _selectionMode = false
+        _selectionCallback = nil
+    end
 
     -- Initial render
     _currentBoxIndex = 1
@@ -714,12 +1093,15 @@ function Vault:Open()
 
     -- Ensure summary starts hidden every open
     do
-        local summary = gui:FindFirstChild("Summary")
         local middle = gui:FindFirstChild("Middle")
-        if summary then summary.Visible = false end
         if middle then middle.Visible = true end
-        local mi = summary and summary:FindFirstChild("MoveInfo")
-        if mi then mi.Visible = false end
+        SummaryUI:Hide()
+        _currentCreatureIndex = nil
+        -- Update Settings button visibility based on selection mode
+        local settingsBtn = middle and middle:FindFirstChild("Settings")
+        if settingsBtn and settingsBtn:IsA("GuiButton") then
+            settingsBtn.Visible = not _selectionMode
+        end
     end
 
     -- Prevent player movement while Vault is open
@@ -749,52 +1131,99 @@ function Vault:Open()
     if not gui:GetAttribute("ConnectionsMade") then
         gui:SetAttribute("ConnectionsMade", true)
         local closeBtn = gui:FindFirstChild("Close")
-        if closeBtn and closeBtn:IsA("TextButton") then
-            closeBtn.MouseButton1Click:Connect(function()
-                -- play close sfx/flash
-                pcall(function()
-                    local s = SFX and SFX:FindFirstChild("ShutOff")
-                    if s and s:IsA("Sound") then s:Play() end
-                end)
-                playVaultFlash(false)
-                -- send pending ordering to server
-                local payload = snapshotBoxesForSave()
-                local pd = ClientData:Get()
-                payload.Party = _pendingParty or (pd and pd.Party) or {}
-                pcall(function()
-                    Request:InvokeServer({"UpdateVaultBoxes", payload})
-                end)
-                -- Properly show TopBar via UI module API
-                pcall(function()
-                    local UI = require(script.Parent)
-                    if UI and UI.TopBar and UI.TopBar.Show then
-                        UI.TopBar:Show()
+        if closeBtn and (closeBtn:IsA("TextButton") or closeBtn:IsA("ImageButton")) then
+            UIFunctions:NewButton(
+                closeBtn,
+                {"Action"},
+                { Click = "One", HoverOn = "One", HoverOff = "One" },
+                0.3,
+                function()
+                    Audio.SFX.Click:Play()
+                    
+                    -- SECURITY: Prevent closing vault if Say is active (e.g., during confirmation prompts)
+                    if Say:IsActive() then
+                        return
                     end
-                end)
-                -- Hide the Vault only after the flash has fully covered the screen
-                task.delay(0.75, function()
-                    if gui and gui.Parent then
-                        gui.Visible = false
-                        -- Also reset summary visibility so it won't persist next time
-                        local summary = gui:FindFirstChild("Summary")
-                        local middle = gui:FindFirstChild("Middle")
-                        if summary then summary.Visible = false end
-                        if middle then middle.Visible = true end
-                        local mi = summary and summary:FindFirstChild("MoveInfo")
-                        if mi then mi.Visible = false end
-                        -- Re-enable movement now that Vault is fully closed
-                        pcall(function()
-                            CharacterFunctions:SetSuppressed(false)
-                            CharacterFunctions:CanMove(true)
+                    
+                    -- Check if we're in selection mode during Mystery Trade
+                    if _selectionMode then
+                        local ok, MysteryTrade = pcall(function()
+                            return require(script.Parent:WaitForChild("MysteryTrade"))
                         end)
+                        if ok and MysteryTrade then
+                            local state = MysteryTrade:GetState()
+                            if state == "Selecting" then
+                                -- Show confirmation dialog
+                                Say:Say("System", false, {"Are you sure you want to cancel the trade?"})
+                                local choice = Say:YieldChoice()
+                                Say:Exit()
+                                
+                                if choice ~= true then
+                                    -- User chose No, do nothing
+                                    return
+                                end
+                                
+                                -- User chose Yes, cancel the trade
+                                MysteryTrade:HandleAbort("Trade cancelled.")
+                                -- The HandleAbort will close the vault, so we don't need to do it here
+                                return
+                            end
+                        end
                     end
-                end)
-            end)
+                    
+                    -- Normal close behavior
+                    -- play close sfx/flash
+                    pcall(function()
+                        local s = SFX and SFX:FindFirstChild("ShutOff")
+                        if s and s:IsA("Sound") then s:Play() end
+                    end)
+                    playVaultFlash(false)
+                    -- send pending ordering to server
+                    local payload = snapshotBoxesForSave()
+                    local pd = ClientData:Get()
+                    payload.Party = _pendingParty or (pd and pd.Party) or {}
+                    pcall(function()
+                        Request:InvokeServer({"UpdateVaultBoxes", payload})
+                    end)
+                    -- Properly show TopBar via UI module API
+                    pcall(function()
+                        local UI = require(script.Parent)
+                        if UI and UI.TopBar and UI.TopBar.Show then
+                            UI.TopBar:Show()
+                        end
+                    end)
+                    -- Hide the Vault only after the flash has fully covered the screen
+                    task.delay(0.75, function()
+                        if gui and gui.Parent then
+                            gui.Visible = false
+                            -- Also reset summary visibility so it won't persist next time
+                            local middle = gui:FindFirstChild("Middle")
+                            SummaryUI:Hide()
+                            _currentCreatureIndex = nil
+                            if middle then middle.Visible = true end
+                            -- Re-enable movement now that Vault is fully closed
+                            pcall(function()
+                                CharacterFunctions:SetSuppressed(false)
+                                CharacterFunctions:CanMove(true)
+                            end)
+                            -- Reset selection mode state
+                            _selectionMode = false
+                            _selectionCallback = nil
+                        end
+                    end)
+                end
+            )
         end
-        -- Wire Middle.Settings (Box options)
+        -- Wire Middle.Settings (Box options) - hide in selection mode
         local middle = gui:FindFirstChild("Middle")
         local settingsBtn = middle and middle:FindFirstChild("Settings")
 		if settingsBtn and settingsBtn:IsA("GuiButton") then
+			-- Hide Settings button in selection mode
+			if _selectionMode then
+				settingsBtn.Visible = false
+			else
+				settingsBtn.Visible = true
+			end
 			UIFunctions:NewButton(settingsBtn, {"Action"}, {Click = "One", HoverOn = "One", HoverOff = "One"}, 0.25, function()
 				-- Open/Show BoxOptions overlay (single instance, toggled visible)
 				local options = gui:FindFirstChild("BoxOptions_Active")
@@ -880,8 +1309,8 @@ function Vault:Open()
                                 end
                             end
 
-                            -- Populate with available backgrounds
-                            for _, id in ipairs(BOX_BACKGROUNDS) do
+							-- Populate with available backgrounds
+							for _, id in ipairs(BoxBackgrounds.GetBackgrounds()) do
                                 local b = template:Clone()
                                 b.Visible = true
                                 b.Name = "BG_" .. tostring(id)
@@ -1010,6 +1439,54 @@ function Vault:Open()
         end
     end
 
+end
+
+function Vault:Close()
+	local gui = getGui()
+	if not gui then return end
+	
+	-- Play close sfx/flash
+	pcall(function()
+		local s = SFX and SFX:FindFirstChild("ShutOff")
+		if s and s:IsA("Sound") then s:Play() end
+	end)
+	playVaultFlash(false)
+	
+	-- Send pending ordering to server
+	local payload = snapshotBoxesForSave()
+	local pd = ClientData:Get()
+	payload.Party = _pendingParty or (pd and pd.Party) or {}
+	pcall(function()
+		Request:InvokeServer({"UpdateVaultBoxes", payload})
+	end)
+	
+	-- Properly show TopBar via UI module API
+	pcall(function()
+		local UI = require(script.Parent)
+		if UI and UI.TopBar and UI.TopBar.Show then
+			UI.TopBar:Show()
+		end
+	end)
+	
+	-- Hide the Vault only after the flash has fully covered the screen
+	task.delay(0.75, function()
+		if gui and gui.Parent then
+			gui.Visible = false
+			-- Also reset summary visibility so it won't persist next time
+			local middle = gui:FindFirstChild("Middle")
+			SummaryUI:Hide()
+			_currentCreatureIndex = nil
+			if middle then middle.Visible = true end
+			-- Re-enable movement now that Vault is fully closed
+			pcall(function()
+				CharacterFunctions:SetSuppressed(false)
+				CharacterFunctions:CanMove(true)
+			end)
+			-- Reset selection mode state
+			_selectionMode = false
+			_selectionCallback = nil
+		end
+	end)
 end
 
 return Vault

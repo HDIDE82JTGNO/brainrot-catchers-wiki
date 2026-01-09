@@ -39,6 +39,7 @@ local TIER_ITEMS: {[number]: TierDefinition} = {
 			{ ItemName = "Stone Armor", Price = 900 },
 			{ ItemName = "Focus Bandage", Price = 1500 },
 			{ ItemName = "Crumbs", Price = 950 },
+			{ ItemName = "Focus Spray", Price = 400 },
 		},
 	},
 	[3] = {
@@ -50,6 +51,7 @@ local TIER_ITEMS: {[number]: TierDefinition} = {
 			{ ItemName = "Metal Fist", Price = 1650 },
 			{ ItemName = "Fairy Dust", Price = 1650 },
 			{ ItemName = "Echo Bell", Price = 1725 },
+			{ ItemName = "Focus Spray", Price = 400 },
 		},
 	},
 	[4] = {
@@ -60,6 +62,7 @@ local TIER_ITEMS: {[number]: TierDefinition} = {
 			{ ItemName = "Rage Core", Price = 2200 },
 			{ ItemName = "Inferno Seed", Price = 2800 },
 			{ ItemName = "Tore Stone", Price = 3000 },
+			{ ItemName = "Super Focus Spray", Price = 700 },
 		},
 	},
 	[5] = {
@@ -71,6 +74,7 @@ local TIER_ITEMS: {[number]: TierDefinition} = {
 			{ ItemName = "Bright Core", Price = 1600 },
 			{ ItemName = "Echo Bell", Price = 1725 },
 			{ ItemName = "Rot Cube", Price = 1400 },
+			{ ItemName = "Max Focus Spray", Price = 900 },
 		},
 	},
 }

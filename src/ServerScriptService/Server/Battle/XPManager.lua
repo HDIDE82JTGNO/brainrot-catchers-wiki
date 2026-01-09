@@ -259,7 +259,10 @@ function XPManager.EvolveCreature(creature: Creature): (boolean, string?)
 	end
 	
 	-- Check if the creature has reached the evolution level
-	if not creature.Level or creature.Level < creatureData.EvolutionLevel then
+	-- Safety check: ensure both Level and EvolutionLevel are numbers before comparing
+	if not creature.Level or type(creature.Level) ~= "number" or 
+	   not creatureData.EvolutionLevel or type(creatureData.EvolutionLevel) ~= "number" or
+	   creature.Level < creatureData.EvolutionLevel then
 		return false, nil
 	end
 	
@@ -358,8 +361,8 @@ end
 	@param defeatedCreature The defeated creature
 	@param receivingCreature The creature receiving XP
 	@param isTrainerBattle Whether this was a trainer battle
-	@param participantCount Number of creatures that participated
-	@param isShared Whether this is shared XP (exp share)
+	@param participantCount Number of creatures that participated (when EXP Share is on, this should be total non-fainted party members)
+	@param isShared DEPRECATED: This parameter is no longer used. Participant count should be passed directly via participantCount.
 	@return number XP amount
 ]]
 function XPManager.CalculateXPYield(
@@ -398,8 +401,9 @@ function XPManager.CalculateXPYield(
 	-- v: Evolution bonus (can evolve but hasn't) - not implemented, always 1
 	local v = 1.0
 	
-	-- s: Number of participants (if shared XP, use 2 to halve the XP)
-	local s = isShared and 2 or (participantCount or 1)
+	-- s: Number of participants (participantCount should already account for EXP Share)
+	-- Note: isShared parameter is deprecated and ignored
+	local s = participantCount or 1
 	
 	-- Calculate XP using Pokémon formula
 	local xp = math.floor((a * t * b * e * L * p * f * v) / (7 * s))

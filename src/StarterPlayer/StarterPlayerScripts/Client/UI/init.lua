@@ -12,4 +12,9 @@ return {
 	NameInput = require(script:WaitForChild("NameInput")),
 	CatchCareShop = require(script:WaitForChild("CatchCareShop")),
 	BadgeAnimation = require(script:WaitForChild("BadgeAnimation")),
+	CurrentRequest = require(script:WaitForChild("CurrentRequest")),
+	Trade = require(script:WaitForChild("Trade")),
+	WorldInfo = require(script:WaitForChild("WorldInfo")),
+	AdminPanel = require(script:WaitForChild("AdminPanel")),
+	Shop = require(script:WaitForChild("Shop")),
 }

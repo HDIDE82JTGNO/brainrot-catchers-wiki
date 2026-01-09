@@ -15,6 +15,7 @@ local UIFunctions = require(script.Parent.Parent.UI.UIFunctions)
 local UI = require(script.Parent.Parent.UI)
 local CutsceneRegistry = require(script.Parent:WaitForChild("CutsceneRegistry"))
 local IndoorCamera = require(script.Parent:WaitForChild("IndoorCamera"))
+local WorldInfo = require(script.Parent.Parent.UI:WaitForChild("WorldInfo"))
 
 local Events = game.ReplicatedStorage.Events
 
@@ -277,6 +278,11 @@ function ChunkManager:Load(Chunk: Folder, Visual: boolean, ClearCurrentChunk)
 			DBG:print("No chunk event function found for:", "Load_"..Chunk.Name)
 		end
 	end)
+	
+	-- Update WorldInfo with current chunk for weather display
+	pcall(function()
+		WorldInfo:SetCurrentChunk(Chunk.Name)
+	end)
 
 	DBG:print(string.format("Chunk setup in %.2f seconds!", tick() - LoadStartTime))
 
@@ -296,11 +302,108 @@ function ChunkManager:PositionPlayerAtStartDoor()
 	-- Priority 0: Check for LeaveData CFrame positioning (highest priority)
 	local ClientData = require(script.Parent.Parent.Plugins.ClientData)
 	local PlayerData = ClientData:Get()
+	local currentChunkName = ChunkManager.CurrentChunk and ChunkManager.CurrentChunk.Model and ChunkManager.CurrentChunk.Model.Name
+	local doors = ChunkManager.CurrentChunk and ChunkManager.CurrentChunk.Doors or {}
+
+	-- Helper: spawn at Essentials.Spawn for no-door chunks (e.g., Trade)
+	local function trySpawnAtSpawnPart()
+		-- Only attempt when the chunk explicitly has no doors or is named Trade
+		local hasNoDoors = (type(doors) == "table" and #doors == 0)
+		if not ((currentChunkName == "Trade") or (hasNoDoors and ChunkManager.CurrentChunk and ChunkManager.CurrentChunk.Essentials:FindFirstChild("Spawn"))) then
+			return false
+		end
+
+		local spawnPart = ChunkManager.CurrentChunk.Essentials:FindFirstChild("Spawn")
+		if not spawnPart then
+			return false
+		end
+
+		local player = Players.LocalPlayer
+		if not player then
+			return false
+		end
+
+		local function applySpawn()
+			local character = player.Character
+			local hrp = character and character:FindFirstChild("HumanoidRootPart")
+			if not hrp then
+				return false
+			end
+
+			hrp.CFrame = spawnPart.CFrame
+			if hrp.AssemblyLinearVelocity then
+				hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+			end
+			if hrp.AssemblyAngularVelocity then
+				hrp.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+			end
+			local humanoid = character:FindFirstChildOfClass("Humanoid")
+			if humanoid then
+				pcall(function()
+					humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+				end)
+			end
+
+			DBG:print("[ChunkLoader] Positioned player at Spawn (chunk=", tostring(currentChunkName), ", part=", spawnPart.Name, ")")
+
+			task.delay(0.8, function()
+				SafeCanMove(true, "spawn part (no doors)")
+			end)
+
+			-- End circular transition (screen comes back)
+			local PlayerGui = player and player.PlayerGui
+			local GameUI = PlayerGui and PlayerGui:FindFirstChild("GameUI")
+			local CircleTransition = GameUI and GameUI:FindFirstChild("CircularTransition")
+			if CircleTransition then
+				task.spawn(function()
+					task.wait(0.45)
+					UIFunctions:CircularTransition(CircleTransition, false)
+				end)
+			end
+
+			-- Show TopBar after transition (with delay)
+			task.delay(1.75, function()
+				if UI and UI.TopBar then
+					local IsCutsceneActive = CutsceneRegistry:IsAnyActive()
+					if not IsCutsceneActive then
+						UI.TopBar:Show()
+						DBG:print("Showed TopBar after transition (delayed) - spawn part")
+					else
+						DBG:print("Skipped TopBar:Show() - cutscene is active (spawn part)")
+					end
+				else
+					DBG:warn("UI or TopBar not available for showing - spawn part")
+				end
+			end)
+			return true
+		end
+
+		if applySpawn() then
+			return true
+		end
+
+		-- Retry once when the character spawns
+		player.CharacterAdded:Once(function()
+			task.defer(function()
+				if applySpawn() then
+					return
+				end
+				DBG:warn("[ChunkLoader] Spawn retry failed; falling back to default positioning (chunk=" .. tostring(currentChunkName) .. ")")
+			end)
+		end)
+
+		-- Even if we schedule a retry, we consumed this path; skip other positioning
+		return true
+	end
+
+	-- If we can place via Spawn part (e.g., Trade), do it and exit early
+	if trySpawnAtSpawnPart() then
+		return
+	end
 	
     -- If we left mid-battle, use the pre-battle snapshot to place away from immediate LOS
     if PlayerData and PlayerData.PendingBattle and type(PlayerData.PendingBattle) == "table" then
         local snap = PlayerData.PendingBattle
-        local currentChunkName = ChunkManager.CurrentChunk and ChunkManager.CurrentChunk.Model and ChunkManager.CurrentChunk.Model.Name
         if type(snap.Chunk) == "string" and snap.Chunk == currentChunkName then
             -- Try to place the player at a safe fallback spawn in this chunk
             local Player = game.Players.LocalPlayer
@@ -321,10 +424,10 @@ function ChunkManager:PositionPlayerAtStartDoor()
         end
     end
 
+    -- Do NOT use LeaveData placement in Trade (or other no-door contexts)
     if PlayerData and PlayerData.LeaveData and PlayerData.LeaveData.Position and PlayerData.LeaveData.Rotation then
         -- Safety: ensure the loaded chunk matches LeaveData.Chunk; if not, skip using LeaveData to avoid mismatched placement
         local leaveChunkName = PlayerData.LeaveData.Chunk
-        local currentChunkName = ChunkManager.CurrentChunk and ChunkManager.CurrentChunk.Model and ChunkManager.CurrentChunk.Model.Name
         if type(leaveChunkName) == "string" and leaveChunkName ~= currentChunkName then
             DBG:print("LeaveData chunk mismatch (", tostring(leaveChunkName), "!=", tostring(currentChunkName), ") - skipping LeaveData positioning")
         else
@@ -423,25 +526,34 @@ function ChunkManager:PositionPlayerAtStartDoor()
 	
 	-- Priority 1: Use the last door we came through (for returning to previous chunk)
 	if ChunkManager.PreviousChunk and ChunkManager.LastDoorLoadChunk then
-		DBG:print("Looking for return door. PreviousChunk:", ChunkManager.PreviousChunk, "LastDoorLoadChunk:", ChunkManager.LastDoorLoadChunk, "CurrentChunk:", ChunkManager.CurrentChunk.Model.Name)
+		warn("[SpawnDebug] Looking for return door. PreviousChunk:", ChunkManager.PreviousChunk, "LastDoorLoadChunk:", ChunkManager.LastDoorLoadChunk, "CurrentChunk:", ChunkManager.CurrentChunk.Model.Name)
 		
 		-- Find the door that leads back to the previous chunk
 		-- We want to find a door whose LoadChunk equals the PreviousChunk
-		for _, Door in ipairs(ChunkManager.CurrentChunk.Doors) do
-			DBG:print("Checking door:", Door.Name, "LoadChunk:", Door:GetAttribute("LoadChunk"))
-			if Door:GetAttribute("LoadChunk") == ChunkManager.PreviousChunk then
+		for i, Door in ipairs(ChunkManager.CurrentChunk.Doors) do
+			local doorLoadChunk = Door:GetAttribute("LoadChunk")
+			warn("[SpawnDebug] Checking door [" .. i .. "]:", Door.Name, "LoadChunk:", tostring(doorLoadChunk), "| Looking for:", ChunkManager.PreviousChunk)
+			if doorLoadChunk == ChunkManager.PreviousChunk then
 				SpawnDoor = Door
-				SpawnReason = "returning through last door: " .. Door.Name
-				DBG:print("Found matching return door!")
+				SpawnReason = "returning through last door: " .. Door.Name .. " (LoadChunk=" .. tostring(doorLoadChunk) .. ")"
+				local trigger = Door:FindFirstChild("Trigger")
+				if trigger then
+					warn("[SpawnDebug] MATCHED! Door position:", trigger.Position)
+				else
+					warn("[SpawnDebug] MATCHED but door has no Trigger!")
+				end
 				break
 			end
 		end
 		
 		if not SpawnDoor then
-			DBG:print("No return door found for PreviousChunk:", ChunkManager.PreviousChunk)
+			warn("[SpawnDebug] NO MATCH FOUND! PreviousChunk:", ChunkManager.PreviousChunk, "- Available doors:")
+			for i, Door in ipairs(ChunkManager.CurrentChunk.Doors) do
+				warn("  [" .. i .. "]", Door.Name, "->", tostring(Door:GetAttribute("LoadChunk")))
+			end
 		end
 	else
-		DBG:print("No PreviousChunk or LastDoorLoadChunk tracked")
+		warn("[SpawnDebug] No PreviousChunk or LastDoorLoadChunk tracked. PreviousChunk:", tostring(ChunkManager.PreviousChunk), "LastDoorLoadChunk:", tostring(ChunkManager.LastDoorLoadChunk))
 	end
 	
 	-- Priority 2: Use Start = true door (for first time entry)
@@ -540,6 +652,8 @@ function ChunkManager:PositionPlayerAtStartDoor()
 	local TriggerCFrame = Trigger.CFrame
 	local SpawnCFrame = (TriggerCFrame + TriggerCFrame.LookVector * -10 + Vector3.new(0, 0.5, 0)) * CFrame.Angles(0, math.rad(180), 0)
 	local SpawnPosition = SpawnCFrame.Position
+	warn("[SpawnDebug] Using door:", SpawnDoor.Name, "LoadChunk:", tostring(SpawnDoor:GetAttribute("LoadChunk")))
+	warn("[SpawnDebug] Trigger at:", Trigger.Position, "| Spawn at:", SpawnPosition)
 	
 	-- Get player character and position them (robust to Character spawn timing)
 	local Player = game.Players.LocalPlayer
@@ -706,6 +820,24 @@ function ChunkManager:ClientRequestChunk(ChunkName)
 		end
 		
 		DBG:print("[ClientRequestChunk] Found chunk in PlayerGui:", FoundChunk.Name)
+		
+		-- Wait for streaming to complete if chunk is being streamed
+		-- Check for StreamingComplete attribute (set by ChunkStreamer when done)
+		local streamingComplete = FoundChunk:GetAttribute("StreamingComplete")
+		if streamingComplete ~= true then
+			DBG:print("[ClientRequestChunk] Waiting for chunk streaming to complete...")
+			-- Wait up to 5 seconds for streaming to complete
+			local startTime = tick()
+			local timeout = 5
+			while FoundChunk:GetAttribute("StreamingComplete") ~= true do
+				if tick() - startTime > timeout then
+					DBG:warn("[ClientRequestChunk] Streaming timeout - proceeding anyway")
+					break
+				end
+				task.wait(0.1) -- Check every 100ms
+			end
+			DBG:print("[ClientRequestChunk] Streaming complete, proceeding with load")
+		end
 		
 		local ok, chunk = ChunkManager:Load(FoundChunk,false,true)
 		if ok then

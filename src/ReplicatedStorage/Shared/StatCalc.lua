@@ -35,12 +35,14 @@ function StatCalc.GetMaxHP(name: string, level: number): number
 	return calcHP(baseHP, level)
 end
 
-function StatCalc.ComputeStats(name: string, level: number, ivs: {HP: number?, Attack: number?, Defense: number?, Speed: number?}?, natureName: string?)
+function StatCalc.ComputeStats(name: string, level: number, ivs: {HP: number?, Attack: number?, Defense: number?, SpecialAttack: number?, SpecialDefense: number?, Speed: number?}?, natureName: string?)
 	local base = StatCalc.GetBaseStats(name) or {}
 	local maxStats = {
 		HP = calcHP(base.HP or 1, level, ivs and ivs.HP or 0),
 		Attack = calcLinear(base.Attack or 1, level, ivs and ivs.Attack or 0),
 		Defense = calcLinear(base.Defense or 1, level, ivs and ivs.Defense or 0),
+		SpecialAttack = calcLinear(base.SpecialAttack or 1, level, ivs and ivs.SpecialAttack or 0),
+		SpecialDefense = calcLinear(base.SpecialDefense or 1, level, ivs and ivs.SpecialDefense or 0),
 		Speed = calcLinear(base.Speed or 1, level, ivs and ivs.Speed or 0),
 	}
 
@@ -50,10 +52,14 @@ function StatCalc.ComputeStats(name: string, level: number, ivs: {HP: number?, A
 			HP = maxStats.HP,
 			Attack = maxStats.Attack,
 			Defense = maxStats.Defense,
+			SpecialAttack = maxStats.SpecialAttack,
+			SpecialDefense = maxStats.SpecialDefense,
 			Speed = maxStats.Speed,
 		}, natureName)
 		maxStats.Attack = modified.Attack
 		maxStats.Defense = modified.Defense
+		maxStats.SpecialAttack = modified.SpecialAttack
+		maxStats.SpecialDefense = modified.SpecialDefense
 		maxStats.Speed = modified.Speed
 	end
 
@@ -62,6 +68,8 @@ function StatCalc.ComputeStats(name: string, level: number, ivs: {HP: number?, A
 		HP = maxStats.HP,
 		Attack = maxStats.Attack,
 		Defense = maxStats.Defense,
+		SpecialAttack = maxStats.SpecialAttack,
+		SpecialDefense = maxStats.SpecialDefense,
 		Speed = maxStats.Speed,
 	}
 	return stats, maxStats

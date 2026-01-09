@@ -12,6 +12,7 @@ local DBG = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("DBG")
 
 local DayNightLighting = {}
 local SyncEnabled = true
+local SyncLock = false
 
 -- Component-wise Color3 multiply
 local function multiplyColor3(a: Color3, b: Color3): Color3
@@ -96,9 +97,7 @@ function DayNightLighting:StartTimeListener()
 	
 	Events.Communicate.OnClientEvent:Connect(function(EventType, Data)
 		if not SyncEnabled then return end
-		DBG:print("Received event:", EventType, "Data:", Data)
 		if EventType == "TimePeriodChanged" then
-			DBG:print("Received time period change:", Data)
 			self:UpdateLightingForPeriod(Data)
 		end
 	end)
@@ -290,10 +289,25 @@ function DayNightLighting:GetDebugStatus()
 end
 
 function DayNightLighting:SetSyncEnabled(enabled: boolean)
+	if enabled and SyncLock then
+		DBG:print("DayNight sync enable ignored due to lock")
+		return
+	end
+
 	SyncEnabled = enabled
 	DBG:print("DayNight sync:", enabled and "enabled" or "disabled")
 	if enabled then
 		self:RefreshBaseValues()
+	end
+end
+
+function DayNightLighting:LockSyncDisabled(lock: boolean)
+	SyncLock = lock == true
+	if SyncLock then
+		SyncEnabled = false
+		DBG:print("DayNight sync locked OFF")
+	else
+		DBG:print("DayNight sync lock released")
 	end
 end
 

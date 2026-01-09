@@ -1,8 +1,8 @@
 --[[
 	BattleOptionsManager.lua
 	
-	Manages battle option menus (BattleOptions and MoveOptions) with clean state management,
-	smooth animations, and event-driven design.
+	Manages the consolidated BattleUI.Controller (replaces BattleOptions/MoveOptions)
+	with clean state management, smooth animations, and event-driven design.
 	
 	Features:
 	- Slide-in/out animations for both option menus
@@ -20,21 +20,128 @@ local Player = Players.LocalPlayer
 local PlayerGui = Player:WaitForChild("PlayerGui")
 local GameUI = PlayerGui:WaitForChild("GameUI")
 local BattleUI = GameUI:WaitForChild("BattleUI")
+local Controller = BattleUI:WaitForChild("Controller")
 
 -- Import modules
 local Types = require(ReplicatedStorage.Shared.Types)
 local Moves = require(ReplicatedStorage.Shared.Moves)
 
--- UI References
-local BattleOptions = BattleUI:WaitForChild("BattleOptions")
-local MoveOptions = BattleUI:WaitForChild("MoveOptions")
+-- Layout + animation constants for the consolidated Controller frame
+local POSITIONS = {
+	BattleOptions = {
+		Fight = UDim2.fromScale(0.5, 0.101),
+		Bag = UDim2.fromScale(0.03, 0.5),
+		Creatures = UDim2.fromScale(0.952, 0.5),
+		Run = UDim2.fromScale(0.5, 0.918),
+		Move1 = UDim2.fromScale(0.5, -3),
+		Move2 = UDim2.fromScale(-7, 0.5),
+		Move3 = UDim2.fromScale(2.5, 0.5),
+		Move4 = UDim2.fromScale(0.5, 2.5),
+		Back = UDim2.fromScale(-3.5, -3.282),
+	},
+	MoveOptions = {
+		Fight = UDim2.fromScale(0.5, -3),
+		Bag = UDim2.fromScale(-7, 0.5),
+		Creatures = UDim2.fromScale(2.5, 0.5),
+		Run = UDim2.fromScale(0.5, 2.5),
+		Move1 = UDim2.fromScale(0.5, 0.101),
+		Move2 = UDim2.fromScale(0.03, 0.5),
+		Move3 = UDim2.fromScale(0.952, 0.5),
+		Move4 = UDim2.fromScale(0.5, 0.918),
+		Back = UDim2.fromScale(-0.223, -0.174),
+	},
+}
+
+local TWEEN = {
+	Position = TweenInfo.new(0.35, Enum.EasingStyle.Circular, Enum.EasingDirection.InOut),
+	SizeFast = TweenInfo.new(0.25, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
+	SizeSlow = TweenInfo.new(0.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
+}
+
+local SIZE = {
+	Expanded = UDim2.fromScale(0.173, 0.67),
+	Compact = UDim2.fromScale(0.157, 0.611),
+}
+
+local FADE_IN = TweenInfo.new(0.35, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
+
+local TEXT_OBJECT_CLASSES = {
+	TextLabel = true,
+	TextButton = true,
+	TextBox = true,
+}
+
+local function findTextObject(root: Instance?, names: {string}): TextLabel | TextButton | TextBox | nil
+	if not root then
+		return nil
+	end
+
+	for _, name in ipairs(names) do
+		local inst = root:FindFirstChild(name, true)
+		if inst and TEXT_OBJECT_CLASSES[inst.ClassName] then
+			return inst
+		end
+	end
+
+	return nil
+end
+
+local function setTextOnFirst(root: Instance?, names: {string}, text: string): ()
+	local label = findTextObject(root, names)
+	if label then
+		label.Text = text
+	end
+end
+
+local function setImageTransparency(obj: Instance?, transparency: number)
+	if not obj then
+		return
+	end
+	if obj:IsA("ImageLabel") or obj:IsA("ImageButton") then
+		obj.ImageTransparency = transparency
+	end
+end
+
+local function applyPositions(root: Frame, state: "BattleOptions" | "MoveOptions")
+	local pos = POSITIONS[state]
+	if not root or not pos then
+		return
+	end
+
+	for name, value in pairs(pos) do
+		local child = root:FindFirstChild(name)
+		if child and child:IsA("GuiObject") then
+			child.Position = value
+		end
+	end
+end
+
+local function tweenPositions(root: Frame, targets: {[string]: UDim2}, info: TweenInfo, store: {Tween})
+	for name, value in pairs(targets) do
+		local child = root and root:FindFirstChild(name)
+		if child and child:IsA("GuiObject") then
+			local tween = TweenService:Create(child, info, { Position = value })
+			tween:Play()
+			table.insert(store, tween)
+		end
+	end
+end
+
+local function tweenSize(root: Frame, info: TweenInfo, size: UDim2, store: {Tween})
+	if not root then
+		return
+	end
+	local tween = TweenService:Create(root, info, { Size = size })
+	tween:Play()
+	table.insert(store, tween)
+end
 
 -- Type definitions
 export type OptionsState = "Hidden" | "BattleOptions" | "MoveOptions" | "Transitioning"
 
 export type BattleOptionsManager = {
 	_state: OptionsState,
-	_activeTween: Tween?,
+	_activeTweens: {Tween},
 	_callbacks: {
 		onFight: (() -> ())?,
 		onRun: (() -> ())?,
@@ -65,10 +172,28 @@ function BattleOptionsManager.new(): BattleOptionsManager
 	local self = setmetatable({}, BattleOptionsManager)
 	
 	self._state = "Hidden"
-	self._activeTween = nil
+	self._activeTweens = {}
 	self._callbacks = {}
 	self._interactionEnabled = true
 	self._lastClickTime = 0
+	self._root = Controller
+	self._transitionId = 0
+	self._buttons = {
+		Fight = Controller:FindFirstChild("Fight"),
+		Run = Controller:FindFirstChild("Run"),
+		Creatures = Controller:FindFirstChild("Creatures"),
+		Bag = Controller:FindFirstChild("Bag"),
+		Back = Controller:FindFirstChild("Back"),
+		Move1 = Controller:FindFirstChild("Move1"),
+		Move2 = Controller:FindFirstChild("Move2"),
+		Move3 = Controller:FindFirstChild("Move3"),
+		Move4 = Controller:FindFirstChild("Move4"),
+	}
+
+	-- Default layout: battle options compact and hidden until requested
+	applyPositions(self._root, "BattleOptions")
+	self._root.Size = SIZE.Compact
+	self._root.Visible = false
 	
 	-- Connect battle option buttons
 	self:_connectBattleOptionButtons()
@@ -84,65 +209,27 @@ end
 --[[
 	Shows the battle options menu with slide-in animation
 	@param forceShow Whether to force show even if already visible (for state correction)
+	@param skipReturnAnim When true, skips the new offscreen→onscreen fade-in (used by Back)
 ]]
-function BattleOptionsManager:ShowBattleOptions(forceShow: boolean?)
-	if self._state == "Transitioning" then
-		warn("[BattleOptionsManager] Cannot show BattleOptions during transition - queuing show")
-		local active = self._activeTween
-		if active then
-			local conn
-			conn = active.Completed:Connect(function()
-				if conn then conn:Disconnect() end
-				self:ShowBattleOptions(true)
-			end)
-		else
-			task.defer(function()
-				self:ShowBattleOptions(true)
-			end)
-		end
+function BattleOptionsManager:ShowBattleOptions(forceShow: boolean?, skipReturnAnim: boolean?)
+	if self._state == "Transitioning" and not forceShow then
+		warn("[BattleOptionsManager] Cannot show BattleOptions during transition")
 		return
 	end
-	
+
 	if self._state == "BattleOptions" and not forceShow then
-		print("[BattleOptionsManager] BattleOptions already visible")
-		-- Check if UI is actually visible, if not, force show
-		if not BattleOptions.Visible then
-			print("[BattleOptionsManager] State says visible but UI is hidden - forcing show")
-			forceShow = true
-		else
-			return
-		end
+		return
 	end
-	
-	print("[BattleOptionsManager] Showing BattleOptions")
-	
-	-- Hide move options first if visible
-	if self._state == "MoveOptions" then
-		self:_hideMoveOptions(true) -- Skip cross-fade
-	end
-	
+
 	self._state = "Transitioning"
-	self:_cancelActiveTween()
+	self._root.Visible = true
+	self:_cancelActiveTweens()
 	
-	-- Set initial position (off-screen right)
-	BattleOptions.Visible = true
-	BattleOptions.Position = UDim2.new(1.3, 0, 0.165, 0)
-	
-	-- Slide in
-	local slideInInfo = TweenInfo.new(0.35, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
-	self._activeTween = TweenService:Create(
-		BattleOptions,
-		slideInInfo,
-		{Position = UDim2.new(0.778, 0, 0.165, 0)}
-	)
-	
-	self._activeTween.Completed:Connect(function()
-		self._activeTween = nil
-		self._state = "BattleOptions"
-		print("[BattleOptionsManager] BattleOptions visible")
-	end)
-	
-	self._activeTween:Play()
+	if skipReturnAnim then
+		self:_transitionToBattleOptions()
+	else
+		self:_playBattleOptionsReturnAnim()
+	end
 end
 
 --[[
@@ -153,18 +240,6 @@ end
 function BattleOptionsManager:ShowMoveOptions(creatureData: any, foeCreature: any?)
 	if self._state == "Transitioning" then
 		warn("[BattleOptionsManager] Cannot show MoveOptions during transition - queuing show")
-		local active = self._activeTween
-		if active then
-			local conn
-			conn = active.Completed:Connect(function()
-				if conn then conn:Disconnect() end
-				self:ShowMoveOptions(creatureData, foeCreature)
-			end)
-		else
-			task.defer(function()
-				self:ShowMoveOptions(creatureData, foeCreature)
-			end)
-		end
 		return
 	end
 	
@@ -174,37 +249,14 @@ function BattleOptionsManager:ShowMoveOptions(creatureData: any, foeCreature: an
 	end
 	
 	print("[BattleOptionsManager] Showing MoveOptions")
-	
-	-- Hide battle options first if visible
-	if self._state == "BattleOptions" then
-		self:_hideBattleOptions(true) -- Skip cross-fade
-	end
-	
+
 	self._state = "Transitioning"
-	self:_cancelActiveTween()
+	self._root.Visible = true
+	self:_cancelActiveTweens()
 	
 	-- Update move buttons before showing
 	self:UpdateMoveButtons(creatureData, foeCreature)
-	
-	-- Set initial position (off-screen right)
-	MoveOptions.Visible = true
-	MoveOptions.Position = UDim2.new(1.3, 0, 0.165, 0)
-	
-	-- Slide in
-	local slideInInfo = TweenInfo.new(0.35, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
-	self._activeTween = TweenService:Create(
-		MoveOptions,
-		slideInInfo,
-		{Position = UDim2.new(0.778, 0, 0.165, 0)}
-	)
-	
-	self._activeTween.Completed:Connect(function()
-		self._activeTween = nil
-		self._state = "MoveOptions"
-		print("[BattleOptionsManager] MoveOptions visible")
-	end)
-	
-	self._activeTween:Play()
+	self:_transitionToMoveOptions()
 end
 
 --[[
@@ -218,18 +270,11 @@ function BattleOptionsManager:HideAll()
 	print("[BattleOptionsManager] Hiding all options")
 	
 	-- Cancel any active tween first
-	self:_cancelActiveTween()
-	
-	if self._state == "BattleOptions" then
-		self:_hideBattleOptions(false)
-	elseif self._state == "MoveOptions" then
-		self:_hideMoveOptions(false)
-	else
-		-- If in transitioning state or unknown state, force hide and reset
-		print("[BattleOptionsManager] Force hiding and resetting state")
-		BattleOptions.Visible = false
-		MoveOptions.Visible = false
-		self._state = "Hidden"
+	self:_cancelActiveTweens()
+
+	self._state = "Hidden"
+	if self._root then
+		self._root.Visible = false
 	end
 end
 
@@ -256,7 +301,7 @@ function BattleOptionsManager:UpdateMoveButtons(creatureData: any, foeCreature: 
 	
 	-- Update each move button (1-4)
 	for i = 1, 4 do
-		local moveButton = MoveOptions:FindFirstChild("Move" .. i)
+		local moveButton = self._buttons["Move" .. i]
 		if moveButton then
 			local currentMove = moves[i]
 			
@@ -291,40 +336,39 @@ function BattleOptionsManager:UpdateMoveButtons(creatureData: any, foeCreature: 
 				end
 				
 				-- Update move name
-				local nameLabel = moveButton:FindFirstChild("MoveName")
-				if nameLabel and nameLabel:IsA("TextLabel") then
-					nameLabel.Text = moveName
-				end
+				setTextOnFirst(moveButton, {"MoveName"}, moveName)
 				
 				-- Update move type
-				local typeLabel = moveButton:FindFirstChild("MoveType")
-				if typeLabel and typeLabel:IsA("TextLabel") then
-					if moveType then
-						-- Find type name
-						local typeName = self:_getTypeName(moveType)
-						typeLabel.Text = typeName or "Normal"
-					else
-						typeLabel.Text = "Normal"
-					end
-				end
-				
-				-- Color move button background and stroke
+				local resolvedTypeName = "Normal"
+				local typeData = nil
 				if moveType then
 					local typeName = self:_getTypeName(moveType)
-					local typeData = typeName and Types[typeName]
-					if typeData and typeData.uicolor then
+					if typeName then
+						resolvedTypeName = typeName
+						typeData = Types[typeName]
+					end
+				end
+
+				setTextOnFirst(moveButton, {"TypeName", "MoveType", "Type"}, resolvedTypeName)
+				
+				-- Color move button background and stroke
+				if typeData and typeData.uicolor then
+					if moveButton:IsA("GuiObject") then
 						moveButton.BackgroundColor3 = typeData.uicolor
-						
-						-- Darken stroke color
-						local stroke = moveButton:FindFirstChild("UIStroke")
-						if stroke then
-							local c = typeData.uicolor
-							stroke.Color = Color3.new(
-								math.max(0, c.R * 0.6),
-								math.max(0, c.G * 0.6),
-								math.max(0, c.B * 0.6)
-							)
-						end
+					end
+					if moveButton:IsA("ImageButton") or moveButton:IsA("ImageLabel") then
+						moveButton.ImageColor3 = typeData.uicolor
+					end
+
+					-- Darken stroke color
+					local stroke = moveButton:FindFirstChild("UIStroke")
+					if stroke then
+						local c = typeData.uicolor
+						stroke.Color = Color3.new(
+							math.max(0, c.R * 0.6),
+							math.max(0, c.G * 0.6),
+							math.max(0, c.B * 0.6)
+						)
 					end
 				end
 				
@@ -376,7 +420,7 @@ end
 	Cleans up the manager
 ]]
 function BattleOptionsManager:Cleanup()
-	self:_cancelActiveTween()
+	self:_cancelActiveTweens()
 	self:HideAll()
 	self._callbacks = {}
 	print("[BattleOptionsManager] Cleaned up")
@@ -394,77 +438,144 @@ end
 -- ============================================================================
 
 --[[
-	Internal: Hides battle options with slide-out animation
-	@param skipCrossFade Whether to skip cross-fade logic
+	Internal: Plays the animation from battle options → move options
 ]]
-function BattleOptionsManager:_hideBattleOptions(skipCrossFade: boolean)
-	if not skipCrossFade then
-		self._state = "Transitioning"
-	end
-	
-	self:_cancelActiveTween()
-	
-	-- Slide out
-	local slideOutInfo = TweenInfo.new(0.35, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
-	self._activeTween = TweenService:Create(
-		BattleOptions,
-		slideOutInfo,
-		{Position = UDim2.new(1.3, 0, 0.165, 0)}
-	)
-	
-	self._activeTween.Completed:Connect(function()
-		BattleOptions.Visible = false
-		self._activeTween = nil
-		if not skipCrossFade then
-			self._state = "Hidden"
-			print("[BattleOptionsManager] BattleOptions hidden")
-		end
+function BattleOptionsManager:_transitionToMoveOptions()
+	self._transitionId += 1
+	local token = self._transitionId
+	local tweens = self._activeTweens
+
+	applyPositions(self._root, "BattleOptions")
+	tweenPositions(self._root, {
+		Fight = POSITIONS.MoveOptions.Fight,
+		Bag = POSITIONS.MoveOptions.Bag,
+		Creatures = POSITIONS.MoveOptions.Creatures,
+		Run = POSITIONS.MoveOptions.Run,
+	}, TWEEN.Position, tweens)
+	tweenSize(self._root, TWEEN.SizeFast, SIZE.Expanded, tweens)
+
+	task.delay(0.15, function()
+		if self._transitionId ~= token then return end
+		tweenPositions(self._root, {
+			Move1 = POSITIONS.MoveOptions.Move1,
+			Move2 = POSITIONS.MoveOptions.Move2,
+			Move3 = POSITIONS.MoveOptions.Move3,
+			Move4 = POSITIONS.MoveOptions.Move4,
+			Back = POSITIONS.MoveOptions.Back,
+		}, TWEEN.Position, tweens)
+		tweenSize(self._root, TWEEN.SizeFast, SIZE.Expanded, tweens)
 	end)
-	
-	self._activeTween:Play()
+
+	task.delay(0.35, function()
+		if self._transitionId ~= token then return end
+		tweenSize(self._root, TWEEN.SizeSlow, SIZE.Compact, tweens)
+		self._state = "MoveOptions"
+	end)
 end
 
 --[[
-	Internal: Hides move options with slide-out animation
-	@param skipCrossFade Whether to skip cross-fade logic
+	Internal: Plays the animation from move options → battle options
 ]]
-function BattleOptionsManager:_hideMoveOptions(skipCrossFade: boolean)
-	if not skipCrossFade then
-		self._state = "Transitioning"
+function BattleOptionsManager:_transitionToBattleOptions()
+	self._transitionId += 1
+	local token = self._transitionId
+	local tweens = self._activeTweens
+
+	applyPositions(self._root, "MoveOptions")
+	tweenPositions(self._root, {
+		Move1 = POSITIONS.BattleOptions.Move1,
+		Move2 = POSITIONS.BattleOptions.Move2,
+		Move3 = POSITIONS.BattleOptions.Move3,
+		Move4 = POSITIONS.BattleOptions.Move4,
+	}, TWEEN.Position, tweens)
+	local back = self._buttons.Back
+	if back then
+		local tween = TweenService:Create(back, TWEEN.Position, { Position = POSITIONS.BattleOptions.Back })
+		tween:Play()
+		table.insert(tweens, tween)
 	end
-	
-	self:_cancelActiveTween()
-	
-	-- Slide out
-	local slideOutInfo = TweenInfo.new(0.35, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
-	self._activeTween = TweenService:Create(
-		MoveOptions,
-		slideOutInfo,
-		{Position = UDim2.new(1.3, 0, 0.165, 0)}
-	)
-	
-	self._activeTween.Completed:Connect(function()
-		MoveOptions.Visible = false
-		self._activeTween = nil
-		if not skipCrossFade then
-			self._state = "Hidden"
-			print("[BattleOptionsManager] MoveOptions hidden")
-		end
+	tweenSize(self._root, TWEEN.SizeFast, SIZE.Expanded, tweens)
+
+	task.delay(0.35, function()
+		if self._transitionId ~= token then return end
+		tweenSize(self._root, TWEEN.SizeSlow, SIZE.Compact, tweens)
+		tweenPositions(self._root, {
+			Fight = POSITIONS.BattleOptions.Fight,
+			Bag = POSITIONS.BattleOptions.Bag,
+			Creatures = POSITIONS.BattleOptions.Creatures,
+			Run = POSITIONS.BattleOptions.Run,
+		}, TWEEN.Position, tweens)
+		tweenSize(self._root, TWEEN.SizeFast, SIZE.Compact, tweens)
+		self._state = "BattleOptions"
 	end)
-	
-	self._activeTween:Play()
 end
 
 --[[
-	Internal: Cancels the active tween if any
+	Internal: Resets all buttons offscreen, fades in controller, and slides battle options on
 ]]
-function BattleOptionsManager:_cancelActiveTween()
-	if self._activeTween then
-		pcall(function()
-			self._activeTween:Cancel()
-		end)
-		self._activeTween = nil
+function BattleOptionsManager:_playBattleOptionsReturnAnim()
+	self._transitionId += 1
+	local token = self._transitionId
+	local tweens = self._activeTweens
+	local root = self._root
+	if not root then
+		return
 	end
+
+	-- Force everything offscreen first
+	root.Size = SIZE.Compact
+	setImageTransparency(root, 1)
+
+	local startPositions = {
+		Fight = POSITIONS.MoveOptions.Fight,
+		Bag = POSITIONS.MoveOptions.Bag,
+		Creatures = POSITIONS.MoveOptions.Creatures,
+		Run = POSITIONS.MoveOptions.Run,
+		Move1 = POSITIONS.BattleOptions.Move1,
+		Move2 = POSITIONS.BattleOptions.Move2,
+		Move3 = POSITIONS.BattleOptions.Move3,
+		Move4 = POSITIONS.BattleOptions.Move4,
+		Back = POSITIONS.BattleOptions.Back,
+	}
+
+	for name, pos in pairs(startPositions) do
+		local child = root:FindFirstChild(name)
+		if child and child:IsA("GuiObject") then
+			child.Position = pos
+		end
+	end
+
+	-- Fade in the controller
+	local fadeTween = TweenService:Create(root, FADE_IN, { ImageTransparency = 0 })
+	fadeTween:Play()
+	table.insert(tweens, fadeTween)
+
+	-- Slide battle options into place
+	tweenPositions(root, {
+		Fight = POSITIONS.BattleOptions.Fight,
+		Bag = POSITIONS.BattleOptions.Bag,
+		Creatures = POSITIONS.BattleOptions.Creatures,
+		Run = POSITIONS.BattleOptions.Run,
+	}, TWEEN.Position, tweens)
+
+	task.delay(FADE_IN.Time, function()
+		if self._transitionId ~= token then return end
+		self._state = "BattleOptions"
+	end)
+end
+
+--[[
+	Internal: Cancels any active tweens
+]]
+function BattleOptionsManager:_cancelActiveTweens()
+	for _, tween in ipairs(self._activeTweens) do
+		if tween then
+			pcall(function()
+				tween:Cancel()
+			end)
+		end
+	end
+	self._activeTweens = {}
 end
 
 --[[
@@ -474,10 +585,10 @@ function BattleOptionsManager:_connectBattleOptionButtons()
 	-- Get UIFunctions for button setup
 	local UIFunctions = require(script.Parent.Parent.UI.UIFunctions)
 	
-	local fightButton = BattleOptions:FindFirstChild("Fight")
-	local runButton = BattleOptions:FindFirstChild("Run")
-	local creaturesButton = BattleOptions:FindFirstChild("Creatures")
-	local bagButton = BattleOptions:FindFirstChild("Bag")
+	local fightButton = self._buttons.Fight
+	local runButton = self._buttons.Run
+	local creaturesButton = self._buttons.Creatures
+	local bagButton = self._buttons.Bag
 	
 	-- Fight button
 	if fightButton then
@@ -579,7 +690,7 @@ function BattleOptionsManager:_connectMoveOptionButtons()
 	
 	-- Connect each move button (1-4)
 	for i = 1, 4 do
-		local moveButton = MoveOptions:FindFirstChild("Move" .. i)
+		local moveButton = self._buttons["Move" .. i]
 		if moveButton then
 			moveButton:SetAttribute("OGSize", moveButton.Size)
 			UIFunctions:NewButton(
@@ -603,7 +714,7 @@ function BattleOptionsManager:_connectMoveOptionButtons()
 	end
 	
 	-- Connect back button
-	local backButton = MoveOptions:FindFirstChild("Back")
+	local backButton = self._buttons.Back
 	if backButton then
 		backButton:SetAttribute("OGSize", backButton.Size)
 		UIFunctions:NewButton(
@@ -621,7 +732,7 @@ function BattleOptionsManager:_connectMoveOptionButtons()
 					self._callbacks.onBack()
 				else
 					-- Default: return to battle options
-					self:ShowBattleOptions(true)
+					self:ShowBattleOptions(true, true)
 				end
 			end
 		)

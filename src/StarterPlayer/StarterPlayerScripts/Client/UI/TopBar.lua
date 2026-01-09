@@ -3,6 +3,7 @@ TopBar.__index = TopBar
 
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
+local MarketplaceService = game:GetService("MarketplaceService")
 
 local UIFunctions = require(script.Parent:WaitForChild("UIFunctions"))
 local TopBarControl = require(script.Parent:WaitForChild("TopBarControl"))
@@ -12,6 +13,9 @@ local DexModule = require(script.Parent:WaitForChild("Dex"))
 local SaveModule = require(script.Parent:WaitForChild("Save"))
 local SettingsModule = require(script.Parent:WaitForChild("Settings"))
 local CTRLModule = require(script.Parent:WaitForChild("CTRL"))
+local ChallengesModule = require(script.Parent:WaitForChild("Challenges"))
+local ShopModule = require(script.Parent:WaitForChild("Shop"))
+local WorldInfoModule = require(script.Parent:WaitForChild("WorldInfo"))
 local CharacterFunctions = require(script.Parent.Parent.Utilities.CharacterFunctions)
 local ClientData = require(script.Parent.Parent:WaitForChild("Plugins"):WaitForChild("ClientData"))
 local Say = require(script.Parent.Parent.Utilities.Say)
@@ -30,6 +34,9 @@ local SuppressInteractions = false
 -- Track menu state for NPC interaction prevention
 local IsMenuOpen = false
 local IsHiding = false
+
+-- Port-A-Vault gamepass ID
+local PORTAVAULT_GAMEPASS_ID = 1656188952
 
 local function StopTopBarAnimation()
 	local Character = LocalPlayer.Character
@@ -111,11 +118,7 @@ function TopBar:Create()
 	local function HoverOnTopBarButton(Target: GuiButton)
 		self.Which.Position = Target.Position
 		self.Which.Size = UDim2.new(0, 0, 0, 0)
-		if Target.Name == "Save" then
-			self.Which.Text = "Progress"
-		else
-			self.Which.Text = Target.Name
-		end
+		self.Which.Text = Target.Name
 		self.Which.Visible = true
 		UpdateWhichZIndex(Target)
 		TweenService:Create(self.Which, Set, {Position = Target.Position + UDim2.new(0, 0, 0.4, 0)}):Play()
@@ -140,36 +143,94 @@ function TopBar:Create()
 	local function SetTop(inst, bool)
 		if bool == false then
 			inst.ZIndex = -3
-			inst.Shadow.ZIndex = -1
-			inst.Icon.ZIndex = -1
-			inst.IconShadow.ZIndex = -2
+			-- Set ZIndex for child elements if they exist
+			if inst:FindFirstChild("Shadow") then inst.Shadow.ZIndex = -1 end
+			if inst:FindFirstChild("Icon") then inst.Icon.ZIndex = -1 end
+			if inst:FindFirstChild("IconShadow") then inst.IconShadow.ZIndex = -2 end
+			-- Challenges button uses ChallengeText instead of Icon
+			if inst:FindFirstChild("ChallengeText") then inst.ChallengeText.ZIndex = -1 end
 		else
 			inst.ZIndex = 1
-			inst.Shadow.ZIndex = -1
-			inst.Icon.ZIndex = 2
-			inst.IconShadow.ZIndex = 1
+			if inst:FindFirstChild("Shadow") then inst.Shadow.ZIndex = -1 end
+			if inst:FindFirstChild("Icon") then inst.Icon.ZIndex = 2 end
+			if inst:FindFirstChild("IconShadow") then inst.IconShadow.ZIndex = 1 end
+			-- Challenges button uses ChallengeText instead of Icon
+			if inst:FindFirstChild("ChallengeText") then inst.ChallengeText.ZIndex = 2 end
 		end
 	end
 	
 
-	local TopButtons = {"Party", "Bag", "Dex", "Save", "Settings", "CTRL"}
+	local TopButtons = {"Party", "Bag", "Dex", "CTRL", "Challenges"}
 
 	local function StateVisualChange()
 		for _, name in ipairs(TopButtons) do
-			local button = self.TopBarFrame:WaitForChild(name)
-			SetTop(button, name == self.CurrentState)
+			local button = self.TopBarFrame:FindFirstChild(name)
+			if button then
+				SetTop(button, name == self.CurrentState)
+			end
 		end
 	end
 	
 	-- Make StateVisualChange accessible to other methods
 	self.StateVisualChange = StateVisualChange
 
+	-- Check Port-A-Vault gamepass ownership and update CB button visibility
+	local function checkPortAVaultOwnership()
+		local cbButton = self.TopBarFrame:FindFirstChild("CB")
+		if not cbButton then return end
+		
+		local success, ownsGamepass = pcall(function()
+			return MarketplaceService:UserOwnsGamePassAsync(LocalPlayer.UserId, PORTAVAULT_GAMEPASS_ID)
+		end)
+		
+		if success and ownsGamepass then
+			cbButton.Visible = true
+		else
+			cbButton.Visible = false
+		end
+	end
+	
+	-- Expose function to refresh CB button visibility (for Shop.lua to call)
+	self.CheckPortAVaultOwnership = checkPortAVaultOwnership
+
+	-- Store original ChallengeText for restoration
+	local OriginalChallengeText = nil
+	
+	-- Helper: Set Challenges mode (hide/show other buttons, change text)
+	local function SetChallengesMode(isOpen)
+		local challengesButton = self.TopBarFrame:FindFirstChild("Challenges")
+		local challengeText = challengesButton and challengesButton:FindFirstChild("ChallengeText")
+		
+		if isOpen then
+			-- Store original text and change to "Close"
+			if challengeText then
+				OriginalChallengeText = OriginalChallengeText or challengeText.Text
+				challengeText.Text = "Close"
+			end
+			-- Hide all other buttons
+			for _, name in ipairs({"Party", "Bag", "Dex", "CTRL"}) do
+				local button = self.TopBarFrame:FindFirstChild(name)
+				if button then
+					button.Visible = false
+				end
+			end
+		else
+			-- Restore original text
+			if challengeText and OriginalChallengeText then
+				challengeText.Text = OriginalChallengeText
+			end
+			-- Show all other buttons
+			for _, name in ipairs({"Party", "Bag", "Dex", "CTRL"}) do
+				local button = self.TopBarFrame:FindFirstChild(name)
+				if button then
+					button.Visible = true
+				end
+			end
+		end
+	end
+
 	local function CloseCurrent()
-        if self.CurrentState == "Save" then
-			SaveModule:Close()
-        elseif self.CurrentState == "Settings" then
-			SettingsModule:Close()
-        elseif self.CurrentState == "Party" then
+        if self.CurrentState == "Party" then
 			PartyModule:Close()
         elseif self.CurrentState == "Bag" then
 			BagModule:Close()
@@ -177,7 +238,22 @@ function TopBar:Create()
 			DexModule:Close()
 		elseif self.CurrentState == "CTRL" then
 			CTRLModule:Close()
+		elseif self.CurrentState == "Challenges" then
+			ChallengesModule:Close()
+			-- Restore other buttons when closing Challenges
+			SetChallengesMode(false)
 		end
+		
+	
+		pcall(function()
+			SaveModule:Close()
+		end)
+		pcall(function()
+			SettingsModule:Close()
+		end)
+		pcall(function()
+			ShopModule:Close()
+		end)
 		
 		-- Stop TopBar animations and re-enable movement when closing menus
 		StopTopBarAnimation()
@@ -303,6 +379,10 @@ function TopBar:Create()
 			end
 			
 			if not hasCreatures then
+				-- Close any open menu first before showing the message
+				if self.CurrentState ~= nil then
+					CloseCurrent()
+				end
 				-- Player doesn't have any creatures, use Say instead
 				local character = LocalPlayer.Character
 				if character then
@@ -336,77 +416,6 @@ function TopBar:Create()
 		HoverOnTopBarButton,
 		HoverOffTopBarButton
 	)
-	-- Save button
-	UIFunctions:NewButton(
-		self.TopBarFrame:WaitForChild("Save"),
-		{"Action"},
-		{ Click = "One", HoverOn = "One", HoverOff = "One" },
-		0.7,
-		function()
-			-- Prevent opening menus during hide animation or when interactions are suppressed
-			if SuppressInteractions then return end
-			-- Prevent opening menus during hide animation
-			if IsHiding then
-				return
-			end
-			
-			Audio.SFX.Click:Play()
-            if self.CurrentState == "Save" then
-				CloseCurrent()
-			else
-                if self.CurrentState ~= nil then
-					CloseCurrent()
-					task.wait(0.15) 
-				end
-				-- Start TopBar animations and disable movement when opening menu
-				PlayTopBarAnimation()
-				CharacterFunctions:CanMove(false)
-				IsMenuOpen = true
-				SaveModule:Open()
-                self.CurrentState = "Save"
-			end
-			StateVisualChange()
-			UpdateWhichZIndex(self.TopBarFrame:WaitForChild("Save"))
-		end,
-		HoverOnTopBarButton,
-		HoverOffTopBarButton
-	)
-
-	-- Settings button
-	UIFunctions:NewButton(
-		self.TopBarFrame:WaitForChild("Settings"),
-		{"Action"},
-		{ Click = "One", HoverOn = "One", HoverOff = "One" },
-		0.7,
-		function()
-			-- Prevent opening menus during hide animation or when interactions are suppressed
-			if SuppressInteractions then return end
-			-- Prevent opening menus during hide animation
-			if IsHiding then
-				return
-			end
-			
-			Audio.SFX.Click:Play()
-            if self.CurrentState == "Settings" then
-				CloseCurrent()
-			else
-                if self.CurrentState ~= nil then
-					CloseCurrent()
-					task.wait(0.15)
-				end
-				-- Start TopBar animations and disable movement when opening menu
-				PlayTopBarAnimation()
-				CharacterFunctions:CanMove(false)
-				IsMenuOpen = true
-				SettingsModule:Open()
-                self.CurrentState = "Settings"
-			end
-			StateVisualChange()
-			UpdateWhichZIndex(self.TopBarFrame:WaitForChild("Settings"))
-		end,
-		HoverOnTopBarButton,
-		HoverOffTopBarButton
-	)
 
 	-- CTRL button
 	UIFunctions:NewButton(
@@ -432,6 +441,10 @@ function TopBar:Create()
 			end
 			
 			if badges < 1 then
+				-- Close any open menu first before showing the message
+				if self.CurrentState ~= nil then
+					CloseCurrent()
+				end
 				-- Player doesn't have at least 1 badge, use Say instead
 				local character = LocalPlayer.Character
 				if character then
@@ -464,6 +477,107 @@ function TopBar:Create()
 		HoverOnTopBarButton,
 		HoverOffTopBarButton
 	)
+
+	-- Challenges button (no "Which" text on hover)
+	UIFunctions:NewButton(
+		self.TopBarFrame:WaitForChild("Challenges"),
+		{"Action"},
+		{ Click = "One", HoverOn = "One", HoverOff = "One" },
+		0.7,
+		function()
+			-- Prevent opening menus during hide animation or when interactions are suppressed
+			if SuppressInteractions then return end
+			-- Prevent opening menus during hide animation
+			if IsHiding then
+				return
+			end
+			
+			Audio.SFX.Click:Play()
+			
+            if self.CurrentState == "Challenges" then
+				CloseCurrent()
+			else
+                if self.CurrentState ~= nil then
+					CloseCurrent()
+					task.wait(0.15)
+				end
+				-- Start TopBar animations and disable movement when opening menu
+				PlayTopBarAnimation()
+				CharacterFunctions:CanMove(false)
+				IsMenuOpen = true
+				ChallengesModule:Open()
+                self.CurrentState = "Challenges"
+				-- Hide other buttons and change text to "Close"
+				SetChallengesMode(true)
+			end
+			StateVisualChange()
+		end,
+		function() end, -- No hover on effect (no "Which" text)
+		function() end  -- No hover off effect
+	)
+
+	-- CB (Port-A-Vault) button
+	local cbButton = self.TopBarFrame:FindFirstChild("CB")
+	if cbButton then
+		-- Initially hide CB button, will be shown if player owns gamepass
+		cbButton.Visible = false
+		
+		UIFunctions:NewButton(
+			cbButton,
+			{"Action"},
+			{ Click = "One", HoverOn = "One", HoverOff = "One" },
+			0.7,
+			function()
+				-- Prevent opening menus during hide animation or when interactions are suppressed
+				if SuppressInteractions then return end
+				if IsHiding then
+					return
+				end
+				
+				Audio.SFX.Click:Play()
+				
+				-- Validate with server before opening vault
+				local Events = game:GetService("ReplicatedStorage"):WaitForChild("Events")
+				local Request = Events:WaitForChild("Request")
+				
+				local success, result = pcall(function()
+					return Request:InvokeServer({"OpenVault"})
+				end)
+				
+				if success and result == true then
+					-- Server confirmed ownership, open vault
+					local UI = require(script.Parent)
+					if UI and UI.Vault and UI.Vault.Open then
+						-- Close any open menus first
+						if self.CurrentState ~= nil then
+							CloseCurrent()
+							task.wait(0.15)
+						end
+						-- Hide TopBar before opening vault
+						self:Hide()
+						UI.Vault:Open()
+					else
+						-- Access denied - show error message
+						local character = LocalPlayer.Character
+						if character then
+							Say:Say("You", true, {"You need the Port-A-Vault gamepass to use this feature."}, character)
+						end
+					end
+				else
+					-- Request failed
+					local character = LocalPlayer.Character
+					if character then
+						Say:Say("You", true, {"Unable to access vault. Please try again later."}, character)
+					end
+				end
+			end,
+			HoverOnTopBarButton,
+			HoverOffTopBarButton
+		)
+		
+		-- Check ownership on creation
+		checkPortAVaultOwnership()
+	end
 	
 	return self
 end
@@ -475,14 +589,18 @@ function TopBar:Show()
     end
 	self.TopBarFrame.Visible = true
 	local Set = TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.InOut)
-	TweenService:Create(self.TopBarFrame, Set, {Position = UDim2.new(self.TopBarFrame.Position.X.Scale,0,0.081,0)}):Play()
+	TweenService:Create(self.TopBarFrame, Set, {Position = UDim2.new(self.TopBarFrame.Position.X.Scale,0,0.13,0)}):Play()
 	task.delay(0.4,function()
 		self.TopBarFrame.Party.Active = true
 		self.TopBarFrame.Bag.Active = true
 		self.TopBarFrame.Dex.Active = true
-		self.TopBarFrame.Save.Active = true
-		self.TopBarFrame.Settings.Active = true
 		self.TopBarFrame.CTRL.Active = true
+		self.TopBarFrame.Challenges.Active = true
+	end)
+	
+	-- Show WorldInfo when TopBar shows
+	pcall(function()
+		WorldInfoModule:Show()
 	end)
 end
 
@@ -497,7 +615,11 @@ function TopBar:Hide()
 	SaveModule:Close()
 	SettingsModule:Close()
 	CTRLModule:Close()
-	
+	ChallengesModule:Close()
+	pcall(function()
+		ShopModule:Close()
+	end)
+
 	-- Stop TopBar animations and re-enable movement when hiding TopBar
 	StopTopBarAnimation()
 	CharacterFunctions:CanMove(true)
@@ -511,9 +633,8 @@ function TopBar:Hide()
 	self.TopBarFrame.Party.Active = false
 	self.TopBarFrame.Bag.Active = false
 	self.TopBarFrame.Dex.Active = false
-	self.TopBarFrame.Save.Active = false
-	self.TopBarFrame.Settings.Active = false
 	self.TopBarFrame.CTRL.Active = false
+	self.TopBarFrame.Challenges.Active = false
 	
 	-- Update visual state to reflect no active button
 	self.StateVisualChange()
@@ -524,6 +645,11 @@ function TopBar:Hide()
 		self.TopBarFrame.Visible = false
 		IsHiding = false -- Allow menu interactions again after hide animation completes
 	end)
+	
+	-- Hide WorldInfo when TopBar hides
+	pcall(function()
+		WorldInfoModule:Hide()
+	end)
 end
 
 -- Immediate hide without tween, used on critical transitions (e.g., battle start)
@@ -532,14 +658,29 @@ function TopBar:HideImmediate()
     StopTopBarAnimation()
     IsMenuOpen = false
     self.CurrentState = nil
+    
+    -- Close all modules immediately
+    pcall(function() BagModule:Close() end)
+    pcall(function() PartyModule:Close() end)
+    pcall(function() DexModule:Close() end)
+    pcall(function() SaveModule:Close() end)
+    pcall(function() SettingsModule:Close() end)
+    pcall(function() CTRLModule:Close() end)
+    pcall(function() ChallengesModule:Close() end)
+    pcall(function() ShopModule:Close() end)
+    
     self.TopBarFrame.Party.Active = false
     self.TopBarFrame.Bag.Active = false
     self.TopBarFrame.Dex.Active = false
-    self.TopBarFrame.Save.Active = false
-    self.TopBarFrame.Settings.Active = false
     self.TopBarFrame.CTRL.Active = false
+    self.TopBarFrame.Challenges.Active = false
     self.StateVisualChange()
     self.TopBarFrame.Visible = false
+	
+	-- Hide WorldInfo immediately too
+	pcall(function()
+		WorldInfoModule:Hide()
+	end)
 end
 
 function TopBar:GetState()
@@ -547,7 +688,31 @@ function TopBar:GetState()
 end
 
 function TopBar:IsMenuOpen()
-	return IsMenuOpen or IsHiding
+	-- Check internal state first
+	if IsMenuOpen or IsHiding then
+		return true
+	end
+	
+	-- Also check if ShopModule or CatchCareShop are actually open (they can be opened independently)
+	local pg = LocalPlayer:FindFirstChildOfClass("PlayerGui")
+	if pg then
+		local gameUI = pg:FindFirstChild("GameUI")
+		if gameUI then
+			-- Check ShopModule (Robux shop)
+			local shopUI = gameUI:FindFirstChild("Shop")
+			if shopUI and shopUI:IsA("ScreenGui") and shopUI.Visible then
+				return true
+			end
+			
+			-- Check CatchCareShop (in-game shop)
+			local catchCareShop = gameUI:FindFirstChild("CatchCareShop")
+			if catchCareShop and catchCareShop:IsA("Frame") and catchCareShop.Visible then
+				return true
+			end
+		end
+	end
+	
+	return false
 end
 
 -- Public API to control suppression

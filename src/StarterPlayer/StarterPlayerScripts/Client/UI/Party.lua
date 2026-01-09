@@ -13,6 +13,7 @@ local RunService: RunService = game:GetService("RunService")
 local UserInputService: UserInputService = game:GetService("UserInputService")
 local UIFunctions = require(script.Parent:WaitForChild("UIFunctions"))
 local SummaryUI = require(script.Parent:WaitForChild("Summary"))
+local CreatureViewer = require(script.Parent:WaitForChild("CreatureViewer"))
 local ClientData = require(script.Parent.Parent:WaitForChild("Plugins"):WaitForChild("ClientData"))
 local CreatureSpawner = require(script.Parent.Parent:WaitForChild("Utilities"):WaitForChild("CreatureSpawner"))
 
@@ -40,8 +41,6 @@ local COLOR_ANIMATION_TIME = 0.3
 -- Forward declare to avoid nil during click handler compilation
 local LoadSummary
 local ComputeCurrentAndMaxHP
-local setup3DPreview
-local connectSummaryButtons
 
 -- Prevent server-driven refreshes during local drag/tween finalize
 local IsAnimating = false
@@ -56,6 +55,7 @@ local LastSummaryCall = 0
 local SUMMARY_DEBOUNCE_TIME = 0 -- disabled per spec
 local SelectedIndex: number? = nil
 local AllowDrag: boolean = true
+local IsInBattle: boolean = false
 
 local function setAnimating(flag: boolean)
     IsAnimating = flag
@@ -64,8 +64,6 @@ local function setAnimating(flag: boolean)
 end
 
 -- Track orbit input connections for the 3D preview per container (weak keys)
-local OrbitConnections = setmetatable({}, { __mode = "k" })
-
 -- Track move tooltip hover connections per Summary (weak keys)
 local MoveHoverConnections = setmetatable({}, { __mode = "k" })
 
@@ -297,8 +295,55 @@ local function renderSlotFromCreature(btn: TextButton, creatureData: any, slotIn
 			end
 		end
 		
-		-- Update FollowButton Status icon
-		if StatusIcon and StatusIcon:IsA("ImageLabel") and slotIndex then
+		-- Set TypeColor background color based on creature's first type
+		local TypeColor = btn:FindFirstChild("TypeColor")
+		if TypeColor and TypeColor:IsA("Frame") then
+			local BaseCreature = Creatures[creatureData.Name]
+			if BaseCreature and BaseCreature.Type then
+				-- Parse types (handle both string and table formats)
+				local firstType = nil
+				if typeof(BaseCreature.Type) == "table" then
+					for i, t in ipairs(BaseCreature.Type) do
+						if typeof(t) == "string" then
+							firstType = t
+							break
+						end
+					end
+				elseif typeof(BaseCreature.Type) == "string" then
+					firstType = BaseCreature.Type
+				end
+				
+				-- Get type color for first type
+				if firstType and TypesModule[firstType] and TypesModule[firstType].uicolor then
+					local typeColor = TypesModule[firstType].uicolor
+					TypeColor.BackgroundColor3 = typeColor
+					TypeColor.Visible = true
+					-- Update UIStroke if it exists
+					local stroke = TypeColor:FindFirstChild("UIStroke")
+					if stroke then
+						local darker = Color3.new(math.max(0, typeColor.R * 0.6), math.max(0, typeColor.G * 0.6), math.max(0, typeColor.B * 0.6))
+						stroke.Color = darker
+					end
+				else
+					TypeColor.Visible = false
+				end
+			else
+				-- No creature type data, hide frame
+				TypeColor.Visible = false
+			end
+		end
+		
+		-- Check HP to determine if FollowButton should be visible
+		local currentHP, maxHP = ComputeCurrentAndMaxHP(creatureData)
+		local hasZeroHP = currentHP <= 0
+		
+		-- Hide FollowButton if creature has 0 HP or if in battle context
+		if FollowButton and FollowButton:IsA("GuiButton") then
+			FollowButton.Visible = not hasZeroHP and not IsInBattle
+		end
+		
+		-- Update FollowButton Status icon (only if button is visible and not in battle)
+		if StatusIcon and StatusIcon:IsA("ImageLabel") and slotIndex and not hasZeroHP and not IsInBattle then
 			local spawnedSlot = CreatureSpawner:GetSpawnedSlotIndex()
 			print("[PartyUI] renderSlotFromCreature - slotIndex:", slotIndex, "spawnedSlot:", spawnedSlot, "StatusIcon:", StatusIcon)
 			
@@ -321,8 +366,42 @@ local function renderSlotFromCreature(btn: TextButton, creatureData: any, slotIn
 		btn.Active = true
 		btn.Visible = true
 	else
-		-- Empty: hide button entirely
+		-- Empty: hide button entirely and reset TypeColor frame
 		btn.Visible = false
+		local TypeColor = btn:FindFirstChild("TypeColor")
+		if TypeColor and TypeColor:IsA("Frame") then
+			TypeColor.Visible = false
+		end
+	end
+end
+
+-- Function to update all status icons based on current spawn state
+local function updateAllStatusIcons()
+	if not Slots then return end
+	local spawnedSlot = CreatureSpawner:GetSpawnedSlotIndex()
+	print("[PartyUI] updateAllStatusIcons - spawnedSlot:", spawnedSlot, "IsInBattle:", IsInBattle)
+	
+	for i = 1, 6 do
+		local btn = Slots[i]
+		if btn then
+			local FollowButton = btn:FindFirstChild("FollowButton")
+			local StatusIcon = FollowButton and FollowButton:FindFirstChild("Status")
+			if StatusIcon and StatusIcon:IsA("ImageLabel") then
+				-- Only update status icons if not in battle context
+				if not IsInBattle then
+					local srcIndex = CurrentOrder[i]
+					if srcIndex and spawnedSlot == srcIndex then
+						StatusIcon.Image = "rbxassetid://125802977251327"
+						print("[PartyUI] Updated status icon to spawned for slot", i, "(srcIndex:", srcIndex, ")")
+					else
+						StatusIcon.Image = "rbxassetid://113482931893438"
+						if srcIndex then
+							print("[PartyUI] Updated status icon to not spawned for slot", i, "(srcIndex:", srcIndex, ")")
+						end
+					end
+				end
+			end
+		end
 	end
 end
 
@@ -340,6 +419,8 @@ local function renderAllSlots(PartyData)
 			renderSlotFromCreature(btn, creature, srcIndex)
 		end
 	end
+	-- Ensure status icons are updated after rendering all slots
+	updateAllStatusIcons()
 end
 
 local function renderSlotIndex(PartyData, index: number)
@@ -540,7 +621,42 @@ local function ensureDragHandlers(PartyUI: ScreenGui)
 						end)
 						if success and result then
 							print("[PartyUI] Toggle spawn request successful for slot", srcIndex)
-							-- Status icon will update via event listener in Init()
+							-- Optimistically update ALL status icons based on expected new state
+							-- If currently spawned, clicking will despawn it; if not spawned, clicking will spawn it
+							local currentSpawnedSlot = CreatureSpawner:GetSpawnedSlotIndex()
+							local newSpawnedSlot = nil
+							if currentSpawnedSlot == srcIndex then
+								-- Currently spawned, so clicking will despawn - no creature will be spawned
+								newSpawnedSlot = nil
+								print("[PartyUI] Optimistically despawning slot", srcIndex)
+							else
+								-- Not currently spawned, so clicking will spawn this one
+								newSpawnedSlot = srcIndex
+								print("[PartyUI] Optimistically spawning slot", srcIndex)
+							end
+							
+							-- Update ALL status icons immediately based on expected new state
+							if Slots then
+								for slotIdx = 1, 6 do
+									local slotBtn = Slots[slotIdx]
+									if slotBtn then
+										local slotFollowButton = slotBtn:FindFirstChild("FollowButton")
+										local slotStatusIcon = slotFollowButton and slotFollowButton:FindFirstChild("Status")
+										if slotStatusIcon and slotStatusIcon:IsA("ImageLabel") then
+											local slotSrcIndex = CurrentOrder[slotIdx]
+											if slotSrcIndex and newSpawnedSlot == slotSrcIndex then
+												slotStatusIcon.Image = "rbxassetid://125802977251327"
+												print("[PartyUI] Optimistically set status icon to spawned for slot", slotIdx)
+											else
+												slotStatusIcon.Image = "rbxassetid://113482931893438"
+												print("[PartyUI] Optimistically set status icon to not spawned for slot", slotIdx)
+											end
+										end
+									end
+								end
+							end
+							-- Note: The server event listener in Init() will call updateAllStatusIcons()
+							-- when CreatureSpawned/CreatureDespawned events are received
 						else
 							warn("[PartyUI] Failed to toggle spawn for slot", srcIndex, "result:", result)
 						end
@@ -742,6 +858,8 @@ function LoadSummary(PartyData, CreatureData, slotIndex)
 		CatchData = CreatureData.CatchData,
 		-- Instance weight (for size class computation)
 		WeightKg = CreatureData.WeightKg,
+		-- Ability
+		Ability = CreatureData.Ability,
 	}
 end
 
@@ -757,13 +875,25 @@ function PartyModule:Init()
 	Communicate.OnClientEvent:Connect(function(eventType, data)
 		if eventType == "CreatureSpawned" or eventType == "CreatureDespawned" then
 			print("[PartyUI] Spawn state changed:", eventType, "data:", data)
-			-- Wait a frame to ensure CreatureSpawner has updated its state
-			RunService.Heartbeat:Wait()
+			-- Wait a moment to ensure CreatureSpawner has updated its state
+			task.wait(0.1)
 			local spawnedSlot = CreatureSpawner:GetSpawnedSlotIndex()
 			print("[PartyUI] Current spawned slot index:", spawnedSlot)
-			-- Refresh party display to update status icons
-			print("[PartyUI] Calling UpdatePartyDisplay after spawn state change")
-			PartyModule:UpdatePartyDisplay()
+			
+			-- Ensure slots are initialized
+			local PartyUI = PartyModule:GetGui()
+			if PartyUI then
+				getListAndSlots(PartyUI)
+			end
+			
+			-- Update status icons immediately (works even if UI is closed)
+			updateAllStatusIcons()
+			
+			-- Also refresh full party display if UI is visible
+			if PartyUI and PartyUI.Visible then
+				print("[PartyUI] UI is visible, calling UpdatePartyDisplay after spawn state change")
+				PartyModule:UpdatePartyDisplay()
+			end
 		end
 	end)
 	
@@ -905,17 +1035,63 @@ function PartyModule:LoadCreatureSummary(creatureData, slotIndex)
 	
 	local PartyUI = self:GetGui()
 	if not PartyUI then return end
-	local Summary = PartyUI:WaitForChild("Summary")
 	local List = PartyUI:FindFirstChild("List")
 	
-	-- Show summary immediately per new spec and hide list
+	-- Hide list and show summary
 	if List then List.Visible = false end
-	Summary.Visible = true
 	SelectedIndex = slotIndex
 	refreshActiveHighlight()
 
-	-- Delegate summary UI rendering to shared module and stop here to avoid duplicate logic
-	SummaryUI:Render(Summary, creatureData)
+	-- Get party data for navigation
+	local function getPartyData()
+		return ClientData:Get()
+	end
+
+	-- Navigation function
+	local function navigate(delta: number)
+		local data = getPartyData()
+		local party = data and data.Party or {}
+		if not party then return end
+		local count = math.min(#party, 6)
+		if count <= 0 then return end
+		local current = SelectedIndex or 1
+		local nextIndex = ((current - 1 + delta) % count) + 1
+		SelectedIndex = nextIndex
+		refreshActiveHighlight()
+		local srcIndex = CurrentOrder[nextIndex] or nextIndex
+		local creature = party[srcIndex]
+		if not creature then return end
+		local summaryData = LoadSummary(data, creature, nextIndex)
+		self:LoadCreatureSummary(summaryData, nextIndex)
+	end
+
+	-- Set up navigation callbacks
+	local data = getPartyData()
+	local party = data and data.Party or {}
+	local count = math.min(#party, 6)
+	local canNavigate = count > 1
+	
+	SummaryUI:SetNavigationCallbacks(
+		canNavigate and function() navigate(1) end or nil,
+		canNavigate and function() navigate(-1) end or nil,
+		function()
+			-- Close callback: show list and hide summary
+			if List then List.Visible = true end
+			SummaryUI:Hide()
+			SummaryShowing = false
+			
+			-- If in battle context, clear the selection so Send Out button state is correct
+			if IsInBattle and SelectionChangedCallback then
+				SelectionChangedCallback(nil, nil)
+			end
+		end
+	)
+	
+	-- Update navigation button visibility
+	SummaryUI:UpdateNavigationVisibility(canNavigate, canNavigate)
+	
+	-- Show summary with creature data
+	SummaryUI:Show(creatureData, "Party")
 
 	-- Notify battle integration about the current selection so SendOut updates
 	if SelectionChangedCallback then
@@ -949,25 +1125,26 @@ function PartyModule:LoadCreatureSummary(creatureData, slotIndex)
 	local hiddenName = getHiddenAbilityName(speciesName)
 	local hasHidden = (abilityName ~= "" and hiddenName ~= nil and abilityName == hiddenName)
 
-	-- Ability text
-	do
-		local abilityFrame = Summary:FindFirstChild("Ability")
+	-- Get GameUI.Summary frame for ability UI updates
+	local player = game.Players.LocalPlayer
+	local summaryFrame = player and player:FindFirstChild("PlayerGui") and player.PlayerGui:FindFirstChild("GameUI") and player.PlayerGui.GameUI:FindFirstChild("Summary")
+	if summaryFrame then
+		-- Ability text
+		local abilityFrame = summaryFrame:FindFirstChild("Ability")
 		if abilityFrame and abilityFrame:IsA("Frame") then
 			local abilityText = abilityFrame:FindFirstChild("AbilityText")
 			if abilityText and abilityText:IsA("TextLabel") then
 				abilityText.Text = abilityName ~= "" and abilityName or "—"
 			end
 		end
-	end
 
-	-- Hidden ability pill and text
-	do
-		local additionalInfo = Summary:FindFirstChild("AdditionalInfo")
+		-- Hidden ability pill and text
+		local additionalInfo = summaryFrame:FindFirstChild("AdditionalInfo")
 		local ha = additionalInfo and additionalInfo:FindFirstChild("HA")
 		if ha and ha:IsA("GuiObject") then
 			ha.Visible = hasHidden
 		end
-		local hiddenFrame = Summary:FindFirstChild("Hidden")
+		local hiddenFrame = summaryFrame:FindFirstChild("Hidden")
 		if hiddenFrame and hiddenFrame:IsA("Frame") then
 			hiddenFrame.Visible = hasHidden
 			local hiddenText = hiddenFrame:FindFirstChild("HiddenText")
@@ -976,8 +1153,7 @@ function PartyModule:LoadCreatureSummary(creatureData, slotIndex)
 			end
 		end
 	end
-
-	connectSummaryButtons(self, PartyUI)
+	
 	return
 	
 --[[ LEGACY SUMMARY RENDERING BELOW (now handled by Summary module)
@@ -1186,8 +1362,18 @@ function PartyModule:LoadCreatureSummary(creatureData, slotIndex)
 		HPCurrent.Size = UDim2.new(fullXScale * hpPercent, 0, fullYScale, 0)
 	end
 	
+	-- Compute stats for display
+	local stats, maxStats = StatCalc.ComputeStats(creatureData.Name, creatureData.Level, creatureData.IVs, creatureData.Nature)
+	local displayStats = creatureData.MaxStats or maxStats or {}
+
 	local Attack = Summary:WaitForChild("Attack")
+	local AttackStat = Attack:FindFirstChild("Stat")
 	local AttackCurrent = Attack:FindFirstChild("Current")
+	
+	-- Set Attack stat value
+	if AttackStat and AttackStat:IsA("TextLabel") then
+		AttackStat.Text = tostring(displayStats.Attack or 0)
+	end
 	
 	-- Animate Attack bar visual
 	if AttackCurrent then
@@ -1199,19 +1385,31 @@ function PartyModule:LoadCreatureSummary(creatureData, slotIndex)
 	end
 	
 	local Defense = Summary:WaitForChild("Defense")
+	local DefenseStat = Defense:FindFirstChild("Stat")
 	local DefenseCurrent = Defense:FindFirstChild("Current")
+	
+	-- Set Defense stat value
+	if DefenseStat and DefenseStat:IsA("TextLabel") then
+		DefenseStat.Text = tostring(displayStats.Defense or 0)
+	end
 	
 	-- Animate Defense bar visual
 	if DefenseCurrent then
 		DefenseCurrent.Size = UDim2.new(0, 0, 1, 0) -- Start empty
 		local defenseTween = TweenService:Create(DefenseCurrent, TweenInfo.new(STAT_ANIMATION_TIME, TWEEN_STYLE, TWEEN_DIRECTION), {
-			Size = UDim2.new(1, 0, 1, 0) -- Fill to full
+Size = UDim2.new(1, 0, 1, 0) -- Fill to full
 		})
 		defenseTween:Play()
 	end
 	
 	local Speed = Summary:WaitForChild("Speed")
+	local SpeedStat = Speed:FindFirstChild("Stat")
 	local SpeedCurrent = Speed:FindFirstChild("Current")
+	
+	-- Set Speed stat value
+	if SpeedStat and SpeedStat:IsA("TextLabel") then
+		SpeedStat.Text = tostring(displayStats.Speed or 0)
+	end
 	
 	-- Animate Speed bar visual
 	if SpeedCurrent then
@@ -1220,6 +1418,42 @@ function PartyModule:LoadCreatureSummary(creatureData, slotIndex)
 			Size = UDim2.new(1, 0, 1, 0) -- Fill to full
 		})
 		speedTween:Play()
+	end
+	
+	local SpecialAttack = Summary:FindFirstChild("SpecialAttack")
+	local SpecialAttackStat = SpecialAttack and SpecialAttack:FindFirstChild("Stat")
+	local SpecialAttackCurrent = SpecialAttack and SpecialAttack:FindFirstChild("Current")
+	
+	-- Set SpecialAttack stat value
+	if SpecialAttackStat and SpecialAttackStat:IsA("TextLabel") then
+		SpecialAttackStat.Text = tostring(displayStats.SpecialAttack or 0)
+	end
+	
+	-- Animate SpecialAttack bar visual
+	if SpecialAttackCurrent then
+		SpecialAttackCurrent.Size = UDim2.new(0, 0, 1, 0) -- Start empty
+		local specialAttackTween = TweenService:Create(SpecialAttackCurrent, TweenInfo.new(STAT_ANIMATION_TIME, TWEEN_STYLE, TWEEN_DIRECTION), {
+			Size = UDim2.new(1, 0, 1, 0) -- Fill to full
+		})
+		specialAttackTween:Play()
+	end
+	
+	local SpecialDefense = Summary:FindFirstChild("SpecialDefense")
+	local SpecialDefenseStat = SpecialDefense and SpecialDefense:FindFirstChild("Stat")
+	local SpecialDefenseCurrent = SpecialDefense and SpecialDefense:FindFirstChild("Current")
+	
+	-- Set SpecialDefense stat value
+	if SpecialDefenseStat and SpecialDefenseStat:IsA("TextLabel") then
+		SpecialDefenseStat.Text = tostring(displayStats.SpecialDefense or 0)
+	end
+	
+	-- Animate SpecialDefense bar visual
+	if SpecialDefenseCurrent then
+		SpecialDefenseCurrent.Size = UDim2.new(0, 0, 1, 0) -- Start empty
+		local specialDefenseTween = TweenService:Create(SpecialDefenseCurrent, TweenInfo.new(STAT_ANIMATION_TIME, TWEEN_STYLE, TWEEN_DIRECTION), {
+			Size = UDim2.new(1, 0, 1, 0) -- Fill to full
+		})
+		specialDefenseTween:Play()
 	end
 	
     -- Update moves (support both string names and legacy move tables)
@@ -1395,6 +1629,8 @@ function PartyModule:LoadCreatureSummary(creatureData, slotIndex)
 		SetIVFrame("HPIV", creatureData.IVs.HP, Color3.fromRGB(38, 255, 0))
 		SetIVFrame("AttackIV", creatureData.IVs.Attack, Color3.fromRGB(255, 78, 47))
 		SetIVFrame("DefenseIV", creatureData.IVs.Defense, Color3.fromRGB(47, 158, 255))
+		SetIVFrame("SpecialAttackIV", creatureData.IVs.SpecialAttack, Color3.fromRGB(200, 100, 255))
+		SetIVFrame("SpecialDefenseIV", creatureData.IVs.SpecialDefense, Color3.fromRGB(100, 200, 255))
 		SetIVFrame("SPDIV", creatureData.IVs.Speed, Color3.fromRGB(250, 189, 45))
 	end
 
@@ -1467,300 +1703,16 @@ end
 -- Create or update the 3D preview viewport
 setup3DPreview = function(Summary: Frame, creatureData: any)
 	local container = Summary:FindFirstChild("3DPreview")
-	if not container or not container:IsA("Frame") then return end
+	if not container or not container:IsA("GuiObject") then return end
 
-	-- Remove only prior dynamic viewport elements; preserve decorative UI (shadows, strokes, etc.)
-	local previous = container:FindFirstChild("Viewport")
-	if previous and previous:IsA("ViewportFrame") then
-		previous:Destroy()
-	end
-
-	-- Create ViewportFrame
-	local viewport = Instance.new("ViewportFrame")
-	viewport.Name = "Viewport"
-	viewport.Size = UDim2.fromScale(1, 1)
-	viewport.ZIndex = 15
-	viewport.BackgroundTransparency = 1
-	viewport.LightColor = Color3.fromRGB(255, 255, 255)
-	viewport.Ambient = Color3.fromRGB(255, 255, 255)
-	viewport.Parent = container
-
-	-- WorldModel is required for animations to play inside a ViewportFrame
-	local worldModel = Instance.new("WorldModel")
-	worldModel.Name = "WorldModel"
-	worldModel.Parent = viewport
-
-	-- Camera for viewport
-	local cam = Instance.new("Camera")
-	cam.Name = "ViewportCamera"
-	cam.Parent = viewport
-	viewport.CurrentCamera = cam
-
-	-- Try to locate a rig/model by species name under ReplicatedStorage.CreatureModels
-	local ReplicatedStorage = game:GetService("ReplicatedStorage")
-	local modelsFolder = ReplicatedStorage:FindFirstChild("Assets")
-	modelsFolder = modelsFolder and modelsFolder:FindFirstChild("CreatureModels") or nil
-	local modelTemplate: Instance? = nil
-	if modelsFolder then
-		modelTemplate = modelsFolder:FindFirstChild(tostring(creatureData.BaseName or creatureData.Name))
-	end
-
-	if modelTemplate and modelTemplate:IsA("Model") then
-		local model = modelTemplate:Clone()
-		model.Parent = worldModel
-		-- Apply shiny recolor in preview if needed
-		if creatureData.Shiny then
-			local Creatures = require(game:GetService("ReplicatedStorage").Shared.Creatures)
-			local base = Creatures[creatureData.BaseName or creatureData.Name]
-			local shinyColors = base and base.ShinyColors
-			if shinyColors then
-				for _, d in ipairs(model:GetDescendants()) do
-					if d:IsA("BasePart") or d:IsA("MeshPart") then
-						local newColor = shinyColors[d.Name]
-						if newColor then
-							pcall(function()
-								d.Color = newColor
-							end)
-						end
-					end
-				end
-			end
-		end
-		-- Compute bounds to place camera
-		-- Prefer HumanoidRootPart for framing
-		local hrp = model:FindFirstChild("HumanoidRootPart")
-		local anchor: BasePart? = hrp and hrp:IsA("BasePart") and hrp or model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart")
-		if not model.PrimaryPart and anchor then model.PrimaryPart = anchor end
-		if anchor then
-			-- Move model so HRP/anchor sits at origin for consistent framing
-			local targetCF = CFrame.new(0, 0, 0)
-			model:PivotTo(targetCF)
-
-			-- Set default facing: HRP orientation 0, -180, 0 and autofit camera
-			local primary: BasePart? = model.PrimaryPart or model:FindFirstChild("HumanoidRootPart")
-			if primary and primary:IsA("BasePart") then
-				model.PrimaryPart = primary
-			end
-			-- Ensure model HRP starts at orientation 0,0,0
-			model:PivotTo(CFrame.new(0, 0, 0) * CFrame.Angles(0, 0, 0))
-			-- Drag accumulators are initialized later in the orbit handler
-			local size = model:GetExtentsSize()
-			-- Revert to auto-fit camera calculation (position + lookat)
-			local target = (model.PrimaryPart and model.PrimaryPart.Position) or Vector3.new(0, size.Y * 0.5, 0)
-			local vFov = math.rad(cam.FieldOfView)
-			local vp = container.AbsoluteSize
-			local aspect = (vp.Y > 0) and (vp.X / vp.Y) or 1
-			local hFov = 2 * math.atan(math.tan(vFov * 0.5) * aspect)
-			local halfHeight = math.max(0.5, size.Y * 0.5)
-			local halfWidth = math.max(0.5, math.max(size.X, size.Z) * 0.5)
-			local distV = halfHeight / math.tan(vFov * 0.5)
-			local distH = halfWidth / math.tan(hFov * 0.5)
-			local padding = 1.2
-			local distance = math.max(4, math.max(distV, distH) * padding)
-			local forward = Vector3.new(0, 0, -1)
-			local camPos = -(target - (forward.Unit * distance))
-			-- Set viewport camera orientation to 0, -180, 0 while preserving computed position
-			cam.CFrame = CFrame.new(camPos) * CFrame.Angles(0, math.rad(-180), 0)
-			cam.Focus = CFrame.new(target)
-			warn("[PartyUI] CameraFit | size=", size, "vp=", vp, "aspect=", aspect, "vFov=", cam.FieldOfView, "hFov=", math.deg(hFov), "distV=", distV, "distH=", distH, "chosen=", distance)
-			warn("[PartyUI] CameraFit | target=", target, "camPos=", camPos)
-		end
-		-- Attempt to play idle if present (support Humanoid or AnimationController)
-		local animator: Animator? = nil
-		local humanoid = model:FindFirstChildOfClass("Humanoid")
-		if humanoid then
-			animator = humanoid:FindFirstChildOfClass("Animator")
-			if not animator then
-				animator = Instance.new("Animator")
-				animator.Parent = humanoid
-			end
-		else
-			local animController = model:FindFirstChildOfClass("AnimationController")
-			if not animController then
-				animController = Instance.new("AnimationController")
-				animController.Parent = model
-			end
-			animator = animController:FindFirstChildOfClass("Animator")
-			if not animator then
-				animator = Instance.new("Animator")
-				animator.Parent = animController
-			end
-		end
-		local animFolder = model:FindFirstChild("Animations")
-		local idle = animFolder and animFolder:FindFirstChild("Idle") or model:FindFirstChild("Idle")
-		if idle and idle:IsA("Animation") and animator then
-			local track = animator:LoadAnimation(idle)
-			track.Priority = Enum.AnimationPriority.Idle
-			track.Looped = true
-			track:Play()
-			warn("[PartyUI] Played Idle animation")
-		else
-			warn("[PartyUI] Idle animation not found")
-		end
-	else
-		-- Fallback: show the creature sprite in an ImageLabel overlay
-		local Creatures = require(game:GetService("ReplicatedStorage").Shared.Creatures)
-		local base = Creatures[creatureData.BaseName or creatureData.Name]
-		local spriteId = base and base.Sprite or nil
-		if spriteId then
-			local img = Instance.new("ImageLabel")
-			img.BackgroundTransparency = 1
-			img.Image = spriteId
-			img.Size = UDim2.fromScale(1, 1)
-			img.ZIndex = 15
-			img.Parent = container
-		else
-			viewport:Destroy() -- nothing to render
-		end
-	end
-
-	-- Bind simple orbit: drag to rotate model around Y while camera stays fixed
-	-- Clean any previous connections for this container
-	if OrbitConnections[container] then
-		for _, conn in ipairs(OrbitConnections[container]) do
-			if conn and conn.Connected then conn:Disconnect() end
-		end
-		OrbitConnections[container] = nil
-	end
-
-	local conns = {}
-	OrbitConnections[container] = conns
-
-    local dragging = false
-    local lastX: number? = nil
-    local lastY: number? = nil
-    local rotateSpeed = math.rad(0.35) -- radians per pixel (slightly faster)
-    local yawAccum = 0
-    local pitchAccum = 0
-
-    -- Use auto-fit camera computed above; do NOT override with fixed origin
-    warn("[PartyUI] Camera: using auto-fit; not overriding with fixed origin")
-
-	local function onInputBegan(input: InputObject)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 then
-			dragging = true
-			lastX = input.Position.X
-			lastY = input.Position.Y
-		end
-	end
-	local function onInputEnded(input: InputObject)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 then
-			dragging = false
-			lastX = nil
-		end
-	end
-	    local function onInputChanged(input: InputObject)
-	        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-	            if lastX and lastY then
-	                local dx = input.Position.X - lastX
-	                local dy = input.Position.Y - lastY
-	                lastX = input.Position.X
-	                lastY = input.Position.Y
-                -- Update yaw/pitch: right drag -> yaw right; dragging DOWN -> pitch DOWN (positive pitch)
-                yawAccum += (dx * rotateSpeed)
-                pitchAccum += (dy * rotateSpeed)
-	                -- Clamp pitch to avoid flipping (about +/- 80 degrees)
-	                local maxPitch = math.rad(80)
-	                if pitchAccum > maxPitch then pitchAccum = maxPitch end
-	                if pitchAccum < -maxPitch then pitchAccum = -maxPitch end
-	                if worldModel and #worldModel:GetChildren() > 0 then
-	                    local m = worldModel:GetChildren()[1]
-	                    if m and m:IsA("Model") then
-	                        local hrp = m:FindFirstChild("HumanoidRootPart")
-	                        if hrp and hrp:IsA("BasePart") then
-	                            m.PrimaryPart = hrp
-						local pos = hrp.Position
-						-- Force roll to 0 so model never tilts sideways; apply only yaw/pitch
-						local newRoot = CFrame.new(pos) * CFrame.Angles(pitchAccum, yawAccum, 0)
-	                            m:PivotTo(newRoot)
-	                        else
-	                            local cf = m:GetPivot()
-	                            local newPivot = cf * CFrame.Angles(-dy * rotateSpeed, dx * rotateSpeed, 0)
-	                            m:PivotTo(newPivot)
-	                        end
-	                    end
-	                end
-	            end
-	        end
-	    end
-
-	-- Connect to container and UIS; store for cleanup
-	local c1 = container.InputBegan:Connect(onInputBegan)
-	local c2 = container.InputEnded:Connect(onInputEnded)
-	local c3 = game:GetService("UserInputService").InputChanged:Connect(onInputChanged)
-	table.insert(conns, c1)
-	table.insert(conns, c2)
-	table.insert(conns, c3)
+	CreatureViewer:Load(container, {
+		Name = creatureData.Name,
+		BaseName = creatureData.BaseName or creatureData.Name,
+		Shiny = creatureData.Shiny,
+	})
 end
 
--- Wire up Previous, Next, and Back (SummaryClose) buttons
-connectSummaryButtons = function(self, PartyUI: ScreenGui)
-	if not PartyUI then return end
-	local Summary = PartyUI:FindFirstChild("Summary")
-	if not Summary then return end
-
-	-- Prevent duplicate connections by storing on Summary
-	if Summary:GetAttribute("NavConnected") then return end
-	Summary:SetAttribute("NavConnected", true)
-
-	local function getPartyData()
-		return ClientData:Get()
-	end
-
-	local function navigate(delta: number)
-		local data = getPartyData()
-		local party = data and data.Party or {}
-		if not party then return end
-		-- ActiveCount may not be initialized here; compute from party length
-		local count = math.min(#party, 6)
-		if count <= 0 then return end
-		local current = SelectedIndex or 1
-		local nextIndex = ((current - 1 + delta) % count) + 1
-		SelectedIndex = nextIndex
-		refreshActiveHighlight()
-		-- Build enriched summary data to keep UI consistent
-		local srcIndex = CurrentOrder[nextIndex] or nextIndex
-		local creature = party[srcIndex]
-		if not creature then return end
-		local summaryData = LoadSummary(data, creature, nextIndex)
-		self:LoadCreatureSummary(summaryData, nextIndex)
-	end
-
-	local prevBtn = Summary:FindFirstChild("Previous")
-	if prevBtn and prevBtn:IsA("TextButton") then
-		prevBtn.MouseButton1Click:Connect(function()
-			navigate(-1)
-		end)
-	end
-
-	local nextBtn = Summary:FindFirstChild("Next")
-	if nextBtn and nextBtn:IsA("TextButton") then
-		nextBtn.MouseButton1Click:Connect(function()
-			navigate(1)
-		end)
-	end
-
-	local closeBtn = Summary:FindFirstChild("SummaryClose")
-	if closeBtn and closeBtn:IsA("TextButton") then
-		closeBtn.MouseButton1Click:Connect(function()
-			-- Show party list and hide summary
-			local list = PartyUI:FindFirstChild("List")
-			if list then list.Visible = true end
-			Summary.Visible = false
-			-- Clear 3D preview content to free resources
-			local container = Summary:FindFirstChild("3DPreview")
-			if container then
-				for _, child in ipairs(container:GetChildren()) do child:Destroy() end
-			end
-			Summary:SetAttribute("NavConnected", nil)
-		end)
-	end
-end
-
-function PartyModule:GetSummary()
-	local gui = self:GetGui()
-	return gui and gui:FindFirstChild("Summary") or nil
-end
+-- Removed connectSummaryButtons and GetSummary functions - now handled by Summary module
 
 function PartyModule:SetSelectionChangedCallback(callback)
 	print("=== SET SELECTION CHANGED CALLBACK ===")
@@ -1795,6 +1747,8 @@ function PartyModule:Open(All)
 	isOpen = true
 	-- Disable drag while in battle context (when opened from battle)
 	AllowDrag = (All ~= "Battle")
+	-- Track battle context for hiding spawn buttons
+	IsInBattle = (All == "Battle")
 	-- Reset summary showing flag when party opens
 	SummaryShowing = false
 	local Party: ScreenGui & {
@@ -1812,15 +1766,19 @@ function PartyModule:Open(All)
 
 	-- Update party display before opening
 	self:UpdatePartyDisplay()
+	-- Ensure status icons are up-to-date after update (defer to next frame to ensure slots are rendered)
+	task.defer(function()
+		updateAllStatusIcons()
+	end)
 
 	-- Ensure List is visible and Summary hidden when opening (reset from previous summary state)
 	local gui = self:GetGui()
 	if gui then
 		local List = gui:FindFirstChild("List")
 		if List then List.Visible = true end
-		local Summary = gui:FindFirstChild("Summary")
-		if Summary then Summary.Visible = false end
 	end
+	-- Hide GameUI.Summary when party opens
+	SummaryUI:Hide()
 
 	Party.Visible = true
 	Party.Size = CLOSED_SIZE
@@ -1882,6 +1840,15 @@ function PartyModule:Close(All)
 	if not isOpen then return end -- Not open, don't close
 	
 	isOpen = false
+	-- Reset battle context flag when closing
+	IsInBattle = false
+	
+	-- Close summary immediately if it's showing when party closes
+	if SummaryShowing then
+		SummaryUI:Hide()
+		SummaryShowing = false
+	end
+	
 	local Party: ScreenGui & {
 		Shadow: { Image: ImageLabel },
 		Topbar: {
@@ -1933,21 +1900,9 @@ function PartyModule:Close(All)
 
 	task.delay(0.4, function()
 		Party.Visible = false
-		-- Reset summary showing flag when party closes
+		-- Reset summary showing flag when party closes (summary already closed above)
 		SummaryShowing = false
-		-- Cleanup move hover connections for current summary, if any
-		local gui = self:GetGui()
-		local summary = gui and gui:FindFirstChild("Summary") or nil
-		if summary and MoveHoverConnections[summary] then
-			local bucket = MoveHoverConnections[summary]
-			if bucket.Follow and bucket.Follow.Connected then bucket.Follow:Disconnect() end
-			if bucket.PerMove then
-				for _, c in ipairs(bucket.PerMove) do
-					if c and c.Connected then c:Disconnect() end
-				end
-			end
-			MoveHoverConnections[summary] = nil
-		end
+		-- Summary module now handles its own cleanup, no need to clean up MoveHoverConnections here
 		if OnCloseCallback then
 			OnCloseCallback()
 		end

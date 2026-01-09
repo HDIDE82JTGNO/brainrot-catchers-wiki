@@ -15,6 +15,9 @@ local ChunkService: any = nil
 local DBG: any = nil
 local ActiveBattles: {[Player]: any} = {}
 
+-- Chunk streaming for optimized transmission
+local ChunkStreamer = require(script.Parent.ChunkStreamer)
+
 --[[
 	Initialize WorldSystem with dependencies
 ]]
@@ -235,11 +238,21 @@ function WorldSystem.LoadChunkPlayer(Player: Player, ChunkName: string): any?
 
 	local ClonedChunk = SourceFolder:Clone()
 	ClonedChunk.Name = ChunkName
-	ClonedChunk.Parent = Player.PlayerGui
+	
+	-- Set attributes before streaming
 	pcall(function()
 		ClonedChunk:SetAttribute("IsInterior", ChunkData.IsSubRoom == true)
 		ClonedChunk:SetAttribute("ScriptedCam", ChunkData.ScriptedCam == true)
 	end)
+	
+	-- Use optimized chunk streaming instead of direct parenting
+	-- This prevents freezing/crashes by batching the replication
+	local streamSuccess = ChunkStreamer:StreamChunk(ClonedChunk, Player.PlayerGui, Player)
+	if not streamSuccess then
+		DBG:warn("[LoadChunkPlayer] Failed to stream chunk, falling back to direct parenting")
+		-- Fallback to direct parenting if streaming fails
+		ClonedChunk.Parent = Player.PlayerGui
+	end
 	
 	-- Validate LeaveData vs chunk fallback spawn
 	do

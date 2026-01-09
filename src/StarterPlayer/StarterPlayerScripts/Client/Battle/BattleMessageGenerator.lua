@@ -17,6 +17,11 @@ local BattleMessageGenerator = {}
 -- Cache for checking if player and foe have the same creature
 local _cachedPlayerCreatureName: string? = nil
 local _cachedFoeCreatureName: string? = nil
+-- Message logger helper to ensure every generated battle message is traced
+local function _emit(msg: string, tag: string): string
+	print(string.format("[BattleMessage][%s] %s", tag, msg))
+	return msg
+end
 
 --[[
 	Updates the cached creature names for comparison
@@ -56,7 +61,7 @@ function BattleMessageGenerator.MoveUsed(actorName: string, moveName: string, is
 	if isPlayer == false then
 		displayName = formatFoeName(actorName)
 	end
-	return string.format("%s used %s!", displayName, moveName)
+	return _emit(string.format("%s used %s!", displayName, moveName), "MoveUsed")
 end
 
 --[[
@@ -71,9 +76,7 @@ function BattleMessageGenerator.Faint(creatureName: string, isPlayer: boolean?):
 	if isPlayer == false then
 		displayName = formatFoeName(creatureName)
 	end
-    local msg = string.format("%s fainted!", displayName)
-    print("[FAINT][Generator]", msg)
-    return msg
+	return _emit(string.format("%s fainted!", displayName), "Faint")
 end
 
 --[[
@@ -82,7 +85,7 @@ end
 	@return Formatted message string
 ]]
 function BattleMessageGenerator.Recall(creatureName: string): string
-	return string.format("%s, come back!", creatureName)
+	return _emit(string.format("%s, come back!", creatureName), "Recall")
 end
 
 --[[
@@ -102,12 +105,12 @@ function BattleMessageGenerator.SendOut(creatureName: string, variant: number?, 
             string.format("Go for it %s!", creatureName),
         }
         local index = variant or math.random(1, #messages)
-        return messages[index] or messages[1]
+        return _emit(messages[index] or messages[1], "SendOut:Player")
     else
         if trainerName and trainerName ~= "" then
-            return string.format("%s sent out %s!", trainerName, creatureName)
+            return _emit(string.format("%s sent out %s!", trainerName, creatureName), "SendOut:Trainer")
         end
-        return string.format("Trainer sent out %s!", creatureName)
+        return _emit(string.format("Trainer sent out %s!", creatureName), "SendOut:Trainer")
     end
 end
 
@@ -119,7 +122,7 @@ end
 	@return Formatted message string
 ]]
 function BattleMessageGenerator.XPGain(creatureName: string, xpAmount: number, isShared: boolean?): string
-	return string.format("%s gained %d XP!", creatureName, xpAmount)
+	return _emit(string.format("%s gained %d XP!", creatureName, xpAmount), "XPGain")
 end
 
 --[[
@@ -127,7 +130,7 @@ end
 	@return Formatted message string
 ]]
 function BattleMessageGenerator.XPSpread(): string
-	return "The rest of your party gained XP thanks to EXP Spread!"
+	return _emit("The rest of your party gained XP thanks to EXP Spread!", "XPSpread")
 end
 
 --[[
@@ -137,7 +140,7 @@ end
 	@return Formatted message string
 ]]
 function BattleMessageGenerator.LevelUp(creatureName: string, newLevel: number): string
-	return string.format("%s reached Lv. %d!", creatureName, newLevel)
+	return _emit(string.format("%s reached Lv. %d!", creatureName, newLevel), "LevelUp")
 end
 
 --
@@ -147,12 +150,12 @@ end
 -- @return Formatted message string
 --
 function BattleMessageGenerator.MoveLearned(creatureName: string, moveName: string): string
-    return string.format("%s learned %s!", creatureName, moveName)
+    return _emit(string.format("%s learned %s!", creatureName, moveName), "MoveLearned")
 end
 
 -- Move learn declined
 function BattleMessageGenerator.MoveDeclined(creatureName: string, moveName: string): string
-    return string.format("%s did not learn %s.", creatureName, moveName)
+    return _emit(string.format("%s did not learn %s.", creatureName, moveName), "MoveDeclined")
 end
 
 --[[
@@ -162,7 +165,7 @@ end
 	@return Formatted message string
 ]]
 function BattleMessageGenerator.Evolution(oldName: string, newName: string): string
-	return string.format("%s evolved into %s!", oldName, newName)
+	return _emit(string.format("%s evolved into %s!", oldName, newName), "Evolution")
 end
 
 --[[
@@ -170,7 +173,7 @@ end
 	@return Formatted message string
 ]]
 function BattleMessageGenerator.CriticalHit(): string
-	return "A critical hit!"
+	return _emit("A critical hit!", "CriticalHit")
 end
 
 --[[
@@ -182,13 +185,13 @@ function BattleMessageGenerator.Miss(actorName: string?, moveName: string?): str
 	-- If message is already formatted (from server), use it directly
 	if actorName and not string.find(actorName, "'s attack missed", 1, true) and not string.find(actorName, "avoided", 1, true) then
 		if moveName then
-			return string.format("%s used %s, but it missed!", actorName, moveName)
+			return _emit(string.format("%s used %s, but it missed!", actorName, moveName), "Miss")
 		else
-			return string.format("%s's attack missed!", actorName)
+			return _emit(string.format("%s's attack missed!", actorName), "Miss")
 		end
 	end
 	-- Default message for when server provides pre-formatted message
-	return actorName or "The attack missed!"
+	return _emit(actorName or "The attack missed!", "Miss")
 end
 
 --[[
@@ -198,13 +201,13 @@ end
 ]]
 function BattleMessageGenerator.Effectiveness(effectiveness: string): string
 	if effectiveness == "SuperEffective" then
-		return "It's super effective!"
+		return _emit("It's super effective!", "Effectiveness")
 	elseif effectiveness == "NotVeryEffective" then
-		return "It's not very effective..."
+		return _emit("It's not very effective...", "Effectiveness")
 	elseif effectiveness == "NoEffect" then
-		return "It doesn't affect the target..."
+		return _emit("It doesn't affect the target...", "Effectiveness")
 	end
-	return ""
+	return _emit("", "Effectiveness")
 end
 
 --[[
@@ -239,12 +242,12 @@ function BattleMessageGenerator.StatusApplied(creatureName: string, status: stri
 	
 	local message = statusMap[statusStr]
 	if message then
-		return message
+		return _emit(message, "StatusApplied")
 	end
 	
 	-- Fallback: try to generate a reasonable message
 	warn("[BattleMessageGenerator] Unknown status type:", status, "for creature:", creatureName)
-	return string.format("%s was affected!", creatureName)
+	return _emit(string.format("%s was affected!", creatureName), "StatusApplied:Fallback")
 end
 
 --[[
@@ -262,7 +265,8 @@ function BattleMessageGenerator.StatusRemoved(creatureName: string, status: stri
 		Freeze = string.format("%s thawed out!", creatureName),
 	}
 	
-	return statusMessages[status] or string.format("%s recovered from %s!", creatureName, status)
+	local msg = statusMessages[status] or string.format("%s recovered from %s!", creatureName, status)
+	return _emit(msg, "StatusRemoved")
 end
 
 --[[
@@ -302,7 +306,7 @@ function BattleMessageGenerator.StatChange(creatureName: string, stat: string, s
 		end
 	end
 	
-	return string.format("%s's %s %s!", creatureName, statName, changeText)
+	return _emit(string.format("%s's %s %s!", creatureName, statName, changeText), "StatChange")
 end
 
 --[[
@@ -312,9 +316,9 @@ end
 ]]
 function BattleMessageGenerator.Escape(success: boolean): string
 	if success then
-		return "Got away safely!"
+		return _emit("Got away safely!", "Escape")
 	else
-		return "Can't escape!"
+		return _emit("Can't escape!", "Escape")
 	end
 end
 
@@ -324,7 +328,7 @@ end
 	@return Formatted message string
 ]]
 function BattleMessageGenerator.Flinch(creatureName: string): string
-	return string.format("%s flinched and couldn't move!", creatureName)
+	return _emit(string.format("%s flinched and couldn't move!", creatureName), "Flinch")
 end
 
 --[[
@@ -334,7 +338,7 @@ end
 	@return Formatted message string
 ]]
 function BattleMessageGenerator.Heal(creatureName: string, amount: number): string
-	return string.format("%s restored %d HP!", creatureName, amount)
+	return _emit(string.format("%s restored %d HP!", creatureName, amount), "Heal")
 end
 
 --[[
@@ -343,44 +347,267 @@ end
 	@return Formatted message string
 ]]
 function BattleMessageGenerator.Recoil(creatureName: string): string
-	return string.format("%s is damaged by recoil!", creatureName)
+	return _emit(string.format("%s was hurt by the recoil!", creatureName), "Recoil")
+end
+
+--[[
+	Generates a message for entry hazard setup
+	@param hazardType "StealthRock" | "Spikes" | "ToxicSpikes"
+	@param isPlayer Whether the player set the hazard (hazards go on opponent's side)
+	@param layers The layer count (for Spikes/ToxicSpikes)
+	@return Formatted message string
+]]
+function BattleMessageGenerator.HazardSet(hazardType: string, isPlayer: boolean, layers: number?): string
+	local sideDesc = isPlayer and "opposing side" or "your side"
+	
+	if hazardType == "StealthRock" then
+		return _emit(string.format("Pointed stones float in the air around the %s!", sideDesc), "HazardSet:StealthRock")
+	elseif hazardType == "Spikes" then
+		local layerMsg = ""
+		if layers and layers > 1 then
+			layerMsg = string.format(" (Layer %d)", layers)
+		end
+		return _emit(string.format("Spikes were scattered around the %s!%s", sideDesc, layerMsg), "HazardSet:Spikes")
+	elseif hazardType == "ToxicSpikes" then
+		local layerMsg = ""
+		if layers and layers > 1 then
+			layerMsg = string.format(" (Layer %d)", layers)
+		end
+		return _emit(string.format("Toxic Spikes were scattered around the %s!%s", sideDesc, layerMsg), "HazardSet:ToxicSpikes")
+	end
+	
+	return _emit("Hazards were set!", "HazardSet:Unknown")
+end
+
+--[[
+	Generates a message for entry hazard damage on switch-in
+	@param creatureName The name of the creature taking damage
+	@param hazardType "StealthRock" | "Spikes" | "ToxicSpikes"
+	@param statusApplied Optional status for Toxic Spikes ("PSN" or "TOX")
+	@param absorbed Whether Toxic Spikes were absorbed by Poison type
+	@return Formatted message string
+]]
+function BattleMessageGenerator.HazardDamage(creatureName: string, hazardType: string, statusApplied: string?, absorbed: boolean?): string
+	if hazardType == "StealthRock" then
+		return _emit(string.format("%s is hurt by Stealth Rock!", creatureName), "HazardDamage:StealthRock")
+	elseif hazardType == "Spikes" then
+		return _emit(string.format("%s is hurt by the Spikes!", creatureName), "HazardDamage:Spikes")
+	elseif hazardType == "ToxicSpikes" then
+		if absorbed then
+			return _emit(string.format("%s absorbed the Toxic Spikes!", creatureName), "HazardDamage:ToxicSpikesAbsorbed")
+		elseif statusApplied == "TOX" then
+			return _emit(string.format("%s was badly poisoned by Toxic Spikes!", creatureName), "HazardDamage:ToxicSpikesTOX")
+		elseif statusApplied == "PSN" then
+			return _emit(string.format("%s was poisoned by Toxic Spikes!", creatureName), "HazardDamage:ToxicSpikesPSN")
+		end
+		return _emit(string.format("%s was affected by Toxic Spikes!", creatureName), "HazardDamage:ToxicSpikes")
+	end
+	
+	return _emit(string.format("%s was hurt by the hazards!", creatureName), "HazardDamage:Unknown")
+end
+
+--[[
+	Generates a message for hazard removal
+	@param isPlayer Whether the player's side was cleared
+	@param hadStealthRock Whether Stealth Rock was cleared
+	@param hadSpikes Whether Spikes were cleared
+	@param hadToxicSpikes Whether Toxic Spikes were cleared
+	@return Formatted message string
+]]
+function BattleMessageGenerator.HazardClear(isPlayer: boolean, hadStealthRock: boolean?, hadSpikes: boolean?, hadToxicSpikes: boolean?): string
+	local sideDesc = isPlayer and "your side" or "the opposing side"
+	local hazardList = {}
+	
+	if hadStealthRock then
+		table.insert(hazardList, "the pointed stones")
+	end
+	if hadSpikes then
+		table.insert(hazardList, "the spikes")
+	end
+	if hadToxicSpikes then
+		table.insert(hazardList, "the toxic spikes")
+	end
+	
+	if #hazardList == 0 then
+		return ""
+	elseif #hazardList == 1 then
+		local capitalized = hazardList[1]:gsub("^%l", string.upper)
+		return _emit(string.format("%s disappeared from around %s!", capitalized, sideDesc), "HazardClear")
+	else
+		local last = table.remove(hazardList)
+		local capitalized = hazardList[1]:gsub("^%l", string.upper)
+		hazardList[1] = capitalized
+		return _emit(string.format("%s and %s disappeared from around %s!", table.concat(hazardList, ", "), last, sideDesc), "HazardClear")
+	end
+end
+
+--[[
+	Generates a message for ability activation
+	@param creatureName The name of the creature
+	@param abilityName The name of the ability
+	@param effectDescription Optional description of the effect
+	@return Formatted message string
+]]
+function BattleMessageGenerator.AbilityActivation(creatureName: string, abilityName: string, effectDescription: string?): string
+	if effectDescription then
+		return _emit(string.format("[%s] %s", abilityName, effectDescription), "AbilityActivation")
+	end
+	return _emit(string.format("%s's %s activated!", creatureName, abilityName), "AbilityActivation")
+end
+
+--[[
+	Generates a message for ability-based stat changes
+	@param creatureName The name of the creature
+	@param stat The stat being changed
+	@param stages The number of stages (positive = increase, negative = decrease)
+	@param abilityName Optional ability name for context
+	@return Formatted message string
+]]
+function BattleMessageGenerator.AbilityStatChange(creatureName: string, stat: string, stages: number, abilityName: string?): string
+	local statNames = {
+		Attack = "Attack",
+		Defense = "Defense",
+		Speed = "Speed",
+		Accuracy = "accuracy",
+		Evasion = "evasiveness",
+	}
+	
+	local statName = statNames[stat] or stat
+	local changeText
+	
+	if stages > 0 then
+		if stages == 1 then
+			changeText = "rose"
+		elseif stages == 2 then
+			changeText = "sharply rose"
+		else
+			changeText = "rose drastically"
+		end
+	else
+		if stages == -1 then
+			changeText = "fell"
+		elseif stages == -2 then
+			changeText = "harshly fell"
+		else
+			changeText = "severely fell"
+		end
+	end
+	
+	return _emit(string.format("%s's %s %s!", creatureName, statName, changeText), "AbilityStatChange")
+end
+
+--[[
+	Generates ability-specific messages based on ability name and effect type
+	@param abilityName The name of the ability
+	@param creatureName The creature with the ability
+	@param effectType The type of effect (e.g., "speed_boost", "immunity", "intimidate")
+	@param extraData Optional additional data for the message
+	@return Formatted message string
+]]
+function BattleMessageGenerator.AbilityEffect(abilityName: string, creatureName: string, effectType: string, extraData: {[string]: any}?): string
+	extraData = extraData or {}
+	
+	-- Ability-specific message templates
+	local templates = {
+		-- Speed boosts
+		speed_boost = string.format("%s's Speed rose!", creatureName),
+		
+		-- Attack/Defense changes
+		attack_boost = string.format("%s's Attack rose!", creatureName),
+		defense_boost = string.format("%s's Defense rose!", creatureName),
+		attack_drop = string.format("%s's Attack fell!", creatureName),
+		defense_drop = string.format("%s's Defense fell!", creatureName),
+		
+		-- Intimidate-style
+		intimidate = string.format("%s's Attack fell!", extraData.TargetName or "The opposing creature"),
+		
+		-- Weather triggers
+		weather_speed = string.format("%s's Speed rose!", creatureName),
+		
+		-- Type immunities/absorptions
+		immunity = string.format("It doesn't affect %s...", creatureName),
+		absorption = string.format("%s absorbed the attack!", creatureName),
+		
+		-- Heal effects
+		heal = string.format("%s restored HP!", creatureName),
+		
+		-- Damage reduction
+		reduced = "The attack was weakened!",
+		
+		-- Entry effects
+		entry = string.format("%s's %s!", creatureName, abilityName),
+		
+		-- Generic
+		generic = string.format("%s's %s activated!", creatureName, abilityName),
+	}
+	
+	return _emit(templates[effectType] or templates.generic, "AbilityEffect:" .. effectType)
 end
 
 --[[
 	Generates a message for weather effects
-	@param weather The weather type
+	@param weather The weather type (battle weather name or WeatherConfig name)
 	@param action "Start" | "Continue" | "End"
 	@return Formatted message string
 ]]
 function BattleMessageGenerator.Weather(weather: string, action: string): string
+	-- Map battle weather names and WeatherConfig names to messages
 	local weatherMessages = {
+		-- Battle weather names (from abilities)
+		Sunlight = {
+			Start = "The sunlight turned harsh!",
+			Continue = "The sunlight is harsh!",
+			End = "The harsh sunlight faded.",
+		},
 		Rain = {
 			Start = "It started to rain!",
 			Continue = "Rain continues to fall.",
 			End = "The rain stopped.",
-		},
-		Sun = {
-			Start = "The sunlight turned harsh!",
-			Continue = "The sunlight is strong.",
-			End = "The harsh sunlight faded.",
 		},
 		Sandstorm = {
 			Start = "A sandstorm kicked up!",
 			Continue = "The sandstorm rages.",
 			End = "The sandstorm subsided.",
 		},
+		Snow = {
+			Start = "It started to snow!",
+			Continue = "The snow continues to fall.",
+			End = "The snow stopped.",
+		},
+		-- WeatherConfig names
+		["Harsh Sun"] = {
+			Start = "The sunlight turned harsh!",
+			Continue = "The sunlight is harsh!",
+			End = "The harsh sunlight faded.",
+		},
+		["Thunderstorm"] = {
+			Start = "It started to rain!",
+			Continue = "Rain continues to fall.",
+			End = "The rain stopped.",
+		},
+		["Snowstorm"] = {
+			Start = "It started to snow!",
+			Continue = "The snow continues to fall.",
+			End = "The snow stopped.",
+		},
+		-- Legacy names
+		Sun = {
+			Start = "The sunlight turned harsh!",
+			Continue = "The sunlight is harsh!",
+			End = "The harsh sunlight faded.",
+		},
 		Hail = {
-			Start = "It started to hail!",
-			Continue = "Hail continues to fall.",
-			End = "The hail stopped.",
+			Start = "It started to snow!",
+			Continue = "The snow continues to fall.",
+			End = "The snow stopped.",
 		},
 	}
 	
 	if weatherMessages[weather] and weatherMessages[weather][action] then
-		return weatherMessages[weather][action]
+		return _emit(weatherMessages[weather][action], "Weather")
 	end
 	
-	return ""
+	return _emit("", "Weather")
 end
 
 --[[
@@ -391,13 +618,13 @@ end
 ]]
 function BattleMessageGenerator.Trainer(trainerName: string, action: string): string
 	if action == "Challenge" then
-		return string.format("%s wants to battle!", trainerName)
+		return _emit(string.format("%s wants to battle!", trainerName), "Trainer:Challenge")
 	elseif action == "Defeat" then
-		return string.format("You defeated %s!", trainerName)
+		return _emit(string.format("You defeated %s!", trainerName), "Trainer:Defeat")
 	elseif action == "Loss" then
-		return string.format("You lost to %s!", trainerName)
+		return _emit(string.format("You lost to %s!", trainerName), "Trainer:Loss")
 	end
-	return ""
+	return _emit("", "Trainer:Unknown")
 end
 
 --[[
@@ -480,16 +707,33 @@ function BattleMessageGenerator.FromEvent(eventData: any): string?
 	elseif eventType == "Trainer" and eventData.Trainer and eventData.Action then
 		return BattleMessageGenerator.Trainer(eventData.Trainer, eventData.Action)
 	
+	elseif eventType == "AbilityActivation" and eventData.Creature and eventData.Ability then
+		if eventData.EffectType then
+			return BattleMessageGenerator.AbilityEffect(eventData.Ability, eventData.Creature, eventData.EffectType, eventData.ExtraData)
+		end
+		return BattleMessageGenerator.AbilityActivation(eventData.Creature, eventData.Ability, eventData.EffectDescription)
+	
 	elseif eventType == "ItemUse" and eventData.Actor and eventData.Item and eventData.Target then
 		-- Ex: "You used an apple on X"
 		local actor = eventData.Actor
 		local item = eventData.Item
 		local target = eventData.Target
 		if actor == game.Players.LocalPlayer.Name then
-			return string.format("You used an %s on %s", item:lower(), target)
+			return _emit(string.format("You used an %s on %s", item:lower(), target), "ItemUse")
 		else
-			return string.format("%s used an %s on %s", actor, item:lower(), target)
+			return _emit(string.format("%s used an %s on %s", actor, item:lower(), target), "ItemUse")
 		end
+		
+	elseif eventType == "EntryHazard" and eventData.HazardType then
+		return BattleMessageGenerator.HazardSet(eventData.HazardType, eventData.IsPlayer, eventData.Layers)
+		
+	elseif eventType == "HazardDamage" and eventData.HazardType and eventData.Creature then
+		return BattleMessageGenerator.HazardDamage(
+			eventData.Creature, 
+			eventData.HazardType, 
+			eventData.Status, 
+			eventData.Absorbed
+		)
 	end
 	
 	return nil

@@ -7,6 +7,9 @@
 
 local Status = {}
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local StatStages = require(ReplicatedStorage.Shared.StatStages)
+
 export type StatusType = "BRN" | "PAR" | "PSN" | "TOX" | "SLP" | "FRZ"
 export type VolatileStatusType = "Confusion" | "Infatuation" | "Flinch"
 
@@ -95,7 +98,8 @@ function Status.CanBeInflicted(creature: any, statusType: StatusType): boolean
 	-- Type-based immunities
 	if creature.Type then
 		for _, typeName in ipairs(creature.Type) do
-			if typeName == "Fire" and (statusType == "BRN" or statusType == "FRZ") then
+			-- Gen 9: Fire-types are immune to burn (but can still be frozen)
+			if typeName == "Fire" and statusType == "BRN" then
 				return false
 			end
 			if typeName == "Ice" and statusType == "FRZ" then
@@ -104,7 +108,8 @@ function Status.CanBeInflicted(creature: any, statusType: StatusType): boolean
 			if typeName == "Electric" and statusType == "PAR" then
 				return false
 			end
-			if typeName == "Poison" and statusType == "PSN" then
+			-- Poison-types are immune to both poison and toxic poison
+			if typeName == "Poison" and (statusType == "PSN" or statusType == "TOX") then
 				return false
 			end
 			if typeName == "Steel" and (statusType == "PSN" or statusType == "TOX") then
@@ -121,9 +126,8 @@ function Status.CanBeInflicted(creature: any, statusType: StatusType): boolean
 		return false
 	end
 	
-	-- Can't inflict status if already has a non-volatile status
-	if creature.Status and statusType ~= creature.Status.Type then
-		-- Only one non-volatile status at a time
+	-- Can't inflict a major status if already has one (no refreshing/reapplying)
+	if creature.Status then
 		return false
 	end
 	
@@ -140,11 +144,6 @@ end
 function Status.Apply(creature: any, statusType: StatusType, turnsRemaining: number?): boolean
 	if not Status.CanBeInflicted(creature, statusType) then
 		return false
-	end
-	
-	-- Remove any existing status before applying new one (prevent stacking)
-	if creature.Status then
-		Status.Remove(creature)
 	end
 	
 	creature.Status = {
@@ -180,11 +179,15 @@ function Status.ProcessEndOfTurn(creature: any): number?
 	local statusType = status.Type
 	local maxHP = creature.MaxStats and creature.MaxStats.HP or 1
 	
-	if statusType == "BRN" or statusType == "PSN" then
-		-- Burn/Poison: 1/16 max HP loss
+	if statusType == "BRN" then
+		-- Gen 8–9: Burn is 1/16 max HP
 		return math.max(1, math.floor(maxHP / 16))
+	elseif statusType == "PSN" then
+		-- Gen 8–9: Poison is 1/8 max HP
+		return math.max(1, math.floor(maxHP / 8))
 	elseif statusType == "TOX" then
-		-- Badly Poisoned: increasing damage (1/16, 2/16, 3/16, etc.)
+		-- Gen 8–9: Badly Poisoned increases each end of turn while active (1/16, 2/16, 3/16, ...)
+		-- Counter resets when the creature switches out (handled by battle switch logic).
 		local counter = status.ToxicCounter or 1
 		local damage = math.max(1, math.floor(maxHP * counter / 16))
 		-- Increment counter for next turn
@@ -326,8 +329,26 @@ function Status.CanActVolatile(creature: any): (boolean, string?, number?)
 		
 		-- 33% chance to hurt self (0-100, if <= 33)
 		if math.random(1, 100) <= 33 then
-			local maxHP = creature.MaxStats and creature.MaxStats.HP or 1
-			local selfDamage = math.max(1, math.floor(maxHP / 8)) -- 1/8 max HP
+			-- Gen 8–9: confusion self-hit is a 40 BP typeless PHYSICAL hit using the user's
+			-- Attack/Defense (including stat stages and burn Attack reduction).
+			local level = creature.Level or 1
+			local power = 40
+			local atkBase = (creature.Stats and creature.Stats.Attack) or 1
+			local defBase = (creature.Stats and creature.Stats.Defense) or 1
+			local atkStage = StatStages.GetStage(creature, "Attack")
+			local defStage = StatStages.GetStage(creature, "Defense")
+
+			local atk = StatStages.ApplyStage(atkBase, atkStage, false)
+			local def = math.max(1, StatStages.ApplyStage(defBase, defStage, false))
+
+			-- Burn halves Attack for physical damage (unless abilities override elsewhere)
+			atk = math.floor(atk * Status.GetAttackMultiplier(creature))
+
+			local levelFactor = math.floor((2 * level) / 5) + 2
+			local baseDamage = math.floor((levelFactor * power * (atk / def)) / 50) + 2
+			local randomFactor = math.random(85, 100) / 100
+			local selfDamage = math.max(1, math.floor(baseDamage * randomFactor))
+
 			return false, creatureName .. " is confused!\n" .. creatureName .. " hurt itself in confusion!", selfDamage
 		end
 		
@@ -353,7 +374,8 @@ function Status.GetSpeedMultiplier(creature: any): number
 	
 	local statusType = creature.Status.Type
 	if statusType == "PAR" then
-		return 0.25 -- Speed severely reduced
+		-- Gen 8–9: paralysis halves Speed
+		return 0.5
 	end
 	
 	return 1.0

@@ -43,7 +43,7 @@ export type ActionHandler = {
 export type PartyModule = {
 	Open: (() -> ())?,
 	Close: (() -> ())?,
-	SetSelectionChangedCallback: ((CreatureData, number) -> ())?
+	SetSelectionChangedCallback: ((CreatureData?, number?) -> ())?
 }
 
 export type SwitchCallback = (number) -> ()
@@ -62,7 +62,7 @@ export type PartyIntegrationType = {
 	
 	-- Private methods
 	_setupSelectionCallback: (self: PartyIntegrationType) -> (),
-	_onCreatureSelected: (self: PartyIntegrationType, creatureData: CreatureData, slotIndex: number) -> (),
+	_onCreatureSelected: (self: PartyIntegrationType, creatureData: CreatureData?, slotIndex: number?) -> (),
 	_updateSendOutButton: (self: PartyIntegrationType, creatureData: CreatureData, slotIndex: number) -> (),
 	_onSendOutClicked: (self: PartyIntegrationType) -> (),
 	_onCancelClicked: (self: PartyIntegrationType) -> (),
@@ -434,7 +434,7 @@ function PartyIntegration:_setupSelectionCallback()
 	end
 	
 	-- Create callback function
-	local callback = function(creatureData: CreatureData, slotIndex: number)
+	local callback = function(creatureData: CreatureData?, slotIndex: number?)
 		self:_onCreatureSelected(creatureData, slotIndex)
 	end
 	
@@ -454,6 +454,23 @@ function PartyIntegration:_onCreatureSelected(creatureData: CreatureData, slotIn
 	if self._isOpen ~= true or self._switchMode == nil then
 		return
 	end
+	
+	-- Handle nil values for clearing selection (when summary is closed via BACK button)
+	if creatureData == nil or slotIndex == nil then
+		print("[PartyIntegration] Clearing selection (summary closed)")
+		self._selectedCreatureData = nil
+		self._selectedSlotIndex = nil
+		
+		-- Hide SendOut button when selection is cleared
+		if self._uiElements.sendOutButton then
+			self._uiElements.sendOutButton.Visible = false
+			self._uiElements.sendOutButton.Active = false
+			self._uiElements.sendOutButton.BackgroundTransparency = 1
+			print("[PartyIntegration] SendOut button hidden (selection cleared)")
+		end
+		return
+	end
+	
 	print("[PartyIntegration] Creature selected:", creatureData and creatureData.Name or "nil", "Slot:", slotIndex)
 	print("[PartyIntegration] Previous selection - Creature:", self._selectedCreatureData and self._selectedCreatureData.Name or "nil", "Slot:", self._selectedSlotIndex)
 	

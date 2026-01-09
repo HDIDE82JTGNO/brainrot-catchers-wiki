@@ -17,6 +17,8 @@ local LuaTypes = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("
 
 -- Client-side data cache
 local ClientData = require(script.Parent.Parent:WaitForChild("Plugins"):WaitForChild("ClientData"))
+local UIFunctions = require(script.Parent:WaitForChild("UIFunctions"))
+local Audio = script.Parent.Parent:WaitForChild("Assets"):WaitForChild("Audio")
 
 --// Types
 type CreatureDef = LuaTypes.Creature
@@ -110,12 +112,18 @@ local function buildDexEntries(): { DexEntry }
 	return _entries
 end
 
-local function computeCaughtFlags(): (CaughtFlags, number)
+local function computeCaughtFlags(): (CaughtFlags, number, {[string]: boolean})
 	local data = ClientData:Get()
 	local flags: CaughtFlags = {}
+	local seenCreatures: {[string]: boolean} = {}
 
 	if not data then
-		return flags, 0
+		return flags, 0, seenCreatures
+	end
+
+	-- Get seen creatures map
+	if type(data.SeenCreatures) == "table" then
+		seenCreatures = data.SeenCreatures
 	end
 
 	local function markCreature(creature: any)
@@ -158,7 +166,7 @@ local function computeCaughtFlags(): (CaughtFlags, number)
 	end
 
 	print("[Dex] computeCaughtFlags: uniqueCaught =", uniqueCount)
-	return flags, uniqueCount
+	return flags, uniqueCount, seenCreatures
 end
 
 local function setTypeFrame(frame: Instance?, typeName: string?)
@@ -226,13 +234,18 @@ local function showCurrentInfo(dexGui: GuiObject, def: CreatureDef)
 		return
 	end
 
-	print("[Dex] showCurrentInfo: showing info for", def.Name, "DexNumber =", def.DexNumber)
+	-- Check if creature has been seen
+	local data = ClientData:Get()
+	local seenCreatures = (data and type(data.SeenCreatures) == "table") and data.SeenCreatures or {}
+	local isSeen = seenCreatures[def.Name] == true
+
+	print("[Dex] showCurrentInfo: showing info for", def.Name, "DexNumber =", def.DexNumber, "isSeen =", isSeen)
 	main.Visible = true
 
 	-- Basic text fields
 	local nameLabel = main:FindFirstChild("CreatureName")
 	if nameLabel and nameLabel:IsA("TextLabel") then
-		nameLabel.Text = def.Name
+		nameLabel.Text = isSeen and def.Name or "???"
 	end
 
 	local description = main:FindFirstChild("Description")
@@ -318,7 +331,7 @@ local function showCurrentInfo(dexGui: GuiObject, def: CreatureDef)
 	end
 end
 
-local function renderList(dexGui: GuiObject, entries: { DexEntry }, flags: CaughtFlags)
+local function renderList(dexGui: GuiObject, entries: { DexEntry }, flags: CaughtFlags, seenCreatures: {[string]: boolean})
 	local listRoot = dexGui:FindFirstChild("List")
 	if not listRoot or not listRoot:IsA("ScrollingFrame") then
 		print("[Dex] renderList: List scrolling frame not found under Dex")
@@ -337,6 +350,8 @@ local function renderList(dexGui: GuiObject, entries: { DexEntry }, flags: Caugh
 	-- Clear existing rows (keep Template and layout objects)
 	for _, child in ipairs(listRoot:GetChildren()) do
 		if child ~= template and child:IsA("GuiObject") and child.Name ~= "UIListLayout" and child.Name ~= "UIPadding" then
+			-- Clear any button connections before destroying
+			pcall(function() UIFunctions:ClearConnection(child) end)
 			child:Destroy()
 		end
 	end
@@ -344,19 +359,27 @@ local function renderList(dexGui: GuiObject, entries: { DexEntry }, flags: Caugh
 	clearCurrentInfo(dexGui)
 
 	print("[Dex] renderList: rendering", #entries, "entries")
+	
+	-- Animation constants for staggered reveal
+	local STAGGER_DELAY = 0.09 -- Small delay between items for smooth cascade
+	local FADE_IN_TIME = 0.15
 
 	for index, entry in ipairs(entries) do
 		local base = entry.Base
 		local row = template:Clone()
 		row.Name = base.Name
-		row.Visible = true
 		row.LayoutOrder = index
 		row.Parent = listRoot
 
-		-- Creature name
+		-- Check if creature has been seen
+		local isSeen = seenCreatures[base.Name] == true
+		
+		row.Visible = true
+		
+		-- Creature name - show "???" if not seen
 		local nameLabel = row:FindFirstChild("CreatureName")
 		if nameLabel and nameLabel:IsA("TextLabel") then
-			nameLabel.Text = base.Name
+			nameLabel.Text = isSeen and base.Name or "???"
 		end
 
 		-- Dex number
@@ -405,28 +428,102 @@ local function renderList(dexGui: GuiObject, entries: { DexEntry }, flags: Caugh
 			end
 		end
 
-		-- Icon tint based on whether we've caught this variant
+		-- Icon tint based on whether we've seen/caught this variant
 		local caught = flags[base.Name]
 		local hasNormal = caught and caught.Normal or false
 		local hasShiny = caught and caught.Shiny or false
 
 		local seenColor = Color3.fromRGB(255, 255, 255)
-		local unseenColorNormal = Color3.fromRGB(47, 47, 47)
-		local unseenColorShiny = Color3.fromRGB(0, 0, 0)
+		local unseenColorNormal = Color3.fromRGB(0, 0, 0) -- Black for unseen
+		local unseenColorShiny = Color3.fromRGB(0, 0, 0) -- Black for unseen
 
-		if normalIcon and normalIcon:IsA("ImageLabel") then
-			normalIcon.ImageColor3 = hasNormal and seenColor or unseenColorNormal
+		-- If not seen, always show black icons regardless of caught status
+		if not isSeen then
+			if normalIcon and normalIcon:IsA("ImageLabel") then
+				normalIcon.ImageColor3 = unseenColorNormal
+			end
+			if shinyIcon and shinyIcon:IsA("ImageLabel") then
+				shinyIcon.ImageColor3 = unseenColorShiny
+			end
+		else
+			-- If seen, tint based on caught status
+			if normalIcon and normalIcon:IsA("ImageLabel") then
+				normalIcon.ImageColor3 = hasNormal and seenColor or unseenColorNormal
+			end
+			if shinyIcon and shinyIcon:IsA("ImageLabel") then
+				shinyIcon.ImageColor3 = hasShiny and seenColor or unseenColorShiny
+			end
 		end
 
-		if shinyIcon and shinyIcon:IsA("ImageLabel") then
-			-- Shiny unseen state uses pure black, per spec
-			shinyIcon.ImageColor3 = hasShiny and seenColor or unseenColorShiny
+		-- Use UIFunctions for consistent button behavior
+		UIFunctions:NewButton(
+			row,
+			{"Action"},
+			{ Click = "One", HoverOn = "One", HoverOff = "One" },
+			0.3,
+			function()
+				if isSeen then
+					Audio.SFX.Click:Play()
+					print("[Dex] row clicked:", base.Name, "DexNumber =", base.DexNumber)
+					showCurrentInfo(dexGui, base)
+				else
+					print("[Dex] row clicked but creature not seen:", base.Name)
+				end
+			end
+		)
+		
+		-- Store original transparency values before hiding for animation
+		local originalBgTransparency = row.BackgroundTransparency
+		local childOriginalTransparencies = {}
+		for _, child in ipairs(row:GetDescendants()) do
+			if child:IsA("TextLabel") then
+				childOriginalTransparencies[child] = { type = "text", value = child.TextTransparency }
+			elseif child:IsA("ImageLabel") then
+				childOriginalTransparencies[child] = { type = "image", value = child.ImageTransparency }
+			elseif child:IsA("UIStroke") then
+				childOriginalTransparencies[child] = { type = "stroke", value = child.Transparency }
+			end
 		end
-
-		-- Selection handler to load CurrentInfo for this base creature
-		row.MouseButton1Click:Connect(function()
-			print("[Dex] row clicked:", base.Name, "DexNumber =", base.DexNumber)
-			showCurrentInfo(dexGui, base)
+		
+		-- Now set to transparent for fade-in
+		row.BackgroundTransparency = 1
+		for child, data in pairs(childOriginalTransparencies) do
+			if data.type == "text" then
+				child.TextTransparency = 1
+			elseif data.type == "image" then
+				child.ImageTransparency = 1
+			elseif data.type == "stroke" then
+				child.Transparency = 1
+			end
+		end
+		
+		-- Staggered fade-in animation
+		task.delay(index * STAGGER_DELAY, function()
+			if not row or not row.Parent then return end
+			
+			-- Fade in background to original value
+			TweenService:Create(row, TweenInfo.new(FADE_IN_TIME, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+				BackgroundTransparency = originalBgTransparency
+			}):Play()
+			
+			-- Fade in all text, images, and strokes to their original transparency values
+			for child, data in pairs(childOriginalTransparencies) do
+				if child and child.Parent then
+					if data.type == "text" then
+						TweenService:Create(child, TweenInfo.new(FADE_IN_TIME, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+							TextTransparency = data.value
+						}):Play()
+					elseif data.type == "image" then
+						TweenService:Create(child, TweenInfo.new(FADE_IN_TIME, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+							ImageTransparency = data.value
+						}):Play()
+					elseif data.type == "stroke" then
+						TweenService:Create(child, TweenInfo.new(FADE_IN_TIME, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+							Transparency = data.value
+						}):Play()
+					end
+				end
+			end
 		end)
 	end
 end
@@ -453,10 +550,10 @@ function DexModule:Refresh()
 	end
 
 	local entries = buildDexEntries()
-	local flags, caughtUnique = computeCaughtFlags()
+	local flags, caughtUnique, seenCreatures = computeCaughtFlags()
 
 	updateTitle(dexGui, #entries, caughtUnique)
-	renderList(dexGui, entries, flags)
+	renderList(dexGui, entries, flags, seenCreatures)
 end
 
 function DexModule:Open()

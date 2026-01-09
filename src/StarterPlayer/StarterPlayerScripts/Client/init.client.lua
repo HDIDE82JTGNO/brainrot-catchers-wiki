@@ -26,9 +26,25 @@ local ClientInit = require(Utilities:WaitForChild("ClientInit"))
 print("ClientInit loaded")
 local ClientData = require(Plugins:WaitForChild("ClientData"))
 print("ClientData loaded")
+local GameContext = require(Utilities:WaitForChild("GameContext"))
+print("GameContext loaded")
 local Intro = require(Plugins:WaitForChild("Intro"))
 print("Intro loaded")
+-- Initialize player click detectors for Trade context
+pcall(function()
+	require(Utilities:WaitForChild("PlayerClickDetectors"))
+end)
 -- Note: Delay requiring UI to avoid early init issues before GameUI exists
+
+local function refreshContext(): string
+	local ctx = GameContext:Get()
+	pcall(function()
+		Player:SetAttribute("ClientContext", ctx)
+	end)
+	return ctx
+end
+
+local CurrentContext = refreshContext()
 
 -- Preload core animations in the background
 pcall(function()
@@ -67,6 +83,9 @@ if printDebugInfo then
 	DBG:print("PlaceId:", game.PlaceId)
 	DBG:print("GameId:", game.GameId)
 	DBG:print("JobId:", game.JobId)
+
+	DBG:print("=== CONTEXT ===")
+	DBG:print("Context:", CurrentContext)
 
 end
 
@@ -116,6 +135,9 @@ end
 repeat task.wait() until game.Players.LocalPlayer.Character
 CharacterFunctions:Init(game.Players.LocalPlayer.Character)
 
+-- Set camera max zoom distance
+Player.CameraMaxZoomDistance = 20
+
 -- Initialize encounter system
 EncounterZone:Init()
 
@@ -135,7 +157,10 @@ end)
 
 -- Initialize UI systems
 local UI = require(script.UI)
+local CurrentRequest = UI.CurrentRequest
+local TradeUI = UI.Trade
 UI.PlayerList:Init()
+UI.WorldInfo:Init()
 local UIFunctions = require(script.UI.UIFunctions)
 
 -- Initialize Save UI bindings (ConfirmSave button callback)
@@ -145,7 +170,38 @@ pcall(function()
     end
 end)
 
-Intro:Perform(Data) --We need to pass our data into the intro as it needs to display some info.
+-- Initialize CTRL UI bindings (LocationList buttons)
+pcall(function()
+    local CTRLModule = require(script.UI.CTRL)
+    if CTRLModule and CTRLModule.Init then
+        CTRLModule:Init()
+    end
+end)
+
+-- Initialize Admin Panel
+	pcall(function()
+    if UI and UI.AdminPanel and UI.AdminPanel.Init then
+        UI.AdminPanel:Init()
+    end
+end)
+
+
+CurrentContext = refreshContext()
+local targetChunkOverride = GameContext:GetTargetChunk()
+
+--We need to pass our data into the intro as it needs to display some info.
+if CurrentContext == "Trade" then
+	Intro:Perform(Data, {
+		Context = CurrentContext,
+		SkipIntro = true,
+		TargetChunkOverride = targetChunkOverride,
+	})
+else
+	Intro:Perform(Data, {
+		Context = CurrentContext,
+		TargetChunkOverride = targetChunkOverride,
+	})
+end
 
 -- Show PlayerList when TopBar is shown (only once per session)
 local playerListShown = false
@@ -163,12 +219,95 @@ UI.TopBar.Show = function(self, ...)
 	end
 end
 
+-- Check Port-A-Vault ownership after intro completes (TopBar should be created by then)
+task.spawn(function()
+	-- Wait a bit for TopBar to be fully initialized
+	task.wait(1)
+	if UI and UI.TopBar and UI.TopBar.CheckPortAVaultOwnership then
+		UI.TopBar:CheckPortAVaultOwnership()
+	end
+end)
+
 -- Handle server-sent client data updates
 Events.Communicate.OnClientEvent:Connect(function(EventType, Data)
 	if EventType == "ClientData" then
 		DBG:print("CLIENT DATA: Received update from server")
 		DBG:print("Data received:", Data)
 		ClientData:ServerForceUpdateData(Data)
+		
+		-- Restore repel state if present
+		if Data and Data.RepelState and Data.RepelState.ActiveSteps and Data.RepelState.ActiveSteps > 0 then
+			EncounterZone:AddImmunitySteps(Data.RepelState.ActiveSteps)
+			DBG:print("[Repel] Restored repel state:", Data.RepelState.ItemName, "with", Data.RepelState.ActiveSteps, "steps")
+		end
+		
+		-- Check Port-A-Vault ownership when client data updates
+		task.spawn(function()
+			if UI and UI.TopBar and UI.TopBar.CheckPortAVaultOwnership then
+				UI.TopBar:CheckPortAVaultOwnership()
+			end
+		end)
+	elseif EventType == "RepelActivated" then
+		-- Handle repel activation
+		if Data and Data.Steps and Data.Steps > 0 then
+			EncounterZone:AddImmunitySteps(Data.Steps)
+			DBG:print("[Repel] Activated", Data.ItemName, "for", Data.Steps, "steps")
+		end
+	elseif EventType == "BattleRequestIncoming" or EventType == "TradeRequestIncoming" or EventType == "ClearRequests" then
+		CurrentRequest:HandleIncoming(EventType, Data)
+	elseif EventType == "BattleRequestReply" then
+		-- Reply to the requester (declined/accepted)
+		if Data and type(Data) == "table" then
+			local Say = require(Utilities:WaitForChild("Say"))
+			-- Always close any waiting prompt
+			Say:Exit()
+			-- Only show decline/error messages; on accept, stay silent
+			if Data.Accepted == false then
+				local msg = Data.Message or ((Data.FromDisplayName or "Player") .. " has declined your battle request.")
+				Say:Say("System", true, {msg})
+			elseif type(Data.Message) == "string" and Data.Message ~= "" then
+				Say:Say("System", true, {Data.Message})
+			end
+			-- Restore TopBar if it was hidden
+			pcall(function()
+				local UI = require(script.UI)
+				if UI and UI.TopBar then
+					UI.TopBar:SetSuppressed(false)
+					UI.TopBar:Show()
+				end
+			end)
+		end
+	elseif EventType == "TradeRequestReply" then
+		if Data and type(Data) == "table" then
+			local Say = require(Utilities:WaitForChild("Say"))
+			Say:Exit()
+			if Data.Accepted == false then
+				local msg = Data.Message or ((Data.FromDisplayName or "Player") .. " has declined your trade request.")
+				Say:Say("System", true, {msg})
+			elseif Data.Accepted == true then
+				print(("[Trade] %s accepted your trade request (placeholder)."):format(Data.FromDisplayName or "Player"))
+			elseif type(Data.Message) == "string" and Data.Message ~= "" then
+				Say:Say("System", true, {Data.Message})
+			end
+			-- Restore TopBar if it was hidden
+			pcall(function()
+				local UI = require(script.UI)
+				if UI and UI.TopBar then
+					UI.TopBar:SetSuppressed(false)
+					UI.TopBar:Show()
+				end
+			end)
+		end
+	elseif EventType == "TradeStarted" or EventType == "TradeChat" or EventType == "TradeReady" or EventType == "TradeConfirm" or EventType == "TradeCancelled" or EventType == "TradeOfferUpdated" or EventType == "TradeFinalized" then
+		if TradeUI and TradeUI.HandleEvent then
+			TradeUI:HandleEvent(EventType, Data)
+		end
+	elseif EventType == "StartBattle" then
+		-- Clear any waiting messages before battle starts
+		pcall(function()
+			local Say = require(Utilities:WaitForChild("Say"))
+			Say:Exit()
+		end)
 	elseif EventType == "SaveSuccess" then
 		print("[Client] SaveSuccess received - autosave completed")
 		-- Show SaveNotification animation if available

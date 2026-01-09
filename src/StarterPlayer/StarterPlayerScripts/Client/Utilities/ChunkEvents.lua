@@ -45,6 +45,7 @@ end
 
 -- Register modular cutscenes here if needed
 CutsceneManager:RegisterModule("Act1_RooftopCall", "Act1_RooftopCall")
+CutsceneManager:RegisterModule("Chunk7_CityEntrance", "Chunk7_CityEntrance")
 
 return {	
 	["Load_Chunk1"] = function(CurrentChunk)
@@ -61,7 +62,9 @@ return {
             LOS:SetupOnceTrigger(Healer, {
 				MaxDistance = 24,
 				FOV = 10,
-				UniqueKey = "HealerTom_LOS_Chunk1",
+				UniqueKey = "HEALER_TOM_LOS",
+				Persistent = true,
+				PersistentKey = "HEALER_TOM_LOS",
                 OnTrigger = function(npcModel, npcHRP)
 					UI.TopBar:Hide()
                     Say:Say("Healer Tom", true, {
@@ -219,6 +222,14 @@ return {
 					if not phrp or not kyroHRP then return end
 					if (phrp.Position - kyroHRP.Position).Magnitude <= 8 then
 						greeted = true
+						-- Disconnect immediately and set event flag to prevent double triggers
+						if hbProxConn then hbProxConn:Disconnect() hbProxConn = nil end
+						setClientEventFlag("MET_KYRO_ROUTE_1", true)
+						
+						-- Disable player movement during dialogue
+						CharacterFunctions:SetSuppressed(true)
+						CharacterFunctions:CanMove(false)
+						
 						local look = kyroHRP.CFrame.LookVector
 						local target = Vector3.new(kyroHRP.Position.X, phrp.Position.Y, kyroHRP.Position.Z) - (look * -4)
 						MoveTo.MoveToTarget(target, { minWalkSpeed = 12, timeout = 2.5, preserveFacing = true, arriveRadius = 2.0, retryInterval = 0.35, delayAfter = 0.2 })
@@ -232,8 +243,10 @@ return {
 							{ Text = "Just go up ahead and you'll meet a few trainers, and a find a few creatures to catch.", Emotion = "Happy" },
 						}, kyro)
 						UI.TopBar:Show()
-					setClientEventFlag("MET_KYRO_ROUTE_1", true)
-						if hbProxConn then hbProxConn:Disconnect() hbProxConn = nil end
+						
+						-- Re-enable player movement after dialogue
+						CharacterFunctions:SetSuppressed(false)
+						CharacterFunctions:CanMove(true)
 					end
 				end)
 			end
@@ -837,7 +850,9 @@ return {
 			LOS:SetupOnceTrigger(Healer, {
 				MaxDistance = 24,
 				FOV = 10,
-				UniqueKey = "HealerTom_LOS_Chunk2",
+				UniqueKey = "HEALER_TOM_LOS",
+				Persistent = true,
+				PersistentKey = "HEALER_TOM_LOS",
 				OnTrigger = function(npcModel, npcHRP)
 					UI.TopBar:Hide()
 					Say:Say("Healer Tom", true, {
@@ -1314,9 +1329,20 @@ return {
 		end
 		-- Restore any pending Route 2 state on (re)join
 		restoreRoute2State(Ayla, Avocadini, Bryan, Edward, conns)
-		-- Start cutscene when player touches AylaCutsceneTrigger
+		
+		-- Check if Ayla cutscene was already triggered (any route 2 flag means we're past the intro)
+		local cd = ClientData:Get()
+		local ev = cd and cd.Events
+		local aylaAlreadyMet = ev and (ev.AYLA_ROUTE2_SEARCH_ACTIVE == true or ev.AYLA_ROUTE2_CONFRONT == true or ev.AYLA_ROUTE2_DONE == true)
+		
+		-- Only arm the AylaCutsceneTrigger if we haven't already met Ayla
+		if aylaAlreadyMet then
+			DBG:print("[Chunk2] Skipping AylaCutsceneTrigger setup - Ayla already met (flags set)")
+		end
+		
+		-- Start cutscene when player touches AylaCutsceneTrigger (only if not already met)
 		local trigger = getPart("AylaCutsceneTrigger")
-		if trigger then
+		if trigger and not aylaAlreadyMet then
 			local started = false
 			local tConn
 			tConn = trigger.Touched:Connect(function(hit)
@@ -1376,7 +1402,7 @@ return {
 				Say:Say("Ayla", true, {
 					{ Text = "Hey you! I need help finding my creature; I've been calling her for ages and can't find her.", Emotion = "Talking" },
 					{ Text = "There's an area near the end of this route I haven't checked.", Emotion = "Talking" },
-					{ Text = "My creature is Avocadini Guffo—Ava. She's a green owl, super sweet.", Emotion = "Happy" },
+					{ Text = "My creature is Avocadini Guffo, I call herAva. She's a green owl, super sweet.", Emotion = "Happy" },
 					{ Text = "Route 2 is pretty busy with trainers; I couldn't get past after I lost her...", Emotion = "Sad" },
 					{ Text = "If you help me out, I’ll have to pay you back!", Emotion = "Happy" },
 					{ Text = "Before we continue—what's your name?", Emotion = "Talking" },
@@ -2325,7 +2351,17 @@ return {
 			UI.TopBar:SetSuppressed(true)
 			CharacterFunctions:CanMove(false)
 			CharacterFunctions:SetSuppressed(true)
-			local CutsceneFolder = CurrentChunk.Model.Essentials.Cutscene
+
+			-- Teleport player to CutscenePosition if it exists
+			local cutscenePosition = CutsceneFolder:FindFirstChild("CutscenePosition")
+			if cutscenePosition and cutscenePosition:IsA("BasePart") then
+				local player = Players.LocalPlayer
+				local character = player.Character
+				local hrp = character and character:FindFirstChild("HumanoidRootPart")
+				if hrp then
+					hrp.CFrame = cutscenePosition.CFrame
+				end
+			end
 
 			task.wait(0.5)
 
@@ -2385,10 +2421,24 @@ return {
 			CharacterFunctions:CanMove(false)
 			CharacterFunctions:SetSuppressed(true)
 
+			-- Teleport player to CutscenePosition if it exists
+			local cutscenePosition = CutsceneFolder:FindFirstChild("CutscenePosition")
+			if cutscenePosition and cutscenePosition:IsA("BasePart") then
+				local player = Players.LocalPlayer
+				local character = player.Character
+				local hrp = character and character:FindFirstChild("HumanoidRootPart")
+				if hrp then
+					hrp.CFrame = cutscenePosition.CFrame
+				end
+			end
+
 			task.wait(0.5)
 
+			CharacterFunctions:CanMove(false)
+			CharacterFunctions:SetSuppressed(true)
+
 			Say:Say("Ayla", true, {
-				{ Text = "Wow… Asterden is huge! I’m sure you’ll love it here.", Emotion = "Happy" },
+				{ Text = "Asterden is huge! I’m sure you’ll love it here.", Emotion = "Happy" },
 				{ Text = "I’m gonna try to take on the Gym Leader right away!", Emotion = "Happy" },
 				{ Text = "You should go for it too, " .. nickname .. ". I’ll probably finish around the same time as you.", Emotion = "Happy" },
 				{ Text = "And hey, good luck! I’m also gonna look around for Kyro and see if he managed to beat the gym already.", Emotion = "Happy" },
@@ -2422,6 +2472,18 @@ return {
 			UI.TopBar:SetSuppressed(true)
 			CharacterFunctions:CanMove(false)
 			CharacterFunctions:SetSuppressed(true)
+
+			-- Teleport player to CutscenePosition if it exists
+			local cutscenePosition = CutsceneFolder:FindFirstChild("CutscenePosition")
+			if cutscenePosition and cutscenePosition:IsA("BasePart") then
+				local player = Players.LocalPlayer
+				local character = player.Character
+				local hrp = character and character:FindFirstChild("HumanoidRootPart")
+				if hrp then
+					hrp.CFrame = cutscenePosition.CFrame
+				end
+			end
+
 			task.wait(0.5)
 
 			Say:Say("Ayla", true, {
@@ -2662,7 +2724,8 @@ return {
 
 				UI.TopBar:Hide()
 				Say:Say(npcName, true, firstLines, npcModel)
-				UI.TopBar:Show()
+				-- Do not show the TopBar here; a battle starts immediately after dialogue,
+				-- and showing it briefly between the conversation and battle causes a visual flicker.
 
 				pcall(function()
 					TrainerIntroController:PrepareFromNPC(npcModel)
@@ -2823,6 +2886,218 @@ return {
 							},
 						})
 					end)
+				end)
+			end
+		end
+	end,
+	
+	["Load_Chunk7"] = function(CurrentChunk)
+		DBG:print("[ChunkEvents] Load_Chunk7 invoked")
+		
+		-- Run city entrance cutscene if not already played
+		CutsceneManager:RunOnceEvent("CHUNK7_CITY_ENTRANCE", "Chunk7_CityEntrance", CurrentChunk)
+		
+		-- Set up hat return quest interactions
+		task.wait(2) -- Wait for cutscene to complete if it runs
+		
+		local essentials = CurrentChunk and CurrentChunk.Essentials
+		if not essentials then
+			essentials = CurrentChunk and CurrentChunk.Model and CurrentChunk.Model:FindFirstChild("Essentials")
+		end
+		
+		if not essentials then
+			DBG:warn("[ChunkEvents] Load_Chunk7: Essentials not found")
+			return
+		end
+		
+		local cutsceneFolder = essentials:FindFirstChild("Cutscene")
+		if not cutsceneFolder then
+			DBG:warn("[ChunkEvents] Load_Chunk7: Cutscene folder not found")
+			return
+		end
+		
+		-- Position characters if cutscene already ran (characters might be in default positions after chunk reload)
+		local pd = ClientData:Get() or {}
+		local cutsceneRan = pd.Events and pd.Events.CHUNK7_CITY_ENTRANCE == true
+		if cutsceneRan then
+			local gymLeader = cutsceneFolder:FindFirstChild("Range Champion Harlan")
+			local duckaroo = cutsceneFolder:FindFirstChild("Duckaroo")
+			local kyro = cutsceneFolder:FindFirstChild("Kyro")
+			local ayla = cutsceneFolder:FindFirstChild("Ayla")
+			
+			local gymLeaderHRP = gymLeader and gymLeader:FindFirstChild("HumanoidRootPart")
+			local duckarooHRP = duckaroo and duckaroo:FindFirstChild("HumanoidRootPart")
+			local kyroHRP = kyro and kyro:FindFirstChild("HumanoidRootPart")
+			local aylaHRP = ayla and ayla:FindFirstChild("HumanoidRootPart")
+			
+			if gymLeaderHRP then
+				gymLeaderHRP.CFrame = CFrame.new(-20.251, 989.76, 859.898)
+				gymLeaderHRP.Anchored = true
+			end
+			
+			if duckarooHRP then
+				duckarooHRP.CFrame = CFrame.new(-20.349, 989.351, 855.421) * CFrame.Angles(0, math.rad(-107.78), 0)
+				duckarooHRP.Anchored = true
+			end
+			
+			if kyroHRP then
+				kyroHRP.CFrame = CFrame.new(465.426, 1087.646, 923.702)
+				kyroHRP.Anchored = true
+			end
+			
+			if aylaHRP then
+				aylaHRP.CFrame = CFrame.new(465.426, 1087.646, 923.702)
+				aylaHRP.Anchored = true
+			end
+		end
+		
+		local hatZone = cutsceneFolder:FindFirstChild("DuckarooHat")
+		if hatZone then
+			local zonePart = hatZone:FindFirstChild("Zone")
+			if zonePart and zonePart:IsA("BasePart") then
+				-- Set up touch trigger for hat zone
+				zonePart.Touched:Connect(function(hit)
+					local character = hit.Parent
+					local humanoid = character:FindFirstChildOfClass("Humanoid")
+					local player = Players:GetPlayerFromCharacter(character)
+					
+					if player and player == Players.LocalPlayer and humanoid then
+						local pd = ClientData:Get() or {}
+						local returnedHat = pd.Events and pd.Events.RETURNED_DUCKAROO_HAT == true
+						local foundHat = pd.Events and pd.Events.FOUND_DUCKAROO_HAT == true
+						
+						if not returnedHat and not foundHat then
+							setClientEventFlag("FOUND_DUCKAROO_HAT", true)
+							
+							Say:Say("Me", true, {
+								{ Text = "I should return this to the champion!", Emotion = "Happy" },
+								{ Text = "He's waiting at the gym.", Emotion = "Neutral" },
+							})
+							hatZone:Destroy()
+						end
+					end
+				end)
+			end
+		end
+		
+		-- Set up click detector for Range Champion Harlan
+		local gymLeader = cutsceneFolder:FindFirstChild("Range Champion Harlan")
+		if gymLeader and gymLeader:IsA("Model") then
+			local RSAssets = ReplicatedStorage:WaitForChild("Assets")
+			local clickDetectorTemplate = RSAssets:FindFirstChild("ClickDetector")
+			
+			if clickDetectorTemplate then
+				-- Remove existing click detector if any
+				local existingDetector = gymLeader:FindFirstChild("ClickDetector")
+				if existingDetector then
+					existingDetector:Destroy()
+				end
+				
+				local clickDetector = clickDetectorTemplate:Clone()
+				clickDetector.Parent = gymLeader
+				
+				clickDetector.MouseClick:Connect(function()
+					if Say:IsActive() then
+						return
+					end
+					
+					local pd = ClientData:Get() or {}
+					local returnedHat = pd.Events and pd.Events.RETURNED_DUCKAROO_HAT == true
+					local foundHat = pd.Events and pd.Events.FOUND_DUCKAROO_HAT == true
+					
+					if returnedHat then
+						-- Already completed, do nothing or show completion dialogue
+						return
+					elseif foundHat then
+						-- Hat found, trigger return sequence
+						local player = Players.LocalPlayer
+						local character = player.Character or player.CharacterAdded:Wait()
+						local playerHRP = character:FindFirstChild("HumanoidRootPart")
+						
+						local kyro = cutsceneFolder:FindFirstChild("Kyro")
+						local ayla = cutsceneFolder:FindFirstChild("Ayla")
+						local kyroHRP = kyro and kyro:FindFirstChild("HumanoidRootPart")
+						local aylaHRP = ayla and ayla:FindFirstChild("HumanoidRootPart")
+						local gymLeaderHRP = gymLeader and gymLeader:FindFirstChild("HumanoidRootPart")
+						
+						if playerHRP then
+							-- Transition on
+							UIFunctions:Transition(true)
+							CharacterFunctions:CanMove(false)
+							
+							-- Teleport Kyro and Alya beside player (relative to player's rotation)
+							local playerCFrame = playerHRP.CFrame
+							local rightVector = playerCFrame.RightVector
+							
+							if kyroHRP then
+								local offset = rightVector * -3  -- Left side
+								local kyroPos = playerHRP.Position + offset
+								-- Face gym leader
+								if gymLeaderHRP then
+									kyroHRP.CFrame = CFrame.new(kyroPos, Vector3.new(gymLeaderHRP.Position.X, kyroPos.Y, gymLeaderHRP.Position.Z))
+								else
+									kyroHRP.CFrame = CFrame.new(kyroPos)
+								end
+								kyroHRP.Anchored = true
+							end
+							
+							if aylaHRP then
+								local offset = rightVector * 3  -- Right side
+								local aylaPos = playerHRP.Position + offset
+								-- Face gym leader
+								if gymLeaderHRP then
+									aylaHRP.CFrame = CFrame.new(aylaPos, Vector3.new(gymLeaderHRP.Position.X, aylaPos.Y, gymLeaderHRP.Position.Z))
+								else
+									aylaHRP.CFrame = CFrame.new(aylaPos)
+								end
+								aylaHRP.Anchored = true
+							end
+							
+							task.wait(1)
+							
+							-- Transition off
+							UIFunctions:Transition(false)
+							
+							-- Dialogue sequence
+							Say:Say("Range Champion Harlan", true, {
+								{ Text = "Well I'll be…", Emotion = "Happy" },
+								{ Text = "You found it, partners!", Emotion = "Happy" },
+							}, gymLeader)
+							
+							Say:Say("Range Champion Harlan", true, {
+								{ Text = "Duckaroo won't forget this.", Emotion = "Happy" },
+								{ Text = "Neither will I.", Emotion = "Happy" },
+							}, gymLeader)
+							
+							Say:Say("Range Champion Harlan", true, {
+								{ Text = "I'll open the Gym right away.", Emotion = "Happy" },
+								{ Text = "Meet me inside—and brace yourselves.", Emotion = "Smug" },
+							}, gymLeader)
+							
+							Say:Say("Range Champion Harlan", true, {
+								{ Text = "These shooters don't miss… heheh.", Emotion = "Smug" },
+							}, gymLeader)
+							
+							-- Black fade
+							UIFunctions:Transition(true)
+							-- Set event flag
+							setClientEventFlag("RETURNED_DUCKAROO_HAT", true)
+						
+
+							task.wait(1)
+							cutsceneFolder:Destroy()
+							-- Restore movement
+							CharacterFunctions:CanMove(true)
+							UIFunctions:Transition(false)
+						end
+					else
+						-- Hat not found yet
+						Say:Say("Range Champion Harlan", true, {
+							{ Text = "Still lookin' for that hat, partner?", Emotion = "Neutral" },
+							{ Text = "It's somewhere in this city—I'm sure of it.", Emotion = "Neutral" },
+							{ Text = "Bring it back when you find it.", Emotion = "Happy" },
+						}, gymLeader)
+					end
 				end)
 			end
 		end

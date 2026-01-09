@@ -3,6 +3,7 @@ local Intro = {}
 local HasSaveData = false
 
 local TweenService = game:GetService("TweenService")
+local TeleportService = game:GetService("TeleportService")
 local PlayerGui = game.Players.LocalPlayer.PlayerGui
 
 local Utilities = script.Parent.Parent:WaitForChild("Utilities")
@@ -53,7 +54,7 @@ else
 	TextLabel.Parent = Frame
 end
 
-local function ToGame(Data: any, IntroChunk: Instance?)
+local function ToGame(Data: any, IntroChunk: Instance?, TargetChunkOverride: string?)
 	-- Safely destroy the intro/title chunk if it exists
 	if IntroChunk then
 		IntroChunk:Destroy()
@@ -64,31 +65,48 @@ local function ToGame(Data: any, IntroChunk: Instance?)
     -- 2) Current saved Chunk (authoritative current location)
     -- 3) LastChunk (previous chunk fallback)
     -- 4) Chunk1 for brand-new players
-    local TargetChunk = "Chunk1"
-    local safeData = (type(Data) == "table" and Data) or nil
-    if HasSaveData and safeData then
-        -- If a pending battle snapshot exists (left mid-battle), prefer its chunk to avoid LOS re-trigger
-        if safeData.PendingBattle and type(safeData.PendingBattle) == "table" then
-            local snapChunk = safeData.PendingBattle.Chunk
-            if type(snapChunk) == "string" and #snapChunk > 0 then
-                TargetChunk = snapChunk
-            end
-        end
-        local leaveChunk = safeData.LeaveData and safeData.LeaveData.Chunk or nil
-        local currentChunk = safeData.Chunk
-        local lastChunk = safeData.LastChunk
-        if type(leaveChunk) == "string" and #leaveChunk > 0 then
-            TargetChunk = leaveChunk
-        elseif type(currentChunk) == "string" and #currentChunk > 0 then
-            TargetChunk = currentChunk
-        elseif type(lastChunk) == "string" and #lastChunk > 0 then
-            TargetChunk = lastChunk
-        else
-            TargetChunk = "Chunk1"
-        end
-    else
-        TargetChunk = "Chunk1"
-    end
+	local TargetChunk = "Chunk1"
+	local safeData = (type(Data) == "table" and Data) or nil
+
+	-- Contextual override wins first (e.g., Trade mode)
+	if type(TargetChunkOverride) == "string" and TargetChunkOverride ~= "" then
+		TargetChunk = TargetChunkOverride
+		DBG:print("[ToGame] Using target override:", TargetChunk)
+	elseif HasSaveData and safeData then
+		-- Priority order:
+		-- 1) PendingBattle.Chunk (left mid-battle, needs to return there)
+		-- 2) LeaveData.Chunk (explicit save position)
+		-- 3) Current saved Chunk (authoritative current location)
+		-- 4) LastChunk (previous chunk fallback)
+		-- 5) Chunk1 for brand-new players
+		if safeData.PendingBattle and type(safeData.PendingBattle) == "table" then
+			local snapChunk = safeData.PendingBattle.Chunk
+			if type(snapChunk) == "string" and #snapChunk > 0 then
+				TargetChunk = snapChunk
+				DBG:print("[ToGame] Using PendingBattle chunk:", TargetChunk)
+			end
+		else
+			-- Only check LeaveData/Chunk/LastChunk if no PendingBattle
+			local leaveChunk = safeData.LeaveData and safeData.LeaveData.Chunk or nil
+			local currentChunk = safeData.Chunk
+			local lastChunk = safeData.LastChunk
+			if type(leaveChunk) == "string" and #leaveChunk > 0 then
+				TargetChunk = leaveChunk
+				DBG:print("[ToGame] Using LeaveData.Chunk:", TargetChunk)
+			elseif type(currentChunk) == "string" and #currentChunk > 0 then
+				TargetChunk = currentChunk
+				DBG:print("[ToGame] Using Chunk:", TargetChunk)
+			elseif type(lastChunk) == "string" and #lastChunk > 0 then
+				TargetChunk = lastChunk
+				DBG:print("[ToGame] Using LastChunk:", TargetChunk)
+			else
+				TargetChunk = "Chunk1"
+				DBG:print("[ToGame] No saved chunk found, defaulting to Chunk1")
+			end
+		end
+	else
+		TargetChunk = "Chunk1"
+	end
 
 	-- Attempt to load target chunk
 	local chunkLoaded = ChunkLoader:ClientRequestChunk(TargetChunk)
@@ -139,8 +157,71 @@ local function ToGame(Data: any, IntroChunk: Instance?)
 	end
 end
 
-function Intro:Perform(Data:any)
+local function FadeOutLoading(Loading, IntroSpin)
+	if Loading and Loading.Main and Loading.Main.Icon then
+		TweenService:Create(Loading.Main.Icon, TweenInfo.new(0.76, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {
+			Rotation = 500,
+		}):Play()
+
+		TweenService:Create(Loading.Main, TweenInfo.new(0.75, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {
+			BackgroundTransparency = 1,
+		}):Play()
+
+		TweenService:Create(Loading.Main.Icon, TweenInfo.new(0.75, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {
+			Size = UDim2.fromScale(0, 0),
+		}):Play()
+
+		if Loading.Main.IconShadow then
+			TweenService:Create(Loading.Main.IconShadow, TweenInfo.new(0.75, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {
+				Size = UDim2.fromScale(0, 0),
+			}):Play()
+		end
+
+		task.delay(1, function()
+			if IntroSpin then
+				task.cancel(IntroSpin)
+			end
+			pcall(function()
+				Loading:Destroy()
+			end)
+		end)
+	end
+end
+
+function Intro:Perform(Data:any, options)
 	DBG:print("Performing Intro!")
+	
+	options = options or {}
+	local context = options.Context or "Story"
+	local skipIntro = options.SkipIntro == true or context == "Trade" or context == "Battle"
+	local targetOverride = options.TargetChunkOverride
+
+	-- Check for teleport data to see if we're coming from Battle Hub or Trade Hub
+	if not skipIntro then
+		local teleportData = nil
+		local success, result = pcall(function()
+			return TeleportService:GetTeleportData()
+		end)
+		if success and result and type(result) == "table" then
+			teleportData = result
+		end
+		
+		-- If teleport data indicates we came from Battle Hub or Trade Hub, skip Title screen
+		if teleportData and teleportData.sourcePlace then
+			if teleportData.sourcePlace == "BattleHub" or teleportData.sourcePlace == "TradeHub" then
+				DBG:print("[Intro] Detected teleport from", teleportData.sourcePlace, "- skipping Title screen")
+				skipIntro = true
+			end
+		end
+	end
+
+	if skipIntro and not targetOverride and context == "Trade" then
+		targetOverride = "Trade"
+	end
+
+	if skipIntro and not targetOverride and context == "Battle" then
+		targetOverride = "Battle"
+	end
 	
 	CharacterFunctions:CanMove(false)
 	
@@ -165,6 +246,16 @@ function Intro:Perform(Data:any)
 		end)
 	end
 	
+	-- Skip full intro/title flow for special contexts (e.g., Trade)
+	if skipIntro then
+		DBG:print("[Intro] Skipping intro flow for context:", context, "Target:", targetOverride or "nil")
+		ToGame(Data, nil, targetOverride)
+		task.delay(1.5, function()
+			FadeOutLoading(Loading, IntroSpin)
+		end)
+		return
+	end
+	
 	-- Safely load IntroChunk
 	local IntroChunk = nil
 	local success, result = pcall(function()
@@ -172,7 +263,7 @@ function Intro:Perform(Data:any)
 	end)
 	if not success then
 		DBG:warn("IntroChunk not found, skipping to game")
-		ToGame(Data, nil)
+		ToGame(Data, nil, targetOverride)
 		return
 	end
 	IntroChunk = result
@@ -181,7 +272,7 @@ function Intro:Perform(Data:any)
 	local ChunkLoaded, ChunkData = ChunkLoader:Load(IntroChunk, true)
 	if not ChunkLoaded then
 		DBG:warn("Failed to load IntroChunk, skipping to game")
-		ToGame(Data, IntroChunk)
+		ToGame(Data, IntroChunk, targetOverride)
 		return
 	end
 	
@@ -204,32 +295,7 @@ function Intro:Perform(Data:any)
 	task.wait(1)
 	
 	-- Safely handle loading screen animations
-	if Loading and Loading.Main and Loading.Main.Icon then
-		TweenService:Create(Loading.Main.Icon, TweenInfo.new(0.76, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {
-			Rotation = 500,
-		}):Play()
-		
-		TweenService:Create(Loading.Main, TweenInfo.new(0.75, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {
-			BackgroundTransparency = 1,
-		}):Play()
-		
-		TweenService:Create(Loading.Main.Icon, TweenInfo.new(0.75, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {
-			Size = UDim2.fromScale(0, 0),
-		}):Play()
-		
-		if Loading.Main.IconShadow then
-			TweenService:Create(Loading.Main.IconShadow, TweenInfo.new(0.75, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {
-				Size = UDim2.fromScale(0, 0),
-			}):Play()
-		end
-		
-		task.delay(1, function()
-			if IntroSpin then
-				task.cancel(IntroSpin)
-			end
-			Loading:Destroy()
-		end)
-	end
+	FadeOutLoading(Loading, IntroSpin)
 	
 	IntroUI.Parent = PlayerGui
 	
@@ -268,7 +334,7 @@ function Intro:Perform(Data:any)
 					"We hope you enjoy it!"
 				})
 				]]--
-				ToGame(Data,IntroChunk)
+				ToGame(Data,IntroChunk, targetOverride)
 			end
 		)
 	end
@@ -385,7 +451,7 @@ Say:Say("System", false, {
                     if IntroUI.Intro.Continue then IntroUI.Intro.Continue.Visible = true end
                     return
                 end
-                ToGame(newData, IntroChunk)
+                ToGame(newData, IntroChunk, targetOverride)
 				end
 			end
 		)
@@ -393,7 +459,7 @@ Say:Say("System", false, {
 		-- If no proper UI exists, just skip to game after a delay
 		DBG:print("No proper intro UI found, skipping to game in 3 seconds...")
 		task.delay(3, function()
-			ToGame(Data, IntroChunk)
+			ToGame(Data, IntroChunk, targetOverride)
 		end)
 	end
 

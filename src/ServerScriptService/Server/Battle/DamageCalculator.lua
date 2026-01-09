@@ -7,8 +7,12 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local BattleTypes = require(ReplicatedStorage.Shared.BattleTypes)
-local TypesModule = require(ReplicatedStorage.Shared.Types)
 local MovesModule = require(ReplicatedStorage.Shared.Moves)
+local StatStages = require(ReplicatedStorage.Shared.StatStages)
+local TypeChart = require(ReplicatedStorage.Shared.TypeChart)
+local WeatherConfig = require(ReplicatedStorage.Shared.WeatherConfig)
+
+local HeldItemEffects = require(script.Parent.HeldItemEffects)
 
 type Creature = BattleTypes.Creature
 type Move = BattleTypes.Move
@@ -18,9 +22,39 @@ local DamageCalculator = {}
 
 -- Constants
 local CRIT_MULTIPLIER = 1.5
-local CRIT_CHANCE = 1/16
+-- Gen 8–9 crit rate stages:
+-- 0: 1/24
+-- 1: 1/8
+-- 2: 1/2
+-- 3+: 1
+local CRIT_CHANCE = 1/24
 local STAB_MULTIPLIER = 1.5
 local MIN_DAMAGE = 1
+
+-- Critical hit chance multipliers based on crit stage
+-- We store absolute chances to match modern mechanics.
+local CRIT_CHANCE_BY_STAGE = {
+	[0] = 1/24,
+	[1] = 1/8,
+	[2] = 1/2,
+	[3] = 1,
+}
+
+--[[
+	Calculates critical hit chance based on crit stage
+	@param critStage The crit stage (0-4)
+	@param highCritMove Whether the move has high crit chance
+	@return number The crit chance (0.0 to 1.0)
+]]
+local function calculateCritChance(critStage: number, highCritMove: boolean?): number
+	critStage = critStage or 0
+	-- High-crit moves add +1 stage in modern gens.
+	if highCritMove then
+		critStage += 1
+	end
+	critStage = math.clamp(critStage, 0, 3)
+	return CRIT_CHANCE_BY_STAGE[critStage] or CRIT_CHANCE
+end
 
 --[[
 	Calculates type effectiveness multiplier
@@ -28,57 +62,8 @@ local MIN_DAMAGE = 1
 	@param defenderTypes The defender's types (array)
 	@return number The effectiveness multiplier
 ]]
-local function calculateTypeEffectiveness(moveType: string, defenderTypes: {string}): number
-	if not moveType or not defenderTypes then
-		return 1
-	end
-	
-	local effectiveness = 1
-	local moveTypeData = TypesModule[moveType]
-	
-	if not moveTypeData then
-		return 1
-	end
-	
-	for _, defenderType in ipairs(defenderTypes) do
-		-- Check immunity
-		if moveTypeData.immuneTo then
-			for _, immuneType in ipairs(moveTypeData.immuneTo) do
-				if immuneType == defenderType then
-					return 0
-				end
-			end
-		end
-		
-		-- Check super effective
-		if moveTypeData.strongTo then
-			for _, strongType in ipairs(moveTypeData.strongTo) do
-				if strongType == defenderType then
-					effectiveness *= 2
-				end
-			end
-		end
-		
-		-- Check not very effective
-		if moveTypeData.weakTo then
-			for _, weakType in ipairs(moveTypeData.weakTo) do
-				if weakType == defenderType then
-					effectiveness *= 0.5
-				end
-			end
-		end
-		
-		-- Check resist
-		if moveTypeData.resist then
-			for _, resistType in ipairs(moveTypeData.resist) do
-				if resistType == defenderType then
-					effectiveness *= 0.5
-				end
-			end
-		end
-	end
-	
-	return effectiveness
+local function calculateTypeEffectiveness(moveType: any, defenderTypes: {string}): number
+	return TypeChart.GetMultiplier(moveType, defenderTypes)
 end
 
 --[[
@@ -101,13 +86,22 @@ local function calculateSTAB(moveType: string, attackerTypes: {string}): number
 	return 1
 end
 
+local function resolveMoveTypeName(moveTypeValue: any): string?
+	return TypeChart.ResolveTypeName(moveTypeValue)
+end
+
 --[[
 	Determines if the attack is a critical hit
+	@param attacker The attacking creature (for crit stage)
 	@param highCritMove Whether the move has high crit chance
 	@return boolean True if critical hit
 ]]
-local function rollCriticalHit(highCritMove: boolean?): boolean
-	local critChance = highCritMove and (CRIT_CHANCE * 2) or CRIT_CHANCE
+local function rollCriticalHit(attacker: Creature?, highCritMove: boolean?): boolean
+	local critStage = 0
+	if attacker then
+		critStage = StatStages.GetStage(attacker, "CritStage") or 0
+	end
+	local critChance = calculateCritChance(critStage, highCritMove)
 	return math.random() < critChance
 end
 
@@ -118,18 +112,7 @@ end
 	@return number The modified stat value
 ]]
 local function applyStatStage(baseStat: number, stage: number): number
-	if stage == 0 then
-		return baseStat
-	end
-	
-	local multiplier
-	if stage > 0 then
-		multiplier = (2 + stage) / 2
-	else
-		multiplier = 2 / (2 + math.abs(stage))
-	end
-	
-	return math.floor(baseStat * multiplier)
+	return StatStages.ApplyStage(baseStat, stage, false)
 end
 
 --[[
@@ -140,6 +123,7 @@ end
 	@param forceCrit Force a critical hit (optional)
 	@param attackStage Attack stat stage (optional, default 0)
 	@param defenseStage Defense stat stage (optional, default 0)
+	@param weather Weather name or weather ID (optional, for weather multipliers)
 	@return DamageResult The damage calculation result
 ]]
 function DamageCalculator.CalculateDamage(
@@ -148,7 +132,8 @@ function DamageCalculator.CalculateDamage(
 	moveNameOrData: string | Move,
 	forceCrit: boolean?,
 	attackStage: number?,
-	defenseStage: number?
+	defenseStage: number?,
+	weather: string | number?
 ): DamageResult
 	-- Get move data
 	local moveData: Move?
@@ -166,41 +151,109 @@ function DamageCalculator.CalculateDamage(
 			stab = 1,
 		}
 	end
+
+	local moveTypeName = resolveMoveTypeName(moveData.Type)
+
+    -- Determine stats and stages based on move category
+    local category = moveData.Category or "Physical" -- Default to Physical if not specified
+    local atkBase, defBase
+    local atkStageVal, defStageVal
+
+    if category == "Special" then
+        atkBase = attacker.Stats.SpecialAttack or attacker.Stats.Attack
+        defBase = defender.Stats.SpecialDefense or defender.Stats.Defense
+        atkStageVal = attackStage or StatStages.GetStage(attacker, "SpecialAttack")
+        defStageVal = defenseStage or StatStages.GetStage(defender, "SpecialDefense")
+    else
+        atkBase = attacker.Stats.Attack
+        defBase = defender.Stats.Defense
+        atkStageVal = attackStage or StatStages.GetStage(attacker, "Attack")
+        defStageVal = defenseStage or StatStages.GetStage(defender, "Defense")
+    end
+	
+	-- Check if this will be a crit (needed for stat stage ignoring)
+	local willBeCrit = forceCrit or rollCriticalHit(attacker, moveData.Flags and moveData.Flags.highCrit)
+	
+	-- Critical hits ignore negative attack stages and positive defense stages
+	if willBeCrit then
+		atkStageVal = math.max(0, atkStageVal)
+		defStageVal = math.min(0, defStageVal)
+	end
 	
 	-- Get stats with stage modifiers
-	local attackStat = applyStatStage(attacker.Stats.Attack, attackStage or 0)
-	local defenseStat = applyStatStage(defender.Stats.Defense, defenseStage or 0)
+	local attackStat = applyStatStage(atkBase, atkStageVal)
+	local defenseStat = applyStatStage(defBase, defStageVal)
 	
 	-- Apply status multipliers
 	local StatusModule = require(ReplicatedStorage.Shared.Status)
-	local statusAttackMult = StatusModule.GetAttackMultiplier(attacker)
-	local statusSpeedMult = StatusModule.GetSpeedMultiplier(attacker)
-	attackStat = math.floor(attackStat * statusAttackMult)
+	if category ~= "Special" then
+		-- Gen 9: burn halves Attack for physical damage only
+		local statusAttackMult = StatusModule.GetAttackMultiplier(attacker)
+		attackStat = math.floor(attackStat * statusAttackMult)
+	end
 	
 	-- Calculate base damage using Pokémon formula
 	local level = attacker.Level or 1
 	local levelFactor = math.floor((2 * level) / 5) + 2
 	local baseDamage = math.floor((levelFactor * moveData.BasePower * (attackStat / defenseStat)) / 50) + 2
 	
-	-- Calculate modifiers
-	local isCrit = forceCrit or rollCriticalHit(moveData.Flags and moveData.Flags.highCrit)
+	-- Calculate modifiers (isCrit already determined above for stat stage ignoring)
+	local isCrit = willBeCrit
 	local critMultiplier = isCrit and CRIT_MULTIPLIER or 1
 	
-	local stab = calculateSTAB(moveData.Type, attacker.Type or {})
-	local effectiveness = calculateTypeEffectiveness(moveData.Type, defender.Type or {})
+	-- Ability-based move type conversions should occur before STAB/effectiveness
+	local Abilities = require(ReplicatedStorage.Shared.Abilities)
+	moveTypeName = Abilities.ModifyMoveType(attacker, moveTypeName)
+
+	local stab = calculateSTAB(moveTypeName, attacker.Type or {})
+	local effectiveness = calculateTypeEffectiveness(moveTypeName, defender.Type or {})
 	
     -- Apply ability overrides for immunity (e.g., Magic Eyes)
-    local Abilities = require(ReplicatedStorage.Shared.Abilities)
-    effectiveness = Abilities.OverrideImmunity(attacker, defender, moveData.Type, effectiveness)
+    effectiveness = Abilities.OverrideImmunity(attacker, defender, moveTypeName, effectiveness)
 
 	-- Random factor (0.85 to 1.0)
 	local randomFactor = 0.85 + (math.random() * 0.15)
 	
     -- Ability damage multipliers
-    local abilityMult = Abilities.DamageMultiplier(attacker, defender, moveData.Type, type(moveNameOrData)=="string" and moveNameOrData or nil)
+    local abilityMult = Abilities.DamageMultiplier(attacker, defender, moveTypeName, type(moveNameOrData)=="string" and moveNameOrData or nil)
+
+	-- Held item multipliers
+	local heldMult = HeldItemEffects.DamageMultiplier(attacker, defender, moveTypeName)
+
+	-- Weather multipliers
+	local weatherMult = 1.0
+	if weather then
+		local weatherId: number?
+		if type(weather) == "number" then
+			weatherId = weather
+		elseif type(weather) == "string" then
+			-- Map battle weather names to weather IDs
+			-- Battle weather: "Sunlight", "Rain", "Sandstorm", "Snow"
+			-- WeatherConfig names: "Harsh Sun", "Rain", "Thunderstorm", "Sandstorm", "Snow", "Snowstorm"
+			if weather == "Sunlight" then
+				weatherId = 2 -- Harsh Sun
+			elseif weather == "Rain" then
+				weatherId = 7 -- Rain (Thunderstorm also uses Rain modifiers)
+			elseif weather == "Sandstorm" then
+				weatherId = 9 -- Sandstorm
+			elseif weather == "Snow" then
+				weatherId = 4 -- Snow (Snowstorm also uses Snow modifiers)
+			else
+				-- Try to find by name
+				local weatherData = WeatherConfig.GetWeatherByName(weather)
+				if weatherData then
+					weatherId = weatherData.Id
+				end
+			end
+		end
+		
+		if weatherId then
+			weatherMult = WeatherConfig.GetAbilityModifier(weatherId, moveTypeName) or 1.0
+		end
+	end
 
 	-- Calculate final damage
-	local finalDamage = baseDamage * critMultiplier * stab * effectiveness * randomFactor * abilityMult
+	local finalDamage = baseDamage * critMultiplier * stab * effectiveness * randomFactor * abilityMult * heldMult * weatherMult
 	finalDamage = math.floor(finalDamage)
 	
 	-- Ensure minimum damage if not immune
@@ -208,22 +261,10 @@ function DamageCalculator.CalculateDamage(
 		finalDamage = MIN_DAMAGE
 	end
 	
-	-- Convert effectiveness to string for client display
-	local effectivenessString
-	if effectiveness == 0 then
-		effectivenessString = "Immune"
-	elseif effectiveness >= 2 then
-		effectivenessString = "SuperEffective"
-	elseif effectiveness <= 0.5 then
-		effectivenessString = "NotVeryEffective"
-	else
-		effectivenessString = "Normal"
-	end
-	
 	return {
 		damage = finalDamage,
 		isCrit = isCrit,
-		effectiveness = effectivenessString,
+		effectiveness = effectiveness,
 		stab = stab,
 	}
 end
@@ -264,28 +305,15 @@ function DamageCalculator.CheckAccuracy(
 		return true
 	end
 	
-	-- Calculate accuracy with stages
-	local baseAccuracy = moveData.Accuracy
-	local accuracyMultiplier = 1
-	local evasionMultiplier = 1
+	-- Calculate accuracy with stages using StatStages module
+	-- Net stage = accuracy - evasion for combined calculation
+	local accStage = accuracyStage or 0
+	local evaStage = evasionStage or 0
+	local netStage = math.clamp(accStage - evaStage, StatStages.MIN_STAGE, StatStages.MAX_STAGE)
 	
-	if accuracyStage and accuracyStage ~= 0 then
-		if accuracyStage > 0 then
-			accuracyMultiplier = (3 + accuracyStage) / 3
-		else
-			accuracyMultiplier = 3 / (3 + math.abs(accuracyStage))
-		end
-	end
-	
-	if evasionStage and evasionStage ~= 0 then
-		if evasionStage > 0 then
-			evasionMultiplier = 3 / (3 + evasionStage)
-		else
-			evasionMultiplier = (3 + math.abs(evasionStage)) / 3
-		end
-	end
-	
-	local finalAccuracy = baseAccuracy * accuracyMultiplier * evasionMultiplier
+	-- Get the accuracy multiplier for the net stage
+	local accuracyMultiplier = StatStages.GetMultiplier(netStage, true)
+	local finalAccuracy = math.clamp(math.floor(moveData.Accuracy * accuracyMultiplier), 0, 100)
 	
 	-- Roll for hit
 	return math.random(1, 100) <= finalAccuracy
@@ -309,6 +337,16 @@ function DamageCalculator.GetEffectivenessString(moveType: string, defenderTypes
 	else
 		return "Normal"
 	end
+end
+
+--[[
+	Rolls for a critical hit based on crit stage and move properties
+	@param attacker The attacking creature (for crit stage)
+	@param highCritMove Whether the move has high crit chance
+	@return boolean True if critical hit
+]]
+function DamageCalculator.RollCriticalHit(attacker: Creature?, highCritMove: boolean?): boolean
+	return rollCriticalHit(attacker, highCritMove)
 end
 
 return DamageCalculator

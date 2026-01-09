@@ -92,6 +92,22 @@ function SaveModule:Init(All)
 		end
 	)
 	
+	-- Set up Close button
+	local SaveUI = game.Players.LocalPlayer.PlayerGui:WaitForChild("GameUI"):WaitForChild("Save")
+	local CloseButton = SaveUI:WaitForChild("Topbar"):WaitForChild("Close")
+	if CloseButton then
+		UIFunctions:NewButton(
+			CloseButton,
+			{"Action"},
+			{Click = "One", HoverOn = "One", HoverOff = "One"},
+			0.7,
+			function()
+				Audio.SFX.Click:Play()
+				SaveModule:Close()
+			end
+		)
+	end
+	
 end
 
 --// Save Open

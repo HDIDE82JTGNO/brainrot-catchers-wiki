@@ -30,19 +30,18 @@ function BattleUIManager.new(actionHandler: any, partyIntegration: any?): any
 	self._actionHandler = actionHandler
 	self._partyIntegration = partyIntegration
 	self._battleUI = BattleUI
-	self._battleOptions = BattleUI:WaitForChild("BattleOptions")
-	self._moveOptions = BattleUI:WaitForChild("MoveOptions")
+	self._controller = BattleUI:WaitForChild("Controller")
 	
 	-- Button references
-	self._fightButton = self._battleOptions:FindFirstChild("Fight")
-	self._creaturesButton = self._battleOptions:FindFirstChild("Creatures")
-	self._bagButton = self._battleOptions:FindFirstChild("Bag")
-	self._runButton = self._battleOptions:FindFirstChild("Run")
+	self._fightButton = self._controller:FindFirstChild("Fight")
+	self._creaturesButton = self._controller:FindFirstChild("Creatures")
+	self._bagButton = self._controller:FindFirstChild("Bag")
+	self._runButton = self._controller:FindFirstChild("Run")
 	
 	-- Move buttons
 	self._moveButtons = {}
 	for i = 1, 4 do
-		local moveButton = self._moveOptions:FindFirstChild("Move" .. i)
+		local moveButton = self._controller:FindFirstChild("Move" .. i)
 		if moveButton then
 			self._moveButtons[i] = moveButton
 		end
@@ -137,13 +136,24 @@ end
 	Shows battle options
 ]]
 function BattleUIManager:ShowBattleOptions()
-	self._battleOptions.Visible = true
-	self._moveOptions.Visible = false
+	if not self._controller then
+		return
+	end
+
+	self._controller.Visible = true
 	
 	-- Enable buttons
 	for _, button in ipairs({self._fightButton, self._creaturesButton, self._bagButton, self._runButton}) do
 		if button then
 			button.Active = true
+			button.Visible = true
+		end
+	end
+
+	-- Disable move buttons while in battle-options state
+	for _, button in pairs(self._moveButtons) do
+		if button then
+			button.Active = false
 		end
 	end
 end
@@ -152,13 +162,23 @@ end
 	Shows move options
 ]]
 function BattleUIManager:ShowMoveOptions()
-	self._battleOptions.Visible = false
-	self._moveOptions.Visible = true
+	if not self._controller then
+		return
+	end
+
+	self._controller.Visible = true
 	
 	-- Enable move buttons
 	for _, button in pairs(self._moveButtons) do
 		if button and button.Visible then
 			button.Active = true
+		end
+	end
+
+	-- Disable top-level buttons while in move-options state
+	for _, button in ipairs({self._fightButton, self._creaturesButton, self._bagButton, self._runButton}) do
+		if button then
+			button.Active = false
 		end
 	end
 end
@@ -167,8 +187,9 @@ end
 	Hides all battle UI
 ]]
 function BattleUIManager:HideAll()
-	self._battleOptions.Visible = false
-	self._moveOptions.Visible = false
+	if self._controller then
+		self._controller.Visible = false
+	end
 end
 
 --[[

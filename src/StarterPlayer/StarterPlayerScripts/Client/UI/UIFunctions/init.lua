@@ -4,6 +4,7 @@ local TweenService = game:GetService("TweenService")
 local PlayerGui = game.Players.LocalPlayer.PlayerGui
 
 local ButtonClass = require(script:WaitForChild("Button"))
+local StudBurstEmitter = require(script.Parent:WaitForChild("Effects"):WaitForChild("StudBurstEmitter"))
 
 -- Simple signal for when CircularTransition finishes hiding
 local _circularHiddenEvent = Instance.new("BindableEvent")
@@ -235,8 +236,8 @@ function UIFunctions:SaveNotificationSuccess(SaveNotificationFrame)
 	}):Play()
 end
 
-function UIFunctions:DoExclamationMark(ExclamationMark, opts)
-	print("starting exclamation mark")
+function UIFunctions:DoExclamationMark(_, opts)
+	print("starting question mark intro")
 	
 	-- Start intro music deterministically at the very beginning
 	print("=== ATTEMPTING TO START EXCL INTRO MUSIC ===")
@@ -264,70 +265,145 @@ function UIFunctions:DoExclamationMark(ExclamationMark, opts)
 	else
 		print("Exclamation intro started successfully")
 	end
-	
-	-- Reset all properties to ensure clean animation
-	ExclamationMark.Visible = true
-	ExclamationMark.ImageTransparency = 0
-	ExclamationMark.BackgroundTransparency = 1
-	workspace.CurrentCamera.FieldOfView = 70
-	ExclamationMark.Size = UDim2.fromScale(0,0)
-	
-	local FirstTimer:number = 0.5
-	TweenService:Create(ExclamationMark, TweenInfo.new(FirstTimer,Enum.EasingStyle.Back,Enum.EasingDirection.Out), {Size = UDim2.fromScale(0.209,0.734)}):Play()
-	TweenService:Create(workspace.CurrentCamera, TweenInfo.new(FirstTimer,Enum.EasingStyle.Back,Enum.EasingDirection.Out), {FieldOfView = 75}):Play()
-	task.wait(FirstTimer)
-	TweenService:Create(workspace.CurrentCamera, TweenInfo.new(FirstTimer,Enum.EasingStyle.Back,Enum.EasingDirection.Out), {FieldOfView = 70}):Play()
-	task.wait(FirstTimer)
-	local SecondTimer:number = 0.4
-	TweenService:Create(ExclamationMark, TweenInfo.new(SecondTimer,Enum.EasingStyle.Back,Enum.EasingDirection.InOut), {Size = UDim2.fromScale(3.6133,12.6799)}):Play()
-	task.wait(SecondTimer/3)
-	TweenService:Create(workspace.CurrentCamera, TweenInfo.new(SecondTimer*1.5,Enum.EasingStyle.Back,Enum.EasingDirection.Out), {FieldOfView = 10}):Play()
-	
-	-- Wait for the camera zoom to complete
-	task.wait(SecondTimer*1.5)
-	
-	print("exclamation mark grow animation completed")
-end
 
-function UIFunctions:FadeOutExclamationMark(ExclamationMark)
-	print("fading out exclamation mark")
-	
-	-- Force FOV to 50 immediately when starting fade out
-	workspace.CurrentCamera.FieldOfView = 45
-	
-	-- Fade out the exclamation mark
-	local FadeOutInfo = TweenInfo.new(1.0, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-	local FadeOutTween = TweenService:Create(ExclamationMark, FadeOutInfo, {ImageTransparency = 1})
-	FadeOutTween:Play()
-	
-	-- Show battle UI (we need to get it from the battle system)
-	local PlayerGui = game.Players.LocalPlayer.PlayerGui
-	local GameUI = PlayerGui:FindFirstChild("GameUI")
-	if GameUI then
-		local BattleUI = GameUI:FindFirstChild("BattleUI")
-		if BattleUI then
-			BattleUI.Visible = true
-		end
+	-- Resolve UI
+	local pg = PlayerGui or (game.Players.LocalPlayer and game.Players.LocalPlayer:FindFirstChild("PlayerGui"))
+	local gameUI = pg and pg:FindFirstChild("GameUI")
+	if not gameUI then
+		warn("[UIFunctions.DoExclamationMark] GameUI not found; cannot play question mark UI")
+		return false
 	end
 
-	-- Wait for fade to complete to guarantee sequencing, then hide mark
-	FadeOutTween.Completed:Wait()
-	ExclamationMark.Visible = false
-	
-	print("exclamation mark fade out completed")
+	local BlackBars = gameUI:FindFirstChild("BlackBars")
+	local QuestionMark = gameUI:FindFirstChild("QuestionMark")
+	local Flashing = gameUI:FindFirstChild("Flashing")
+	if not (BlackBars and QuestionMark and Flashing) then
+		warn("[UIFunctions.DoExclamationMark] Missing QuestionMark UI parts (BlackBars/QuestionMark/Flashing)")
+		return false
+	end
+
+	-- Fire stud burst alongside the intro if the template exists
+	task.spawn(function()
+		StudBurstEmitter.playBurst(gameUI :: ScreenGui)
+	end)
+
+	-- Hide legacy exclamation mark instance if one was passed
+	if _ and typeof(_) == "Instance" then
+		pcall(function()
+			_.Visible = false
+		end)
+	end
+
+	-- Reset all properties to ensure clean animation
+	BlackBars.Visible = true
+	BlackBars.Size = UDim2.fromScale(1, 15)
+
+	QuestionMark.Visible = true
+	QuestionMark.Rotation = 0
+	QuestionMark.Position = UDim2.fromScale(0.5,0.5)
+	QuestionMark.Size = UDim2.fromScale(0, 0)
+
+	Flashing.BackgroundTransparency = 1
+	Flashing.Visible = true
+
+	TweenService:Create(BlackBars, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Size = UDim2.fromScale(1, 10.5) }):Play()
+	TweenService:Create(QuestionMark, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Size = UDim2.fromScale(0.045,0.112) }):Play()
+
+	task.wait(0.65)
+
+	TweenService:Create(QuestionMark, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Size = UDim2.fromScale(0.22,0.467) }):Play()
+	TweenService:Create(QuestionMark, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Rotation = -3 }):Play()
+	TweenService:Create(Flashing, TweenInfo.new(0.45, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { BackgroundTransparency = 0 }):Play()
+	TweenService:Create(BlackBars, TweenInfo.new(2, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Size = UDim2.fromScale(1, 15) }):Play()
+
+	print("question mark animation queued")
+	return true
 end
 
-function UIFunctions:BlackBars(Active: boolean, Blackbars: ImageLabel)
+function UIFunctions:FadeOutExclamationMark(_)
+	print("fading out question mark")
+	
+	-- Let the question mark linger a bit before fading out
+	task.wait(0.8)
+	
+	local pg = PlayerGui or (game.Players.LocalPlayer and game.Players.LocalPlayer:FindFirstChild("PlayerGui"))
+	local gameUI = pg and pg:FindFirstChild("GameUI")
+	if not gameUI then
+		warn("[UIFunctions.FadeOutExclamationMark] GameUI not found; cannot fade question mark")
+		return false
+	end
+
+	local QuestionMark = gameUI:FindFirstChild("QuestionMark")
+	local Flashing = gameUI:FindFirstChild("Flashing")
+	local BlackBars = gameUI:FindFirstChild("BlackBars")
+
+	-- Hide legacy exclamation mark instance if one was passed
+	if _ and typeof(_) == "Instance" then
+		pcall(function()
+			_.Visible = false
+		end)
+	end
+	
+	-- Fade out the question mark UI
+	if QuestionMark then
+		QuestionMark.Visible = false
+		-- Reset to baseline so next run starts from a known state
+		pcall(function()
+			QuestionMark.Size = UDim2.fromScale(0, 0)
+			QuestionMark.Rotation = 0
+			QuestionMark.Position = UDim2.fromScale(0.5, 0.5)
+		end)
+	end
+
+	local FlashTween
+	if Flashing then
+		FlashTween = TweenService:Create(Flashing, TweenInfo.new(0.63, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), { BackgroundTransparency = 1 })
+		FlashTween:Play()
+	end
+	
+	-- Show battle UI (we need to get it from the battle system)
+	local BattleUI = gameUI:FindFirstChild("BattleUI")
+	if BattleUI then
+		BattleUI.Visible = true
+	end
+
+	-- Wait for fade to complete to guarantee sequencing
+	if FlashTween then
+		FlashTween.Completed:Wait()
+	end
+
+	if Flashing then
+		Flashing.Visible = false
+		pcall(function()
+			Flashing.BackgroundTransparency = 1
+		end)
+	end
+
+	task.delay(2, function()
+		if BlackBars then
+			BlackBars.Visible = false
+			pcall(function()
+				BlackBars.Size = UDim2.fromScale(1, 15)
+			end)
+		end
+	end)
+	
+	print("question mark fade out completed")
+	return true
+end
+
+function UIFunctions:BlackBars(Active: boolean, Blackbars: ImageLabel, Timer : number?)
 	if not Blackbars or not Blackbars:IsA("ImageLabel") then return end
+	local timer = Timer or 0.35
 	task.spawn(function()
 		if Active == true then
 			Blackbars.Visible = true
 			Blackbars.Size = UDim2.fromScale(1, 15)
-			TweenService:Create(Blackbars, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Size = UDim2.fromScale(1, 10.5) }):Play()
+			TweenService:Create(Blackbars, TweenInfo.new(timer, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Size = UDim2.fromScale(1, 10.5) }):Play()
 		else
 			Blackbars.Size = UDim2.fromScale(1, 10.5)
-			TweenService:Create(Blackbars, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Size = UDim2.fromScale(1, 15) }):Play()
-			task.wait(0.35)
+			TweenService:Create(Blackbars, TweenInfo.new(timer, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Size = UDim2.fromScale(1, 15) }):Play()
+			task.wait(timer)
 			Blackbars.Visible = false
 		end
 	end)
@@ -352,6 +428,110 @@ function UIFunctions:ShowLocationName(UI: GuiObject, LocationName: string)
 			task.wait(0.02)
 			Which.MaxVisibleGraphemes = count
 		end
+	end)
+end
+
+--[[ 
+	Staggered Fade-In Animation Helper
+	Use this for populating scrolling frames with subtle cascade animations.
+	
+	@param element - The GuiObject to animate
+	@param index - The element's position in the list (1-based)
+	@param options - Optional table with:
+		- staggerDelay: number (default 0.03) - delay between items
+		- fadeTime: number (default 0.15) - duration of fade-in
+		- includeChildren: boolean (default true) - animate child elements too
+]]
+function UIFunctions:AnimateListItem(element: GuiObject, index: number, options: any?)
+	if not element or not element:IsA("GuiObject") then return end
+	
+	local opts = options or {}
+	local staggerDelay = opts.staggerDelay or 0.03
+	local fadeTime = opts.fadeTime or 0.15
+	local includeChildren = opts.includeChildren ~= false
+	
+	-- Start transparent
+	element.BackgroundTransparency = 1
+	
+	-- Make text and images transparent if including children
+	if includeChildren then
+		for _, child in ipairs(element:GetDescendants()) do
+			if child:IsA("TextLabel") or child:IsA("TextButton") then
+				child.TextTransparency = 1
+			elseif child:IsA("ImageLabel") or child:IsA("ImageButton") then
+				child.ImageTransparency = 1
+			end
+		end
+	end
+	
+	-- Staggered animation
+	task.delay(index * staggerDelay, function()
+		if not element or not element.Parent then return end
+		
+		-- Fade in background
+		TweenService:Create(element, TweenInfo.new(fadeTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+			BackgroundTransparency = 0
+		}):Play()
+		
+		if includeChildren then
+			for _, child in ipairs(element:GetDescendants()) do
+				if child:IsA("TextLabel") or child:IsA("TextButton") then
+					TweenService:Create(child, TweenInfo.new(fadeTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+						TextTransparency = 0
+					}):Play()
+				elseif child:IsA("ImageLabel") or child:IsA("ImageButton") then
+					TweenService:Create(child, TweenInfo.new(fadeTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+						ImageTransparency = 0
+					}):Play()
+				end
+			end
+		end
+	end)
+end
+
+--[[
+	Pulse Animation for selection feedback
+	Creates a subtle scale pulse effect on an element
+	
+	@param element - The GuiObject to pulse
+	@param options - Optional table with:
+		- scale: number (default 1.03) - how much to scale up
+		- duration: number (default 0.2) - total pulse duration
+]]
+function UIFunctions:PulseElement(element: GuiObject, options: any?)
+	if not element or not element:IsA("GuiObject") then return end
+	if element:GetAttribute("IsPulsing") then return end
+	
+	element:SetAttribute("IsPulsing", true)
+	
+	local opts = options or {}
+	local scale = opts.scale or 1.03
+	local duration = opts.duration or 0.2
+	
+	local originalSize = element:GetAttribute("OriginalPulseSize") or element.Size
+	element:SetAttribute("OriginalPulseSize", originalSize)
+	
+	local scaledSize = UDim2.new(
+		originalSize.X.Scale * scale, originalSize.X.Offset,
+		originalSize.Y.Scale * scale, originalSize.Y.Offset
+	)
+	
+	local upTime = duration * 0.4
+	local downTime = duration * 0.6
+	
+	local pulseUp = TweenService:Create(element, TweenInfo.new(upTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+		Size = scaledSize
+	})
+	local pulseDown = TweenService:Create(element, TweenInfo.new(downTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+		Size = originalSize
+	})
+	
+	pulseUp:Play()
+	pulseUp.Completed:Connect(function()
+		pulseDown:Play()
+		pulseDown.Completed:Connect(function()
+			element:SetAttribute("IsPulsing", false)
+		end)
 	end)
 end
 

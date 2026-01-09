@@ -7,9 +7,25 @@
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
 local DBG = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("DBG"))
 
 local DayNightCycle = {}
+
+-- Midday time configuration
+local MIDDAY_SECONDS = 12 * 60 * 60 -- 12:00 (noon) in seconds
+
+-- Check if current context should pause the day/night cycle
+local function shouldPauseCycle(): boolean
+	local context = Workspace:GetAttribute("Context")
+	return context == "Trade" or context == "Battle"
+end
+
+-- Force midday lighting
+local function forceMidday()
+	game.Lighting.ClockTime = 12
+	game.Lighting.TimeOfDay = "12:00:00"
+end
 
 -- Time periods
 local TIME_PERIODS = {
@@ -38,13 +54,22 @@ local TimePeriodChanged = Instance.new("BindableEvent")
 function DayNightCycle:Initialize()
 	DBG:print("Initializing Day/Night Cycle system")
 	
-	-- Start the cycle at a random time for variety (0 to 24 hours in seconds)
-	CurrentCycleTime = math.random(0, CYCLE_CONFIG.TOTAL_CYCLE_SECONDS)
-	CurrentPeriod = self:CalculateTimePeriod(CurrentCycleTime)
-	LastPeriod = CurrentPeriod
-	
-	-- Set initial lighting time
-	self:UpdateLightingTime()
+	-- Check if we should pause for Trade/Battle context
+	if shouldPauseCycle() then
+		DBG:print("Day/Night Cycle paused - Context is Trade or Battle, forcing midday")
+		CurrentCycleTime = MIDDAY_SECONDS
+		CurrentPeriod = TIME_PERIODS.DAY
+		LastPeriod = TIME_PERIODS.DAY
+		forceMidday()
+	else
+		-- Start the cycle at a random time for variety (0 to 24 hours in seconds)
+		CurrentCycleTime = math.random(0, CYCLE_CONFIG.TOTAL_CYCLE_SECONDS)
+		CurrentPeriod = self:CalculateTimePeriod(CurrentCycleTime)
+		LastPeriod = CurrentPeriod
+		
+		-- Set initial lighting time
+		self:UpdateLightingTime()
+	end
 	
 	DBG:print("Day/Night Cycle initialized - Current time:", self:GetFormattedTime(), "Period:", CurrentPeriod)
 	DBG:print("Random cycle time:", CurrentCycleTime, "seconds (", math.floor(CurrentCycleTime/3600), "hours", math.floor((CurrentCycleTime%3600)/60), "minutes)")
@@ -72,6 +97,15 @@ function DayNightCycle:StartCycleTimer()
 	task.spawn(function()
 		while true do
 			task.wait(1) -- Update every second
+			
+			-- Skip cycle updates if in Trade or Battle context - force midday instead
+			if shouldPauseCycle() then
+				-- Force midday and keep time locked
+				CurrentCycleTime = MIDDAY_SECONDS
+				CurrentPeriod = TIME_PERIODS.DAY
+				forceMidday()
+				continue
+			end
 			
 			-- Advance time by 1 second
 			CurrentCycleTime = CurrentCycleTime + 1

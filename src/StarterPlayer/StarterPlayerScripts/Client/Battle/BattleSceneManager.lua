@@ -28,6 +28,7 @@ function BattleSceneManager.new(): any
 	self._assets = ReplicatedStorage:WaitForChild("Assets")
 	self._creatureModels = self._assets:WaitForChild("CreatureModels")
 	self._effects = self._assets:FindFirstChild("Effects")
+	self._sfx = self._assets:FindFirstChild("SFX")
 	
 	return self
 end
@@ -184,11 +185,30 @@ function BattleSceneManager:SpawnCreature(
 		self._foeCreatureModel = model
 	end
 	
+	-- Wrap onComplete to add shiny burst effect after spawn
+	local isShiny = creatureData.Shiny == true
+	local wrappedOnComplete = function()
+		-- Play shiny burst effect if creature is shiny (after spawn completes)
+		if isShiny then
+			-- Small delay to ensure model is fully visible
+			task.delay(0.3, function()
+				if model and model.Parent then
+					self:_playShinyBurst(model)
+				end
+			end)
+		end
+		
+		-- Call original callback
+		if onComplete then
+			onComplete()
+		end
+	end
+	
 	-- Spawn with or without hologram
 	if useHologram then
-		self:_spawnWithHologram(model, spawnPoint, onComplete)
+		self:_spawnWithHologram(model, spawnPoint, wrappedOnComplete)
 	else
-		self:_spawnInstant(model, spawnPoint, onComplete)
+		self:_spawnInstant(model, spawnPoint, wrappedOnComplete)
 	end
 	
 	return model
@@ -267,7 +287,22 @@ function BattleSceneManager:Cleanup()
 		print("[BattleSceneManager] Destroyed foe creature model")
 	end
 	
+	-- Clean up spikes before destroying scene
 	if self._currentScene then
+		-- Find and destroy spike containers
+		for _, child in ipairs(self._currentScene:GetChildren()) do
+			if child:IsA("Model") and (child.Name == "Spikes1" or child.Name == "Spikes2") then
+				print("[BattleSceneManager] Destroying spike container:", child.Name)
+				-- Destroy all spikes in the container
+				for _, spike in ipairs(child:GetChildren()) do
+					if spike:IsA("BasePart") then
+						spike:Destroy()
+					end
+				end
+				child:Destroy()
+			end
+		end
+		
 		print("[BattleSceneManager] Destroying battle scene:", self._currentScene.Name)
 		self._currentScene:Destroy()
 		self._currentScene = nil
@@ -359,5 +394,83 @@ end
 	Internal: Adds shiny effect to model
 ]]
 -- Shiny highlight removed in favor of direct recolor
+
+--[[
+	Internal: Plays shiny burst effect for a creature (sparkles + sound)
+	@param model The creature model
+]]
+function BattleSceneManager:_playShinyBurst(model: Model)
+	print("[BattleSceneManager] _playShinyBurst called for:", model and model.Name or "nil")
+	if not model then
+		return
+	end
+	
+	local hrp = model:FindFirstChild("HumanoidRootPart")
+	local primary: BasePart? = (hrp and hrp:IsA("BasePart")) and hrp or model.PrimaryPart
+	if not primary then
+		print("[BattleSceneManager] _playShinyBurst: no primary part found")
+		return
+	end
+	
+	-- Play Shiny SFX if available
+	local sfx = self._sfx
+	if sfx then
+		local shinySound = sfx:FindFirstChild("Shiny")
+		if shinySound and shinySound:IsA("Sound") then
+			print("[BattleSceneManager] Playing shiny sound")
+			shinySound:Play()
+		end
+	end
+	
+	-- Emit shiny effect particles (same approach as CombatEffects:_emitFromTemplate)
+	local effects = self._effects
+	if not effects then
+		return
+	end
+	
+	local shinyTemplate = effects:FindFirstChild("ShinyEffect")
+	if shinyTemplate and shinyTemplate:IsA("BasePart") then
+		print("[BattleSceneManager] Emitting ShinyEffect at:", tostring(primary.CFrame.Position))
+		
+		-- Clone the template part and position it at the creature
+		local clone = shinyTemplate:Clone()
+		clone.Transparency = 1
+		clone.CanCollide = false
+		clone.Anchored = true
+		clone.CFrame = primary.CFrame
+		clone.Parent = workspace
+		
+		-- Emit from all particle emitters in the clone
+		for _, descendant in ipairs(clone:GetDescendants()) do
+			if descendant:IsA("ParticleEmitter") then
+				local emitCountAttr = descendant:GetAttribute("EmitCount")
+				local emitDelayAttr = descendant:GetAttribute("EmitDelay")
+				local count = (typeof(emitCountAttr) == "number" and emitCountAttr) or 30
+				local delaySec = (typeof(emitDelayAttr) == "number" and emitDelayAttr) or 0
+				
+				if delaySec > 0 then
+					task.delay(delaySec, function()
+						if descendant.Parent then
+							descendant:Emit(count)
+						end
+					end)
+				else
+					descendant:Emit(count)
+				end
+			end
+		end
+		
+		-- Cleanup after 3 seconds
+		task.delay(3, function()
+			if clone and clone.Parent then
+				pcall(function()
+					clone:Destroy()
+				end)
+			end
+		end)
+	else
+		print("[BattleSceneManager] _playShinyBurst: ShinyEffect template not found")
+	end
+end
 
 return BattleSceneManager
