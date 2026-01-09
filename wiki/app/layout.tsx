@@ -24,7 +24,7 @@ export default function RootLayout({
         <BackgroundEffects />
         <div className="relative z-20 flex flex-col min-h-screen">
           <FloatingNav />
-          <div className="fixed top-24 right-4 md:right-8 z-40">
+          <div className="fixed top-24 right-4 md:right-8 z-40 hidden md:block">
             <GlobalSearchWrapper />
           </div>
           <main className="flex-grow container mx-auto px-4 pt-32 pb-24 md:pb-8 md:px-6 md:pt-36 lg:px-8 max-w-7xl">

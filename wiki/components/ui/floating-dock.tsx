@@ -73,7 +73,7 @@ const FloatingDockMobile = ({
   variant?: VariantProps<typeof floatingDockVariants>["variant"];
 }) => {
   return (
-    <div className={cn("fixed top-8 left-1/2 transform -translate-x-1/2 z-50 md:hidden", className)}>
+    <div className={cn("fixed top-12 left-1/2 transform -translate-x-1/2 z-50 md:hidden", className)}>
       <div className="flex h-16 gap-3 rounded-2xl border border-gray-200 bg-white px-3 shadow-lg overflow-x-auto scrollbar-hide max-w-[calc(100vw-2rem)]">
         {items.map((item) => (
           <MobileIconContainer key={item.title} {...item} />
