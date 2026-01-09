@@ -73,8 +73,8 @@ const FloatingDockMobile = ({
   variant?: VariantProps<typeof floatingDockVariants>["variant"];
 }) => {
   return (
-    <div className={cn("fixed bottom-0 left-0 right-0 z-50 md:hidden pb-safe", className)}>
-      <div className="mb-4 mx-4 flex h-16 gap-3 rounded-2xl border border-gray-200 bg-white px-3 shadow-lg overflow-x-auto scrollbar-hide">
+    <div className={cn("fixed top-8 left-1/2 transform -translate-x-1/2 z-50 md:hidden", className)}>
+      <div className="flex h-16 gap-3 rounded-2xl border border-gray-200 bg-white px-3 shadow-lg overflow-x-auto scrollbar-hide max-w-[calc(100vw-2rem)]">
         {items.map((item) => (
           <MobileIconContainer key={item.title} {...item} />
         ))}
@@ -105,7 +105,9 @@ function MobileIconContainer({
       onTouchStart={() => setIsHovered(true)}
       onTouchEnd={() => setTimeout(() => setIsHovered(false), 200)}
     >
-      {icon}
+      <div className="flex items-center justify-center h-5 w-5">
+        {icon}
+      </div>
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: isHovered ? 1 : 0, y: isHovered ? 0 : 10 }}
@@ -113,7 +115,7 @@ function MobileIconContainer({
           duration: 0.2,
           ease: [0.4, 0, 0.2, 1],
         }}
-        className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md bg-gray-800 px-3 py-1.5 text-xs font-medium text-white pointer-events-none z-50 shadow-lg"
+        className="absolute top-full mt-2 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md bg-gray-800 px-3 py-1.5 text-xs font-medium text-white pointer-events-none z-50 shadow-lg"
       >
         {title}
       </motion.div>

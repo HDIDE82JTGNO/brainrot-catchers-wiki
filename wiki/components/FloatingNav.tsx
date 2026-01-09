@@ -130,9 +130,18 @@ export function FloatingNav() {
           <FloatingDock items={links} />
         </motion.div>
       </div>
-      {/* Mobile navbar - always render FloatingDock, it handles mobile visibility internally */}
-      <div className="md:hidden">
-        <FloatingDock items={links} />
+      {/* Mobile navbar with same animation and positioning as desktop */}
+      <div className="fixed top-8 left-1/2 transform -translate-x-1/2 z-50 md:hidden">
+        <motion.div 
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{
+            duration: 0.6,
+            ease: [0.4, 0, 0.2, 1],
+          }}
+        >
+          <FloatingDock items={links} />
+        </motion.div>
       </div>
     </>
   );
