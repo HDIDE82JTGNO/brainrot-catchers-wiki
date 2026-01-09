@@ -131,7 +131,7 @@ export function FloatingNav() {
         </motion.div>
       </div>
       {/* Mobile navbar with same animation and positioning as desktop */}
-      <div className="fixed top-12 left-1/2 transform -translate-x-1/2 z-50 md:hidden">
+      <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 md:hidden">
         <motion.div 
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
