@@ -143,6 +143,10 @@ return {
 		HP = 0, Attack = 0, Defense = 0, Speed = 0,
 	}, "When held by a beaked creature, it is said to trigger a mystical event.", "Items", false, false, "rbxassetid://86893072345080"),
 
+	["Shiny Core"] = createItem({
+		HP = 0, Attack = 0, Defense = 0, Speed = 0,
+	}, "A mysterious core that passively increases your chances of encountering shiny creatures. Cannot be held or used.", "Items", false, false, "rbxassetid://0"),
+
 
 	-- 🛡️ Repels
 	["Focus Spray"] = createItem({

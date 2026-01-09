@@ -197,8 +197,15 @@ function CreatureFactory.CreateFromInfo(info: any)
 	local isShiny = false
 	if info.Shiny == true then
 		isShiny = true
-	elseif math.random(1, GameConfig.SHINY_CHANCE) == 1 then
-		isShiny = true
+	else
+		-- Apply shiny chance multiplier if provided (e.g., from Shiny Core item)
+		local shinyChance = GameConfig.SHINY_CHANCE
+		if info.ShinyChanceMultiplier and type(info.ShinyChanceMultiplier) == "number" and info.ShinyChanceMultiplier > 0 then
+			shinyChance = shinyChance / info.ShinyChanceMultiplier
+		end
+		if math.random(1, shinyChance) == 1 then
+			isShiny = true
+		end
 	end
 
 	local natureName = info.Nature or Natures.GetRandomNature()

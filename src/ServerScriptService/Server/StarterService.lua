@@ -62,6 +62,12 @@ function StarterService.RequestStarters(Player: Player)
 	-- Data to send to client
 	local ForClient = {}
 
+	-- Check if player has Shiny Core to apply shiny chance multiplier
+	local shinyChanceMultiplier = 1
+	if PlayerData.Items and (PlayerData.Items["Shiny Core"] or 0) > 0 then
+		shinyChanceMultiplier = 2
+	end
+
 	-- Generate each starter creature
 	for i, info in ipairs(starterInfo) do
 		-- Tag Original Trainer (OT) and catcher name with player's chosen nickname if available
@@ -70,6 +76,10 @@ function StarterService.RequestStarters(Player: Player)
 		info.CaughtBy = caughtByName
 		-- Starter creatures are tradelocked by design
 		info.TradeLocked = true
+		-- Apply shiny chance multiplier if player has Shiny Core
+		if shinyChanceMultiplier > 1 then
+			info.ShinyChanceMultiplier = shinyChanceMultiplier
+		end
 		local creature = CreatureFactory.CreateFromInfo(info)
 		PlayerData.Starters[i] = creature
 

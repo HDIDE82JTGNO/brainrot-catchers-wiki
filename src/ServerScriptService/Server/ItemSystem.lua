@@ -56,6 +56,12 @@ function ItemSystem.GiveItem(Player: Player, payload: any): boolean | string
 		return "Cannot give this item."
 	end
 
+	-- Disallow Shiny Core as held item
+	if itemName == "Shiny Core" then
+		DBG:print("[Server] GiveItem blocked - item is Shiny Core")
+		return "Cannot give this item."
+	end
+
 	-- Validate inventory
 	PlayerData.Items = PlayerData.Items or {}
 	local count = PlayerData.Items[itemName] or 0

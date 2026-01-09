@@ -885,7 +885,12 @@ function ServerFunctions:StartBattle(Player, BattleType, BattleData)
 			isShiny = false
 		else
 			-- No explicit shiny flag, roll randomly (1 in SHINY_CHANCE)
-			isShiny = math.random(1, GameData.Config.SHINY_CHANCE) == 1
+			-- Check if player has Shiny Core to halve the shiny chance
+			local shinyChance = GameData.Config.SHINY_CHANCE
+			if (PlayerData.Items["Shiny Core"] or 0) > 0 then
+				shinyChance = shinyChance / 2
+			end
+			isShiny = math.random(1, shinyChance) == 1
 		end
 		
 		-- Determine gender using species FemaleChance (0 = male, 1 = female)
