@@ -86,13 +86,6 @@ export function FloatingNav() {
       href: "/challenges",
     },
     {
-      title: "Badges",
-      icon: (
-        <IconTrophy className="h-full w-full text-neutral-600" />
-      ),
-      href: "/badges",
-    },
-    {
       title: "Tools",
       icon: (
         <IconChartBar className="h-full w-full text-neutral-600" />
